@@ -1,0 +1,28 @@
+docs_dir: docs
+markdown_extensions:
+    - admonition
+    - tables
+    - toc:
+        permalink: true
+nav:
+    - Home: index.md
+    - ADRs:
+        - Overview: adr/README.md
+        - 'ADR-0001: Separate the Proxmox SDK into its own repository': adr/0001-separate-the-proxmox-sdk-into-its-own-repository.md
+        - 'ADR-0002: Target Proxmox VE 9.x only': adr/0002-target-proxmox-ve-9x-only.md
+    - Design:
+        - Overview: design/README.md
+        - 'DESIGN-0001: Proxmox SDK package layout': design/0001-proxmox-sdk-package-layout.md
+    - Implementation Plans:
+        - Overview: impl/README.md
+        - 'IMPL-0001: Proxmox VE 9.x SDK coverage': impl/0001-proxmox-ve-9x-sdk-coverage.md
+    - Investigations:
+        - Overview: investigation/README.md
+    - Plans:
+        - Overview: plan/README.md
+    - RFCs:
+        - Overview: rfc/README.md
+plugins:
+    - techdocs-core
+site_description: An idiomatic golang sdk for Proxmox
+site_name: proxmox-go-sdk

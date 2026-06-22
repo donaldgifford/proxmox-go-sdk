@@ -1,0 +1,20 @@
+---
+# $schema=https://www.schemastore.org/catalog-info.json
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: proxmox-go-sdk
+  title: proxmox-go-sdk
+  description: An idiomatic golang sdk for Proxmox
+  annotations:
+    backstage.io/source-location: url:https://github.com/donaldgifford/proxmox-go-sdk
+    backstage.io/techdocs-ref: "dir:."
+  tags:
+    - homelab
+    - go
+  namespace: default
+spec:
+  lifecycle: production
+  type: library
+  owner: donaldgifford
+  system: homelab
