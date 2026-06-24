@@ -1,0 +1,8 @@
+# yamlfmt configuration.
+#
+# Mirror the yamllint ignore for mkdocs.yml: it follows MkDocs conventions
+# (4-space nav-sequence indentation) that yamlfmt would otherwise rewrite,
+# producing churn on every `just fmt`. Keep `just fmt` and `just lint` agreed
+# on leaving it alone.
+exclude:
+  - mkdocs.yml
