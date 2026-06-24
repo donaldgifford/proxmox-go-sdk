@@ -108,11 +108,11 @@ The transport and primitives every service hangs off.
 
 #### Tasks
 
-- [ ] `DoRequest(ctx, method, path, req, resp)` + `ExpandPath` path templating
-- [ ] `Connection`: primary endpoint + optional ordered cluster-node failover
+- [x] `DoRequest(ctx, method, path, req, resp)` + `ExpandPath` path templating
+- [x] `Connection`: primary endpoint + optional ordered cluster-node failover
       set (`WithClusterEndpoints`), TLS (self-signed/IP, min-TLS), retry/backoff
       that rotates across nodes
-- [ ] Credentials + precedence: auth-ticket > API token > user/pass; 2 h ticket
+- [x] Credentials + precedence: auth-ticket > API token > user/pass; 2 h ticket
       refresh; CSRF on writes
 - [ ] `version` service: `MinimumProxmoxVersion = 9.0` + `Support*()` per-minor
       gates

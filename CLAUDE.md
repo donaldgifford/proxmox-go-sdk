@@ -142,7 +142,10 @@ layers.
 
 Phase 1 (foundation) is underway — track progress in IMPL-0001's checkboxes.
 Build order is dependency-driven: `types`+`pverr` → `api` → `version`+`tasks` →
-`mockpve` → root `proxmox` → doc.go promotion.
+`mockpve` → root `proxmox` → doc.go promotion. **Landed so far:** `types`
+(`PVEBool`, ID/ref primitives), `pverr` (error taxonomy + `Classify`), and `api`
+(transport `DoRequest`/`ExpandPath`, sticky cluster failover, the three
+`Credentials` strategies). Next: `version`, `tasks`.
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:
@@ -188,6 +191,14 @@ environment.** This shapes how we test and what "done" means:
   URLs. The `gitea_urls` block in `.goreleaser.yml` is commented by default —
   uncomment for Forgejo releases, and ensure `GITEA_TOKEN` is set in repo
   Secrets (PAT with `write:repository`).
+- **Test-writing lint rules** (lots of `_test.go` files land this phase, so bake
+  these in up front): `golangci-lint`'s `noctx` rejects bare
+  `httptest.NewRequest` — use
+  `httptest.NewRequestWithContext(context.Background(), …)`. `gocritic`'s
+  `httpNoBody` rejects a `nil` request body — pass `http.NoBody`. `revive` flags
+  unused method receivers and unused func params: drop the receiver name
+  (`func (*T) m()`) and rename unused handler params to `_`
+  (`func(w http.ResponseWriter, _ *http.Request)`).
 
 ## Renovate
 
