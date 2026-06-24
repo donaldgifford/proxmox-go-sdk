@@ -110,9 +110,10 @@ layers.
 - **`internal/` is for unexported helpers, NOT the SDK surface.** This is a
   library: the per-domain services (`proxmox/qemu`, `proxmox/storage`, …) are
   **public** so consumers can import them. `proxmox/internal/` holds only things
-  consumers must not depend on (the `0/1`→bool helper, marshalling, log
-  redaction). Do not bury service code in `internal/` — that would wall off the
-  entire SDK. (This reverses the binary-template default.)
+  consumers must not depend on (marshalling helpers, log redaction). The
+  `0/1`→bool type is **public** — `types.PVEBool` — since consumers embed it in
+  config structs. Do not bury service code in `internal/` — that would wall off
+  the entire SDK. (This reverses the binary-template default.)
 - **`go.mod` go directive matches `mise.toml`** (currently `go 1.26.4`). Bump
   both together — Renovate's Go updater handles `go.mod`; bump `mise.toml` in
   the same commit.
@@ -129,12 +130,36 @@ layers.
   run every exported op against `mockpve`. Integration tests that need a live
   9.x node go under `//go:build integration` and run via
   `go test -tags=integration ./...`.
-- **Errors wrap with `%w`** and resolve to the SDK's error taxonomy
-  (`*proxmox.Error` + sentinels like `ErrNotFound`, `ErrTaskFailed`,
-  `ErrUnsupported`). Consumers branch with `errors.Is` / `errors.As`
-  (DESIGN-0001).
+- **Errors wrap with `%w`** and resolve to the SDK's error taxonomy in
+  `proxmox/pverr` (`*pverr.Error` + sentinels like `pverr.ErrNotFound`,
+  `pverr.ErrTaskFailed`, `pverr.ErrUnsupported`). Classification (HTTP status →
+  sentinel) lives in `pverr.Classify`; the transport calls it. Consumers branch
+  with `errors.Is` / `errors.As` (DESIGN-0001 / OQ-1).
 - **`context.Context` is the first arg of every operation.** No background work
   the caller can't cancel; one `*Client` is safe for concurrent use.
+
+## Implementation status & testing reality
+
+Phase 1 (foundation) is underway — track progress in IMPL-0001's checkboxes.
+Build order is dependency-driven: `types`+`pverr` → `api` → `version`+`tasks` →
+`mockpve` → root `proxmox` → doc.go promotion.
+
+**No live PVE node and no recorded `go-vcr` cassettes exist in this dev
+environment.** This shapes how we test and what "done" means:
+
+- Unit tests run against an in-process `mockpve` responder +
+  `net/http/httptest`, not real cassettes. The recorded-corpus →
+  fuzzed-`mockpve` pipeline (OQ-4/5/10) is a capture step deferred until a live
+  9.x node is reachable; `mockpve` is built so that corpus can seed it later
+  without redesign.
+- Integration tests live behind `//go:build integration`, read the node from
+  `PVE_ENDPOINT` / `PVE_TOKEN_ID` / `PVE_TOKEN_SECRET`, and are **not runnable
+  here**. Never claim a phase's live-only Success Criteria pass when they cannot
+  be verified — mark them written-but-unverified instead.
+- Working definition of "done" for a task in this environment: typed op exists,
+  `go build ./...` is clean, it is unit-tested against `mockpve`, and
+  `just lint`
+  - `just test` are green.
 
 ## CI matrix
 

@@ -118,8 +118,8 @@ The transport and primitives every service hangs off.
       gates
 - [ ] `tasks`: UPID parse, `WaitForTask` / `WaitForStatus` waiters, task-log
       read
-- [ ] `0`/`1` → bool handling, typed error taxonomy
-      (NotFound/Conflict/AuthExpired/TaskFailed/Transient)
+- [x] `0`/`1` → bool handling (`types.PVEBool`), typed error taxonomy (`pverr`:
+      NotFound/Conflict/AuthExpired/TaskFailed/Transient/…)
 - [ ] `mockpve` server + mockable interfaces; functional options
       (`WithLogger`/`WithCache`/`WithHTTPClient`/`WithTLS`)
 - [ ] Root `proxmox` package: `NewClient` (seeds `Capabilities` from `/version`,
