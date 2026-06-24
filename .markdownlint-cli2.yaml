@@ -1,3 +1,4 @@
+---
 # markdownlint-cli2 runner options. Lint *rules* live in .markdownlint.yaml
 # (this file only scopes which files are linted).
 #
