@@ -1,15 +1,21 @@
 ---
 # $schema=https://goreleaser.com/static/schema.json
-# goreleaser config for proxmox-go-sdk
+# goreleaser config for proxmox-go-sdk.
+#
+# The SDK itself is a Go library — it is "released" by the git tag alone
+# (consumers `go get` a pinned tag; there is no binary to ship). goreleaser here
+# builds and publishes only the mockpve test-helper server (cmd/mockpve), plus
+# checksums/SBOM/signatures for it.
+#
 # Triggered by .forgejo/workflows/release.yml or .github/workflows/release.yml on tag push.
 version: 2
 
 project_name: proxmox-go-sdk
 
 builds:
-  - id: proxmox-go-sdk
-    main: ./cmd/proxmox-go-sdk
-    binary: proxmox-go-sdk
+  - id: mockpve
+    main: ./cmd/mockpve
+    binary: mockpve
     env:
       - CGO_ENABLED=0
     flags:
@@ -28,7 +34,7 @@ builds:
 
 archives:
   - id: default
-    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "mockpve_{{ .Os }}_{{ .Arch }}"
     formats: ["tar.gz"]
     files:
       - none*
@@ -85,14 +91,20 @@ release:
   header: |
     ## Release {{ .Tag }} ({{ .Date }})
 
-    ### Installation
+    Use the SDK as a Go module:
 
-    #### Linux/macOS (Manual)
     ```bash
-    # Download the appropriate binary for your system
-    # Extract and move to your PATH
-    tar -xzf proxmox-go-sdk*.tar.gz
-    mv proxmox-go-sdk ~/.local/bin/
+    go get github.com/donaldgifford/proxmox-go-sdk/proxmox@{{ .Tag }}
+    ```
+
+    ### mockpve test-helper server (optional)
+
+    The archives below contain only `mockpve`, the in-memory PVE responder for
+    consumer integration tests:
+
+    ```bash
+    tar -xzf mockpve_*.tar.gz
+    mv mockpve ~/.local/bin/
     ```
 
   footer: |
