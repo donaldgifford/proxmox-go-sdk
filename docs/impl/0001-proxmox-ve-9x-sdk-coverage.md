@@ -114,7 +114,7 @@ The transport and primitives every service hangs off.
       that rotates across nodes
 - [x] Credentials + precedence: auth-ticket > API token > user/pass; 2 h ticket
       refresh; CSRF on writes
-- [ ] `version` service: `MinimumProxmoxVersion = 9.0` + `Support*()` per-minor
+- [x] `version` service: `MinimumProxmoxVersion = 9.0` + `Support*()` per-minor
       gates
 - [ ] `tasks`: UPID parse, `WaitForTask` / `WaitForStatus` waiters, task-log
       read

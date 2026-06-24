@@ -145,7 +145,9 @@ Build order is dependency-driven: `types`+`pverr` → `api` → `version`+`tasks
 `mockpve` → root `proxmox` → doc.go promotion. **Landed so far:** `types`
 (`PVEBool`, ID/ref primitives), `pverr` (error taxonomy + `Classify`), and `api`
 (transport `DoRequest`/`ExpandPath`, sticky cluster failover, the three
-`Credentials` strategies). Next: `version`, `tasks`.
+`Credentials` strategies), and `version` (`Capabilities` snapshot, `AtLeast` +
+named per-minor gates, `Service` that fetches `/version` and enforces the 9.0
+floor). Next: `tasks`.
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:
