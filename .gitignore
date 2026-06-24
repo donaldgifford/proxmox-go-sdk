@@ -56,3 +56,7 @@ dist/
 
 # donald-loop runtime state
 .claude/donald-loop.local.md
+
+# Old docs
+START.md
+docs/PE*

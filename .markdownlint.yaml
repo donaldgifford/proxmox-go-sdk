@@ -1,4 +1,5 @@
 ---
+# $schema=https://www.schemastore.org/markdownlint-config-schema.json
 # https://github.com/DavidAnson/markdownlint
 #
 # Unordered list style
@@ -38,6 +39,14 @@ MD013: false
 #   code_blocks: false
 #   headings: false
 #   tables: false
+
+# Multiple headings with the same content
+# siblings_only lets repeated subsection headings (e.g. a "Tasks" /
+# "Success Criteria" pair under each phase) pass, while still catching true
+# duplicates under the same parent.
+# https://github.com/DavidAnson/markdownlint/blob/main/doc/md024.md
+MD024:
+  siblings_only: true
 
 # Spaces after list markers
 # Disabled this because of confluence formatting

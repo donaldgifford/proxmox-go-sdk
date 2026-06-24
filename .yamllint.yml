@@ -46,7 +46,14 @@ rules:
     min-spaces-inside: 0
     max-spaces-inside: 1
 
+# Paths yamllint shouldn't police:
+# - mkdocs.yml: MkDocs conventions (4-space nav indentation, no `---` marker)
+# - {.forgejo,.github}/workflows/: Actions workflows — linted by actionlint,
+#   which understands the `on:`-trigger empty-value keys yamllint rejects
 ignore: |-
   node_modules/
   vendor/
   .git/
+  mkdocs.yml
+  .forgejo/workflows/
+  .github/workflows/
