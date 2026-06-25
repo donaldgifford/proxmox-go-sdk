@@ -116,7 +116,7 @@ The transport and primitives every service hangs off.
       refresh; CSRF on writes
 - [x] `version` service: `MinimumProxmoxVersion = 9.0` + `Support*()` per-minor
       gates
-- [ ] `tasks`: UPID parse, `WaitForTask` / `WaitForStatus` waiters, task-log
+- [x] `tasks`: UPID parse, `WaitForTask` / `WaitForStatus` waiters, task-log
       read
 - [x] `0`/`1` → bool handling (`types.PVEBool`), typed error taxonomy (`pverr`:
       NotFound/Conflict/AuthExpired/TaskFailed/Transient/…)
