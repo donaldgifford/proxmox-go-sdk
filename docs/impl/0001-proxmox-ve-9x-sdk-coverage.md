@@ -120,7 +120,7 @@ The transport and primitives every service hangs off.
       read
 - [x] `0`/`1` → bool handling (`types.PVEBool`), typed error taxonomy (`pverr`:
       NotFound/Conflict/AuthExpired/TaskFailed/Transient/…)
-- [ ] `mockpve` server + mockable interfaces; functional options
+- [x] `mockpve` server + mockable interfaces; functional options
       (`WithLogger`/`WithCache`/`WithHTTPClient`/`WithTLS`)
 - [ ] Root `proxmox` package: `NewClient` (seeds `Capabilities` from `/version`,
       rejects < 9.0) + `Client` accessors + functional options; placement of
