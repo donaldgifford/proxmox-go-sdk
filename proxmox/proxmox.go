@@ -6,6 +6,7 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/lxc"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/qemu"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/storage"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/tasks"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/version"
 )
@@ -77,4 +78,11 @@ func (c *Client) QEMU(node string) *qemu.Service {
 // the client's transport and capability snapshot and is safe for concurrent use.
 func (c *Client) LXC(node string) *lxc.Service {
 	return lxc.NewService(c.api, node, c.caps)
+}
+
+// Storage returns the storage service. It is not node-scoped: datastore
+// configuration is cluster-wide and node-scoped operations take a node
+// argument. It shares the client's transport and capability snapshot.
+func (c *Client) Storage() *storage.Service {
+	return storage.NewService(c.api, c.caps)
 }

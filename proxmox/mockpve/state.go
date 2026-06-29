@@ -17,6 +17,7 @@ type state struct {
 	users   map[string]string       // username -> password, for /access/ticket
 	qemu    qemuState
 	lxc     lxcState
+	storage storageState
 }
 
 // versionData backs GET /version.

@@ -15,6 +15,9 @@ const (
 	msgNoSuchVM     = "no such VM"
 	msgInvalidVMID  = "invalid vmid"
 	msgInvalidForm  = "invalid form body"
+
+	msgNoSuchStorage = "no such storage"
+	msgNoSuchVolume  = "no such volume"
 )
 
 // qemuPowerStatus maps a /status/{action} verb to the run state the mock VM

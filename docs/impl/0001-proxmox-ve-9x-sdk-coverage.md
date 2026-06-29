@@ -174,7 +174,7 @@ The transport and primitives every service hangs off.
 
 #### Tasks
 
-- [ ] Datastore list + status; content listing (volumes, ISOs, templates,
+- [x] Datastore list + status; content listing (volumes, ISOs, templates,
       backups)
 - [ ] Volume create/resize/delete/move
 - [ ] **Snapshots as volume chains** on thick-LVM + Directory/NFS/CIFS
