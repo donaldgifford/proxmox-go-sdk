@@ -19,7 +19,13 @@
 // model yet. Config reads are lossless: keys outside the typed set land in
 // Config.Extra.
 //
-// Power, migration, snapshot, and guest-agent operations land in later tasks of
-// the same phase. See docs/design/0001-proxmox-sdk-package-layout.md and
+// Beyond CRUD the Service covers the full VM lifecycle: power transitions
+// (Start/Stop/Shutdown/Reboot/Suspend/Resume, with per-op options such as
+// WithStopTimeout), live and offline Migrate, disk and NIC add/resize/remove,
+// snapshots (Snapshots/CreateSnapshot/RollbackSnapshot/DeleteSnapshot), and the
+// guest agent (AgentPing/AgentExec/AgentExecStatus/AgentExecWait). See the
+// package Example for a runnable clone → start flow.
+//
+// See docs/design/0001-proxmox-sdk-package-layout.md and
 // docs/impl/0001-proxmox-ve-9x-sdk-coverage.md.
 package qemu

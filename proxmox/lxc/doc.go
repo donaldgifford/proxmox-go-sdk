@@ -24,7 +24,15 @@
 // model yet (mount points, raw lxc.* entries, …). Config reads are lossless:
 // keys outside the typed set land in Config.Extra.
 //
-// Snapshots and OCI-template creation land in later tasks of the same phase. See
-// docs/design/0001-proxmox-sdk-package-layout.md and
+// Beyond CRUD the Service covers the container lifecycle: power transitions
+// (Start/Stop/Shutdown/Reboot/Suspend/Resume, with per-op options such as
+// WithStopTimeout) and snapshots
+// (Snapshots/CreateSnapshot/RollbackSnapshot/DeleteSnapshot, which require a
+// ZFS/btrfs/LVM-thin backing store). PullOCITemplate pulls an OCI image as a
+// container template; it is gated on PVE 9.1 and returns a
+// pverr.ErrUnsupported-wrapped error on older nodes. See the package Example
+// for a runnable create → start flow.
+//
+// See docs/design/0001-proxmox-sdk-package-layout.md and
 // docs/impl/0001-proxmox-ve-9x-sdk-coverage.md.
 package lxc

@@ -251,7 +251,14 @@ signature shows — the structs exceed gocritic's `hugeParam` 80-byte threshold,
 and pointer-passing is exactly Uber's "pass large structs by pointer". The
 `API`-interface-in-the-implementing-package choice is intentional (DESIGN-0001
 pins it as the test-double seam, mirroring `api.Client`), not a stutter to fix.
-Next: Phase 2 task 9 (promote qemu+lxc doc.go with runnable Examples).
+**Doc Examples** (task 9): each service package carries a runnable package-level
+`Example` in `example_test.go`, wired through `proxmox.NewClient` against a
+`mockpve.Serve()` URL with an `// Output:` block (the Phase 1 convention) — qemu
+shows clone → start, lxc shows create → start. They are documentation _and_
+tests. The qemu/lxc `doc.go` overviews are promoted to describe the full landed
+surface (no more "lands in a later task" stubs). Next: verify Phase 2 Success
+Criteria (create→start→snapshot→rollback→stop→delete end-to-end), then Phase 3
+(storage).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:
