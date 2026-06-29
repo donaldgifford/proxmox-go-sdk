@@ -39,11 +39,20 @@ type qemuState struct {
 // values a Config read returns; values are Go-typed so they marshal back as the
 // JSON types the SDK's typed fields expect.
 type vmRecord struct {
-	VMID   int
-	Node   string
-	Name   string
-	Status string
-	Config map[string]any
+	VMID      int
+	Node      string
+	Name      string
+	Status    string
+	Config    map[string]any
+	Snapshots map[string]*snapRecord // keyed by snapshot name.
+}
+
+// snapRecord models one VM snapshot in the mock.
+type snapRecord struct {
+	Name        string
+	Description string
+	VMState     bool
+	SnapTime    int64
 }
 
 // qemuListEntry is one element of GET /nodes/{node}/qemu.
@@ -60,6 +69,14 @@ type qemuStatusPayload struct {
 	Status string `json:"status"`
 }
 
+// qemuSnapshotPayload is one element of GET /nodes/{node}/qemu/{vmid}/snapshot.
+type qemuSnapshotPayload struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	VMState     int    `json:"vmstate,omitempty"`
+	SnapTime    int64  `json:"snaptime,omitempty"`
+}
+
 // AddVM seeds a VM on node with the given name and status ("stopped" or
 // "running"). The node need not be registered first. Call before serving.
 func (s *Server) AddVM(node string, vmid int, name, status string) {
@@ -72,11 +89,12 @@ func (s *Server) AddVM(node string, vmid int, name, status string) {
 		s.st.qemu.vms[node] = make(map[int]*vmRecord)
 	}
 	s.st.qemu.vms[node][vmid] = &vmRecord{
-		VMID:   vmid,
-		Node:   node,
-		Name:   name,
-		Status: status,
-		Config: make(map[string]any),
+		VMID:      vmid,
+		Node:      node,
+		Name:      name,
+		Status:    status,
+		Config:    make(map[string]any),
+		Snapshots: make(map[string]*snapRecord),
 	}
 }
 
@@ -138,6 +156,10 @@ func (s *Server) registerQEMURoutes() {
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/status/{action}", s.handleQEMUPower)
 	s.mux.HandleFunc("PUT /api2/json/nodes/{node}/qemu/{vmid}/resize", s.handleQEMUResize)
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/migrate", s.handleQEMUMigrate)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/qemu/{vmid}/snapshot", s.handleQEMUSnapshotList)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/snapshot", s.handleQEMUSnapshotCreate)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/snapshot/{snap}/rollback", s.handleQEMUSnapshotRollback)
+	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/qemu/{vmid}/snapshot/{snap}", s.handleQEMUSnapshotDelete)
 }
 
 func (s *Server) handleQEMUList(w http.ResponseWriter, r *http.Request) {
@@ -396,6 +418,134 @@ func (s *Server) handleQEMUMigrate(w http.ResponseWriter, r *http.Request) {
 	}
 	// The migration task runs on the source node.
 	s.writeData(w, s.finishedTask(node, "qmigrate", strconv.Itoa(vmid)))
+}
+
+func (s *Server) handleQEMUSnapshotList(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	s.st.mu.Lock()
+	rec := s.lookupVM(node, vmid)
+	var snaps []qemuSnapshotPayload
+	if rec != nil {
+		snaps = make([]qemuSnapshotPayload, 0, len(rec.Snapshots)+1)
+		for _, snap := range rec.Snapshots {
+			vmstate := 0
+			if snap.VMState {
+				vmstate = 1
+			}
+			snaps = append(snaps, qemuSnapshotPayload{
+				Name:        snap.Name,
+				Description: snap.Description,
+				VMState:     vmstate,
+				SnapTime:    snap.SnapTime,
+			})
+		}
+		// PVE always appends a synthetic "current" entry for the live state.
+		snaps = append(snaps, qemuSnapshotPayload{Name: "current", Description: "You are here!"})
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	s.writeData(w, snaps)
+}
+
+func (s *Server) handleQEMUSnapshotCreate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if perr := r.ParseForm(); perr != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	name := r.PostForm.Get("snapname")
+	if name == "" {
+		s.writeError(w, http.StatusBadRequest, "missing snapname")
+		return
+	}
+
+	s.st.mu.Lock()
+	rec := s.lookupVM(node, vmid)
+	if rec != nil {
+		rec.Snapshots[name] = &snapRecord{
+			Name:        name,
+			Description: r.PostForm.Get("description"),
+			VMState:     r.PostForm.Get("vmstate") == "1",
+		}
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	s.writeData(w, s.finishedTask(node, "qmsnapshot", strconv.Itoa(vmid)))
+}
+
+func (s *Server) handleQEMUSnapshotRollback(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node, vmid, ok := s.snapshotTarget(w, r)
+	if !ok {
+		return
+	}
+	s.writeData(w, s.finishedTask(node, "qmrollback", strconv.Itoa(vmid)))
+}
+
+func (s *Server) handleQEMUSnapshotDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node, vmid, ok := s.snapshotTarget(w, r)
+	if !ok {
+		return
+	}
+	name := r.PathValue("snap")
+	s.st.mu.Lock()
+	if rec := s.lookupVM(node, vmid); rec != nil {
+		delete(rec.Snapshots, name)
+	}
+	s.st.mu.Unlock()
+	s.writeData(w, s.finishedTask(node, "qmdelsnapshot", strconv.Itoa(vmid)))
+}
+
+// snapshotTarget resolves and validates the {node}/{vmid}/{snap} of a snapshot
+// sub-request, writing the appropriate error and returning ok=false on failure.
+func (s *Server) snapshotTarget(w http.ResponseWriter, r *http.Request) (node string, vmid int, ok bool) {
+	node = r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return "", 0, false
+	}
+	name := r.PathValue("snap")
+	s.st.mu.Lock()
+	rec := s.lookupVM(node, vmid)
+	hasSnap := false
+	if rec != nil {
+		_, hasSnap = rec.Snapshots[name]
+	}
+	s.st.mu.Unlock()
+	if rec == nil || !hasSnap {
+		s.writeError(w, http.StatusNotFound, "no such snapshot")
+		return "", 0, false
+	}
+	return node, vmid, true
 }
 
 // finishedTask records a synthetic task that is already complete with exit

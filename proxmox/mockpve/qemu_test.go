@@ -191,6 +191,51 @@ func TestQEMUPowerUnknownAction(t *testing.T) {
 	}
 }
 
+func TestQEMUSnapshots(t *testing.T) {
+	mock := mockpve.New()
+	mock.AddVM("pve", 100, "box", "running")
+	c, cleanup := mock.NewClient()
+	defer cleanup()
+	ctx := context.Background()
+
+	var upid string
+	body := url.Values{"snapname": {"snap1"}, "vmstate": {"1"}}
+	if err := c.DoRequest(ctx, http.MethodPost, "/nodes/pve/qemu/100/snapshot", body, &upid); err != nil {
+		t.Fatalf("create snapshot: %v", err)
+	}
+
+	var snaps []struct {
+		Name string `json:"name"`
+	}
+	if err := c.DoRequest(ctx, http.MethodGet, "/nodes/pve/qemu/100/snapshot", nil, &snaps); err != nil {
+		t.Fatalf("list snapshots: %v", err)
+	}
+	// snap1 plus the synthetic "current".
+	if len(snaps) != 2 {
+		t.Errorf("snapshot list = %+v, want snap1 + current", snaps)
+	}
+
+	if err := c.DoRequest(ctx, http.MethodPost, "/nodes/pve/qemu/100/snapshot/snap1/rollback", url.Values{}, &upid); err != nil {
+		t.Fatalf("rollback: %v", err)
+	}
+	if err := c.DoRequest(ctx, http.MethodDelete, "/nodes/pve/qemu/100/snapshot/snap1", nil, &upid); err != nil {
+		t.Fatalf("delete snapshot: %v", err)
+	}
+}
+
+func TestQEMUSnapshotRollbackUnknown(t *testing.T) {
+	mock := mockpve.New()
+	mock.AddVM("pve", 100, "box", "running")
+	c, cleanup := mock.NewClient()
+	defer cleanup()
+
+	var upid string
+	err := c.DoRequest(context.Background(), http.MethodPost, "/nodes/pve/qemu/100/snapshot/ghost/rollback", url.Values{}, &upid)
+	if !errors.Is(err, pverr.ErrNotFound) {
+		t.Errorf("rollback of unknown snapshot = %v, want ErrNotFound", err)
+	}
+}
+
 func TestQEMUResize(t *testing.T) {
 	mock := mockpve.New()
 	mock.AddVM("pve", 100, "box", "stopped")

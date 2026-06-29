@@ -519,6 +519,98 @@ func TestMigrateValidation(t *testing.T) {
 	}
 }
 
+// hasSnapshot reports whether the list contains a snapshot named want.
+func hasSnapshot(snaps []qemu.Snapshot, want string) bool {
+	for _, s := range snaps {
+		if s.Name == want {
+			return true
+		}
+	}
+	return false
+}
+
+func TestSnapshotLifecycle(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "box", "running")
+	svc, ts := newServices(t, mock)
+	ctx := context.Background()
+
+	ref, err := svc.CreateSnapshot(ctx, 100, &qemu.SnapshotSpec{
+		Name:        "before-upgrade",
+		Description: "pre-change checkpoint",
+		VMState:     true,
+	})
+	if err != nil {
+		t.Fatalf("CreateSnapshot: %v", err)
+	}
+	awaitOK(t, ts, ref)
+
+	snaps, err := svc.Snapshots(ctx, 100)
+	if err != nil {
+		t.Fatalf("Snapshots: %v", err)
+	}
+	if !hasSnapshot(snaps, "before-upgrade") {
+		t.Fatalf("snapshots %+v missing before-upgrade", snaps)
+	}
+	if !hasSnapshot(snaps, "current") {
+		t.Errorf("snapshots %+v missing the synthetic current entry", snaps)
+	}
+
+	rbRef, err := svc.RollbackSnapshot(ctx, 100, "before-upgrade", qemu.WithStartAfterRollback())
+	if err != nil {
+		t.Fatalf("RollbackSnapshot: %v", err)
+	}
+	awaitOK(t, ts, rbRef)
+
+	delRef, err := svc.DeleteSnapshot(ctx, 100, "before-upgrade")
+	if err != nil {
+		t.Fatalf("DeleteSnapshot: %v", err)
+	}
+	awaitOK(t, ts, delRef)
+
+	snaps, err = svc.Snapshots(ctx, 100)
+	if err != nil {
+		t.Fatalf("Snapshots after delete: %v", err)
+	}
+	if hasSnapshot(snaps, "before-upgrade") {
+		t.Errorf("snapshot before-upgrade still present after delete: %+v", snaps)
+	}
+}
+
+func TestSnapshotValidation(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "box", "stopped")
+	svc, _ := newServices(t, mock)
+	ctx := context.Background()
+
+	if _, err := svc.CreateSnapshot(ctx, 100, nil); err == nil {
+		t.Error("CreateSnapshot(nil) error = nil, want non-nil")
+	}
+	if _, err := svc.CreateSnapshot(ctx, 100, &qemu.SnapshotSpec{}); err == nil {
+		t.Error("CreateSnapshot(no name) error = nil, want non-nil")
+	}
+	if _, err := svc.RollbackSnapshot(ctx, 100, ""); err == nil {
+		t.Error("RollbackSnapshot(no name) error = nil, want non-nil")
+	}
+	if _, err := svc.DeleteSnapshot(ctx, 100, ""); err == nil {
+		t.Error("DeleteSnapshot(no name) error = nil, want non-nil")
+	}
+}
+
+func TestRollbackUnknownSnapshot(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "box", "running")
+	svc, _ := newServices(t, mock)
+
+	_, err := svc.RollbackSnapshot(context.Background(), 100, "ghost")
+	if !errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("RollbackSnapshot(ghost) error = %v, want ErrNotFound", err)
+	}
+}
+
 // TestCreateWithExtra exercises the unmodelled-param escape hatch end to end.
 func TestCreateWithExtra(t *testing.T) {
 	t.Parallel()

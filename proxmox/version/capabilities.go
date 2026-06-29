@@ -78,6 +78,10 @@ func (c Capabilities) DynamicLoadBalancer() bool { return c.AtLeast(9, 2) }
 // OCITemplates gates pulling OCI images as LXC templates (9.1+).
 func (c Capabilities) OCITemplates() bool { return c.AtLeast(9, 1) }
 
+// TPMStateSnapshots gates snapshotting a VM's TPM state on file-based storage
+// (NFS/CIFS/directory) (9.1+).
+func (c Capabilities) TPMStateSnapshots() bool { return c.AtLeast(9, 1) }
+
 // TokenSecretRotation gates regenerating an API token secret in place (9.2+).
 func (c Capabilities) TokenSecretRotation() bool { return c.AtLeast(9, 2) }
 

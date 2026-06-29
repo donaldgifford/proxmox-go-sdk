@@ -55,6 +55,12 @@ type API interface {
 	AddNIC(ctx context.Context, vmid int, spec *NICSpec) (tasks.Ref, error)
 	RemoveNIC(ctx context.Context, vmid int, slot string) (tasks.Ref, error)
 	Migrate(ctx context.Context, vmid int, spec *MigrateSpec) (tasks.Ref, error)
+
+	// Snapshots.
+	Snapshots(ctx context.Context, vmid int) ([]Snapshot, error)
+	CreateSnapshot(ctx context.Context, vmid int, spec *SnapshotSpec) (tasks.Ref, error)
+	RollbackSnapshot(ctx context.Context, vmid int, name string, opts ...RollbackOption) (tasks.Ref, error)
+	DeleteSnapshot(ctx context.Context, vmid int, name string) (tasks.Ref, error)
 }
 
 // Compile-time assertion that *Service implements the full contract.

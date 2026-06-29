@@ -77,10 +77,11 @@ func TestGates(t *testing.T) {
 		dlb bool // DynamicLoadBalancer 9.2+
 		oci bool // OCITemplates 9.1+
 		tsr bool // TokenSecretRotation 9.2+
+		tpm bool // TPMStateSnapshots 9.1+
 	}{
-		{ver: "9.0.0", dlb: false, oci: false, tsr: false},
-		{ver: "9.1.0", dlb: false, oci: true, tsr: false},
-		{ver: "9.2.0", dlb: true, oci: true, tsr: true},
+		{ver: "9.0.0", dlb: false, oci: false, tsr: false, tpm: false},
+		{ver: "9.1.0", dlb: false, oci: true, tsr: false, tpm: true},
+		{ver: "9.2.0", dlb: true, oci: true, tsr: true, tpm: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.ver, func(t *testing.T) {
@@ -93,6 +94,9 @@ func TestGates(t *testing.T) {
 			}
 			if got := caps.TokenSecretRotation(); got != tt.tsr {
 				t.Errorf("TokenSecretRotation() = %v, want %v", got, tt.tsr)
+			}
+			if got := caps.TPMStateSnapshots(); got != tt.tpm {
+				t.Errorf("TPMStateSnapshots() = %v, want %v", got, tt.tpm)
 			}
 		})
 	}
