@@ -140,27 +140,31 @@ layers.
 
 ## Implementation status & testing reality
 
-Phase 1 (foundation) is underway — track progress in IMPL-0001's checkboxes.
-Build order is dependency-driven: `types`+`pverr` → `api` → `version`+`tasks` →
-`mockpve` → root `proxmox` → doc.go promotion. **Landed so far:** `types`
-(`PVEBool`, ID/ref primitives), `pverr` (error taxonomy + `Classify`), and `api`
-(transport `DoRequest`/`ExpandPath`, sticky cluster failover, the three
-`Credentials` strategies), and `version` (`Capabilities` snapshot, `AtLeast` +
-named per-minor gates, `Service` that fetches `/version` and enforces the 9.0
-floor), and `tasks` (UPID parse, `Status`/`Log` reads, `Wait`/`WaitFor` backoff
-waiters that surface `pverr.ErrTaskFailed` with the log tail), and `mockpve`
-(in-memory PVE responder: an `http.Handler` serving the envelope for `/version`,
-`/access/ticket`, and task status/log; `New` + `Seed`/`Add`/`Finish` methods +
-the four options; `mock.NewClient()` returns a wired `api.Client` + cleanup;
-`RegisterHandler`/`WithCache` are the seams for later services + the recorded
-corpus), and the root `proxmox` client (`NewClient` builds the transport, seeds
-`Capabilities` from `/version` rejecting < 9.0, exposes
-`API`/`Version`/`Capabilities`/`Tasks` accessors + functional options that adapt
-to `api.TransportOption`s; per-service accessors land with their services). Two
-deliberate deviations from DESIGN-0001: `WithCache` is deferred (nothing
-consumes a cache yet) and `Tasks()` takes no node (the `tasks.Ref` carries it).
-Next: finish `doc.go` promotion (`types`, `pverr`) + runnable `Example`s (task
-9).
+**Phase 1 (foundation) is implementation-complete** — all 9 tasks checked in
+IMPL-0001. The build order was `types`+`pverr` → `api` → `version`+`tasks` →
+`mockpve` → root `proxmox` → doc.go promotion + runnable Examples. `go build`,
+`just lint`, and `just test` (race) are green; every package is doc-promoted and
+`go doc ./...` renders cleanly. The phase's two **live-only** Success Criteria
+(version round-trip + waiters against a real 9.x node) are mock-verified only —
+written-but-unverified here. Next: **Phase 2 (compute — QEMU + LXC)**. **Landed
+so far:** `types` (`PVEBool`, ID/ref primitives), `pverr` (error taxonomy +
+`Classify`), and `api` (transport `DoRequest`/`ExpandPath`, sticky cluster
+failover, the three `Credentials` strategies), and `version` (`Capabilities`
+snapshot, `AtLeast` + named per-minor gates, `Service` that fetches `/version`
+and enforces the 9.0 floor), and `tasks` (UPID parse, `Status`/`Log` reads,
+`Wait`/`WaitFor` backoff waiters that surface `pverr.ErrTaskFailed` with the log
+tail), and `mockpve` (in-memory PVE responder: an `http.Handler` serving the
+envelope for `/version`, `/access/ticket`, and task status/log; `New` +
+`Seed`/`Add`/`Finish` methods + the four options; `mock.NewClient()` returns a
+wired `api.Client` + cleanup; `RegisterHandler`/`WithCache` are the seams for
+later services + the recorded corpus), and the root `proxmox` client
+(`NewClient` builds the transport, seeds `Capabilities` from `/version`
+rejecting < 9.0, exposes `API`/`Version`/`Capabilities`/`Tasks` accessors +
+functional options that adapt to `api.TransportOption`s; per-service accessors
+land with their services). Two deliberate deviations from DESIGN-0001:
+`WithCache` is deferred (nothing consumes a cache yet) and `Tasks()` takes no
+node (the `tasks.Ref` carries it). Next: finish `doc.go` promotion (`types`,
+`pverr`) + runnable `Example`s (task 9).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

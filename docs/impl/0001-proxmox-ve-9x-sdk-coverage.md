@@ -125,7 +125,7 @@ The transport and primitives every service hangs off.
 - [x] Root `proxmox` package: `NewClient` (seeds `Capabilities` from `/version`,
       rejects < 9.0) + `Client` accessors + functional options; placement of
       shared primitives & the error taxonomy per **OQ-1**
-- [ ] Promote the `doc.go` stubs (created in the skeleton commit) for every
+- [x] Promote the `doc.go` stubs (created in the skeleton commit) for every
       Phase 1 package — `api`, `types`, `pverr`, `version`, `tasks`, root
       `proxmox`: replace the "Skeleton: no implementation yet" placeholder with
       a real package overview + a runnable `Example`; `go doc ./...` renders
@@ -136,6 +136,14 @@ The transport and primitives every service hangs off.
 - `go build ./...` clean; auth + a trivial `GET /version` round-trips against
   live 9.x
 - Waiters drive a real start/stop task to completion
+
+> **Status (all 9 tasks done):** `go build ./...` and `just lint`/`just test`
+> (race) are green. Auth (token / pre-minted ticket / user-pass mint+refresh) +
+> `GET /version` round-trip and the task waiters (running→stopped OK/failed) are
+> **verified against the in-process `mockpve` responder**, not a live 9.x node.
+> The two live-only criteria above are therefore **written-but-unverified** in
+> this environment (no live node / recorded cassettes — see CLAUDE.md); they
+> stand to be confirmed once a 9.x node is reachable.
 
 ---
 
