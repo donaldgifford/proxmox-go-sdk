@@ -358,6 +358,167 @@ func TestStartNotFound(t *testing.T) {
 	}
 }
 
+func TestAddDisk(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "box", "stopped")
+	svc, _ := newServices(t, mock)
+	ctx := context.Background()
+
+	if _, err := svc.AddDisk(ctx, 100, &qemu.DiskSpec{
+		Slot:    "scsi1",
+		Storage: "local-lvm",
+		SizeGB:  32,
+		Options: map[string]string{"discard": "on", "ssd": "1"},
+	}); err != nil {
+		t.Fatalf("AddDisk: %v", err)
+	}
+
+	cfg, err := svc.Config(ctx, 100)
+	if err != nil {
+		t.Fatalf("Config: %v", err)
+	}
+	// Options are rendered sorted for determinism.
+	if cfg.SCSI1 != "local-lvm:32,discard=on,ssd=1" {
+		t.Errorf("scsi1 = %q, want local-lvm:32,discard=on,ssd=1", cfg.SCSI1)
+	}
+}
+
+func TestAddDiskValidation(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "box", "stopped")
+	svc, _ := newServices(t, mock)
+	ctx := context.Background()
+
+	if _, err := svc.AddDisk(ctx, 100, nil); err == nil {
+		t.Error("AddDisk(nil) error = nil, want non-nil")
+	}
+	if _, err := svc.AddDisk(ctx, 100, &qemu.DiskSpec{Slot: "scsi1"}); err == nil {
+		t.Error("AddDisk(no storage/size) error = nil, want non-nil")
+	}
+}
+
+func TestRemoveDisk(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "box", "stopped")
+	mock.SetVMConfig(testNode, 100, map[string]any{"scsi1": "local-lvm:vm-100-disk-1,size=32G"})
+	svc, _ := newServices(t, mock)
+	ctx := context.Background()
+
+	if _, err := svc.RemoveDisk(ctx, 100, "scsi1"); err != nil {
+		t.Fatalf("RemoveDisk: %v", err)
+	}
+	cfg, err := svc.Config(ctx, 100)
+	if err != nil {
+		t.Fatalf("Config: %v", err)
+	}
+	if cfg.SCSI1 != "" {
+		t.Errorf("scsi1 = %q after RemoveDisk, want empty", cfg.SCSI1)
+	}
+}
+
+func TestResizeDisk(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "box", "stopped")
+	svc, _ := newServices(t, mock)
+
+	ref, err := svc.ResizeDisk(context.Background(), 100, "scsi0", "+10G")
+	if err != nil {
+		t.Fatalf("ResizeDisk: %v", err)
+	}
+	if ref.UPID != "" {
+		t.Errorf("ResizeDisk returned task %q, want zero ref (synchronous)", ref.UPID)
+	}
+}
+
+func TestAddNIC(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "box", "stopped")
+	svc, _ := newServices(t, mock)
+	ctx := context.Background()
+
+	if _, err := svc.AddNIC(ctx, 100, &qemu.NICSpec{
+		Slot:   "net1",
+		Model:  "virtio",
+		Bridge: "vmbr0",
+		VLAN:   10,
+	}); err != nil {
+		t.Fatalf("AddNIC: %v", err)
+	}
+	cfg, err := svc.Config(ctx, 100)
+	if err != nil {
+		t.Fatalf("Config: %v", err)
+	}
+	if cfg.Net1 != "virtio,bridge=vmbr0,tag=10" {
+		t.Errorf("net1 = %q, want virtio,bridge=vmbr0,tag=10", cfg.Net1)
+	}
+}
+
+func TestRemoveNIC(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "box", "stopped")
+	mock.SetVMConfig(testNode, 100, map[string]any{"net1": "virtio,bridge=vmbr0"})
+	svc, _ := newServices(t, mock)
+	ctx := context.Background()
+
+	if _, err := svc.RemoveNIC(ctx, 100, "net1"); err != nil {
+		t.Fatalf("RemoveNIC: %v", err)
+	}
+	cfg, err := svc.Config(ctx, 100)
+	if err != nil {
+		t.Fatalf("Config: %v", err)
+	}
+	if cfg.Net1 != "" {
+		t.Errorf("net1 = %q after RemoveNIC, want empty", cfg.Net1)
+	}
+}
+
+func TestMigrate(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "mover", "running")
+	c, cleanup := mock.NewClient()
+	t.Cleanup(cleanup)
+	src := qemu.NewService(c, testNode, version.Capabilities{})
+	tgt := qemu.NewService(c, "pve2", version.Capabilities{})
+	tsvc := tasks.NewService(c)
+	ctx := context.Background()
+
+	online := types.PVEBool(true)
+	ref, err := src.Migrate(ctx, 100, &qemu.MigrateSpec{Target: "pve2", Online: &online})
+	if err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	awaitOK(t, tsvc, ref)
+
+	if _, err := src.Get(ctx, 100); !errors.Is(err, pverr.ErrNotFound) {
+		t.Errorf("Get on source after migrate = %v, want ErrNotFound", err)
+	}
+	if _, err := tgt.Get(ctx, 100); err != nil {
+		t.Errorf("Get on target after migrate: %v", err)
+	}
+}
+
+func TestMigrateValidation(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "box", "running")
+	svc, _ := newServices(t, mock)
+	ctx := context.Background()
+
+	if _, err := svc.Migrate(ctx, 100, nil); err == nil {
+		t.Error("Migrate(nil) error = nil, want non-nil")
+	}
+	if _, err := svc.Migrate(ctx, 100, &qemu.MigrateSpec{}); err == nil {
+		t.Error("Migrate(no target) error = nil, want non-nil")
+	}
+}
+
 // TestCreateWithExtra exercises the unmodelled-param escape hatch end to end.
 func TestCreateWithExtra(t *testing.T) {
 	t.Parallel()

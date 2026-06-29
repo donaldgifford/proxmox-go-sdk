@@ -47,6 +47,14 @@ type API interface {
 	Reboot(ctx context.Context, vmid int) (tasks.Ref, error)
 	Suspend(ctx context.Context, vmid int, opts ...SuspendOption) (tasks.Ref, error)
 	Resume(ctx context.Context, vmid int) (tasks.Ref, error)
+
+	// Devices and migration.
+	AddDisk(ctx context.Context, vmid int, spec *DiskSpec) (tasks.Ref, error)
+	ResizeDisk(ctx context.Context, vmid int, disk, size string) (tasks.Ref, error)
+	RemoveDisk(ctx context.Context, vmid int, slot string) (tasks.Ref, error)
+	AddNIC(ctx context.Context, vmid int, spec *NICSpec) (tasks.Ref, error)
+	RemoveNIC(ctx context.Context, vmid int, slot string) (tasks.Ref, error)
+	Migrate(ctx context.Context, vmid int, spec *MigrateSpec) (tasks.Ref, error)
 }
 
 // Compile-time assertion that *Service implements the full contract.

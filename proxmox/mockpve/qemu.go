@@ -3,6 +3,7 @@ package mockpve
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -135,6 +136,8 @@ func (s *Server) registerQEMURoutes() {
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/clone", s.handleQEMUClone)
 	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/qemu/{vmid}", s.handleQEMUDelete)
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/status/{action}", s.handleQEMUPower)
+	s.mux.HandleFunc("PUT /api2/json/nodes/{node}/qemu/{vmid}/resize", s.handleQEMUResize)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/migrate", s.handleQEMUMigrate)
 }
 
 func (s *Server) handleQEMUList(w http.ResponseWriter, r *http.Request) {
@@ -221,7 +224,15 @@ func (s *Server) handleQEMUSetConfig(w http.ResponseWriter, r *http.Request) {
 	s.st.mu.Lock()
 	rec := s.lookupVM(node, vmid)
 	if rec != nil {
+		if del := r.PostForm.Get("delete"); del != "" {
+			for _, k := range strings.Split(del, ",") {
+				delete(rec.Config, strings.TrimSpace(k))
+			}
+		}
 		for key := range r.PostForm {
+			if key == "delete" {
+				continue
+			}
 			rec.Config[key] = parseConfigValue(r.PostForm.Get(key))
 		}
 	}
@@ -327,6 +338,64 @@ func (s *Server) handleQEMUPower(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeData(w, s.finishedTask(node, "qm"+action, strconv.Itoa(vmid)))
+}
+
+func (s *Server) handleQEMUResize(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	if !s.vmExists(node, vmid) {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	// PVE resizes synchronously and answers with null data.
+	s.writeData(w, nil)
+}
+
+func (s *Server) handleQEMUMigrate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if perr := r.ParseForm(); perr != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	target := r.PostForm.Get("target")
+	if target == "" {
+		s.writeError(w, http.StatusBadRequest, "missing target")
+		return
+	}
+
+	s.st.mu.Lock()
+	rec := s.lookupVM(node, vmid)
+	if rec != nil {
+		if s.st.qemu.vms[target] == nil {
+			s.st.qemu.vms[target] = make(map[int]*vmRecord)
+		}
+		rec.Node = target
+		s.st.qemu.vms[target][vmid] = rec
+		delete(s.st.qemu.vms[node], vmid)
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	// The migration task runs on the source node.
+	s.writeData(w, s.finishedTask(node, "qmigrate", strconv.Itoa(vmid)))
 }
 
 // finishedTask records a synthetic task that is already complete with exit

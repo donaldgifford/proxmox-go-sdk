@@ -191,6 +191,61 @@ func TestQEMUPowerUnknownAction(t *testing.T) {
 	}
 }
 
+func TestQEMUResize(t *testing.T) {
+	mock := mockpve.New()
+	mock.AddVM("pve", 100, "box", "stopped")
+	c, cleanup := mock.NewClient()
+	defer cleanup()
+
+	body := url.Values{"disk": {"scsi0"}, "size": {"+10G"}}
+	var upid string
+	if err := c.DoRequest(context.Background(), http.MethodPut, "/nodes/pve/qemu/100/resize", body, &upid); err != nil {
+		t.Fatalf("resize: %v", err)
+	}
+	if upid != "" {
+		t.Errorf("resize returned UPID %q, want empty (synchronous)", upid)
+	}
+}
+
+func TestQEMUMigrate(t *testing.T) {
+	mock := mockpve.New()
+	mock.AddVM("pve", 100, "box", "running")
+	c, cleanup := mock.NewClient()
+	defer cleanup()
+	ctx := context.Background()
+
+	body := url.Values{"target": {"pve2"}, "online": {"1"}}
+	var upid string
+	if err := c.DoRequest(ctx, http.MethodPost, "/nodes/pve/qemu/100/migrate", body, &upid); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	if upid == "" {
+		t.Fatal("migrate returned an empty UPID")
+	}
+
+	// The VM now lives on the target node.
+	var out any
+	if err := c.DoRequest(ctx, http.MethodGet, "/nodes/pve/qemu/100/status/current", nil, &out); !errors.Is(err, pverr.ErrNotFound) {
+		t.Errorf("source status after migrate = %v, want ErrNotFound", err)
+	}
+	if err := c.DoRequest(ctx, http.MethodGet, "/nodes/pve2/qemu/100/status/current", nil, &out); err != nil {
+		t.Errorf("target status after migrate: %v", err)
+	}
+}
+
+func TestQEMUMigrateMissingTarget(t *testing.T) {
+	mock := mockpve.New()
+	mock.AddVM("pve", 100, "box", "running")
+	c, cleanup := mock.NewClient()
+	defer cleanup()
+
+	var upid string
+	err := c.DoRequest(context.Background(), http.MethodPost, "/nodes/pve/qemu/100/migrate", url.Values{}, &upid)
+	if err == nil {
+		t.Error("migrate without target error = nil, want non-nil")
+	}
+}
+
 func TestQEMUCloneSourceNotFound(t *testing.T) {
 	mock := mockpve.New()
 	c, cleanup := mock.NewClient()

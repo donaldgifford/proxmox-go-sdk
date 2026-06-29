@@ -153,7 +153,7 @@ The transport and primitives every service hangs off.
 
 - [x] QEMU: list, status, config get/set, create, clone, delete
 - [x] QEMU power: start/stop/shutdown/reboot/suspend/resume
-- [ ] QEMU migrate (online/offline), disk + NIC add/resize/remove
+- [x] QEMU migrate (online/offline), disk + NIC add/resize/remove
 - [ ] QEMU snapshots: list/create/rollback/delete (+ TPM-state snapshots on
       NFS/CIFS/dir `(9.1+)`)
 - [ ] Guest-agent exec + fine-grained agent privileges (9.x model)
