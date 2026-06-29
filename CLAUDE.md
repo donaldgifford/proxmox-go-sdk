@@ -153,7 +153,14 @@ waiters that surface `pverr.ErrTaskFailed` with the log tail), and `mockpve`
 `/access/ticket`, and task status/log; `New` + `Seed`/`Add`/`Finish` methods +
 the four options; `mock.NewClient()` returns a wired `api.Client` + cleanup;
 `RegisterHandler`/`WithCache` are the seams for later services + the recorded
-corpus). Next: the root `proxmox` client + `doc.go` promotion.
+corpus), and the root `proxmox` client (`NewClient` builds the transport, seeds
+`Capabilities` from `/version` rejecting < 9.0, exposes
+`API`/`Version`/`Capabilities`/`Tasks` accessors + functional options that adapt
+to `api.TransportOption`s; per-service accessors land with their services). Two
+deliberate deviations from DESIGN-0001: `WithCache` is deferred (nothing
+consumes a cache yet) and `Tasks()` takes no node (the `tasks.Ref` carries it).
+Next: finish `doc.go` promotion (`types`, `pverr`) + runnable `Example`s (task
+9).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

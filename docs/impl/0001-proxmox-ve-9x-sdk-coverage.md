@@ -122,7 +122,7 @@ The transport and primitives every service hangs off.
       NotFound/Conflict/AuthExpired/TaskFailed/Transient/…)
 - [x] `mockpve` server + mockable interfaces; functional options
       (`WithLogger`/`WithCache`/`WithHTTPClient`/`WithTLS`)
-- [ ] Root `proxmox` package: `NewClient` (seeds `Capabilities` from `/version`,
+- [x] Root `proxmox` package: `NewClient` (seeds `Capabilities` from `/version`,
       rejects < 9.0) + `Client` accessors + functional options; placement of
       shared primitives & the error taxonomy per **OQ-1**
 - [ ] Promote the `doc.go` stubs (created in the skeleton commit) for every
