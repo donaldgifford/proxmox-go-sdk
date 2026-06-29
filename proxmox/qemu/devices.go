@@ -2,7 +2,6 @@ package qemu
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -10,11 +9,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/internal/svcutil"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/tasks"
 )
-
-// errMissingField reports a required spec field that was left empty.
-var errMissingField = errors.New("missing required field")
 
 // DiskSpec describes a disk to attach to a VM. AddDisk renders it to the PVE
 // volume syntax "<storage>:<size-in-GiB>[,opt=val…]" and sets it on Slot.
@@ -77,10 +74,10 @@ func appendOptions(base string, opts map[string]string) string {
 // hot-plugs the disk, in which case the returned Ref tracks the work.
 func (s *Service) AddDisk(ctx context.Context, vmid int, spec *DiskSpec) (tasks.Ref, error) {
 	if spec == nil {
-		return tasks.Ref{}, fmt.Errorf("qemu.AddDisk: %w", errNilSpec)
+		return tasks.Ref{}, fmt.Errorf("qemu.AddDisk: %w", svcutil.ErrNilSpec)
 	}
 	if spec.Slot == "" || spec.Storage == "" || spec.SizeGB <= 0 {
-		return tasks.Ref{}, fmt.Errorf("qemu.AddDisk: slot, storage, and a positive size: %w", errMissingField)
+		return tasks.Ref{}, fmt.Errorf("qemu.AddDisk: slot, storage, and a positive size: %w", svcutil.ErrMissingField)
 	}
 	return s.SetConfig(ctx, vmid, &ConfigUpdate{Extra: map[string]string{spec.Slot: spec.value()}})
 }
@@ -89,7 +86,7 @@ func (s *Service) AddDisk(ctx context.Context, vmid int, spec *DiskSpec) (tasks.
 // "unused" entry rather than deleting the underlying volume.
 func (s *Service) RemoveDisk(ctx context.Context, vmid int, slot string) (tasks.Ref, error) {
 	if slot == "" {
-		return tasks.Ref{}, fmt.Errorf("qemu.RemoveDisk: slot: %w", errMissingField)
+		return tasks.Ref{}, fmt.Errorf("qemu.RemoveDisk: slot: %w", svcutil.ErrMissingField)
 	}
 	return s.SetConfig(ctx, vmid, &ConfigUpdate{Delete: slot})
 }
@@ -97,10 +94,10 @@ func (s *Service) RemoveDisk(ctx context.Context, vmid int, slot string) (tasks.
 // AddNIC attaches a network interface described by spec.
 func (s *Service) AddNIC(ctx context.Context, vmid int, spec *NICSpec) (tasks.Ref, error) {
 	if spec == nil {
-		return tasks.Ref{}, fmt.Errorf("qemu.AddNIC: %w", errNilSpec)
+		return tasks.Ref{}, fmt.Errorf("qemu.AddNIC: %w", svcutil.ErrNilSpec)
 	}
 	if spec.Slot == "" || spec.Model == "" {
-		return tasks.Ref{}, fmt.Errorf("qemu.AddNIC: slot and model: %w", errMissingField)
+		return tasks.Ref{}, fmt.Errorf("qemu.AddNIC: slot and model: %w", svcutil.ErrMissingField)
 	}
 	return s.SetConfig(ctx, vmid, &ConfigUpdate{Extra: map[string]string{spec.Slot: spec.value()}})
 }
@@ -108,7 +105,7 @@ func (s *Service) AddNIC(ctx context.Context, vmid int, spec *NICSpec) (tasks.Re
 // RemoveNIC detaches the network interface at slot (e.g. "net1").
 func (s *Service) RemoveNIC(ctx context.Context, vmid int, slot string) (tasks.Ref, error) {
 	if slot == "" {
-		return tasks.Ref{}, fmt.Errorf("qemu.RemoveNIC: slot: %w", errMissingField)
+		return tasks.Ref{}, fmt.Errorf("qemu.RemoveNIC: slot: %w", svcutil.ErrMissingField)
 	}
 	return s.SetConfig(ctx, vmid, &ConfigUpdate{Delete: slot})
 }
@@ -118,7 +115,7 @@ func (s *Service) RemoveNIC(ctx context.Context, vmid int, slot string) (tasks.R
 // synchronous, so the returned Ref is usually the zero value.
 func (s *Service) ResizeDisk(ctx context.Context, vmid int, disk, size string) (tasks.Ref, error) {
 	if disk == "" || size == "" {
-		return tasks.Ref{}, fmt.Errorf("qemu.ResizeDisk: disk and size: %w", errMissingField)
+		return tasks.Ref{}, fmt.Errorf("qemu.ResizeDisk: disk and size: %w", svcutil.ErrMissingField)
 	}
 	body := url.Values{"disk": {disk}, "size": {size}}
 	var upid string
@@ -128,5 +125,5 @@ func (s *Service) ResizeDisk(ctx context.Context, vmid int, disk, size string) (
 	if upid == "" {
 		return tasks.Ref{}, nil
 	}
-	return toRef("qemu.ResizeDisk", upid)
+	return svcutil.TaskRef("qemu.ResizeDisk", upid)
 }

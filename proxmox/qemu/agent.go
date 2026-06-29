@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/internal/svcutil"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/types"
 )
 
@@ -53,7 +54,7 @@ func (s *Service) AgentPing(ctx context.Context, vmid int) error {
 // or use AgentExecWait to do both.
 func (s *Service) AgentExec(ctx context.Context, vmid int, command []string) (int, error) {
 	if len(command) == 0 {
-		return 0, fmt.Errorf("qemu.AgentExec: command: %w", errMissingField)
+		return 0, fmt.Errorf("qemu.AgentExec: command: %w", svcutil.ErrMissingField)
 	}
 	body := url.Values{"command": command}
 	var res agentExecResponse

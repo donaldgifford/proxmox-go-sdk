@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/internal/svcutil"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/tasks"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/types"
 )
@@ -61,12 +62,12 @@ func (s *Service) Snapshots(ctx context.Context, vmid int) ([]Snapshot, error) {
 // CreateSnapshot takes a snapshot of a VM and returns the snapshot task.
 func (s *Service) CreateSnapshot(ctx context.Context, vmid int, spec *SnapshotSpec) (tasks.Ref, error) {
 	if spec == nil {
-		return tasks.Ref{}, fmt.Errorf("qemu.CreateSnapshot: %w", errNilSpec)
+		return tasks.Ref{}, fmt.Errorf("qemu.CreateSnapshot: %w", svcutil.ErrNilSpec)
 	}
 	if spec.Name == "" {
-		return tasks.Ref{}, fmt.Errorf("qemu.CreateSnapshot: snapshot name: %w", errMissingField)
+		return tasks.Ref{}, fmt.Errorf("qemu.CreateSnapshot: snapshot name: %w", svcutil.ErrMissingField)
 	}
-	body, err := encodeWithExtra(spec, spec.Extra)
+	body, err := svcutil.EncodeWithExtra(spec, spec.Extra)
 	if err != nil {
 		return tasks.Ref{}, fmt.Errorf("qemu.CreateSnapshot: %w", err)
 	}
@@ -74,7 +75,7 @@ func (s *Service) CreateSnapshot(ctx context.Context, vmid int, spec *SnapshotSp
 	if derr := s.c.DoRequest(ctx, http.MethodPost, s.vmPath(vmid)+"/snapshot", body, &upid); derr != nil {
 		return tasks.Ref{}, fmt.Errorf("qemu.CreateSnapshot: %w", derr)
 	}
-	return toRef("qemu.CreateSnapshot", upid)
+	return svcutil.TaskRef("qemu.CreateSnapshot", upid)
 }
 
 // RollbackSnapshot reverts a VM to the named snapshot and returns the rollback
@@ -82,7 +83,7 @@ func (s *Service) CreateSnapshot(ctx context.Context, vmid int, spec *SnapshotSp
 // WithStartAfterRollback to start it afterwards.
 func (s *Service) RollbackSnapshot(ctx context.Context, vmid int, name string, opts ...RollbackOption) (tasks.Ref, error) {
 	if name == "" {
-		return tasks.Ref{}, fmt.Errorf("qemu.RollbackSnapshot: snapshot name: %w", errMissingField)
+		return tasks.Ref{}, fmt.Errorf("qemu.RollbackSnapshot: snapshot name: %w", svcutil.ErrMissingField)
 	}
 	cfg := newSnapConfig()
 	for _, opt := range opts {
@@ -97,17 +98,17 @@ func (s *Service) RollbackSnapshot(ctx context.Context, vmid int, name string, o
 	if err := s.c.DoRequest(ctx, http.MethodPost, path, body, &upid); err != nil {
 		return tasks.Ref{}, fmt.Errorf("qemu.RollbackSnapshot: %w", err)
 	}
-	return toRef("qemu.RollbackSnapshot", upid)
+	return svcutil.TaskRef("qemu.RollbackSnapshot", upid)
 }
 
 // DeleteSnapshot removes the named snapshot and returns the deletion task.
 func (s *Service) DeleteSnapshot(ctx context.Context, vmid int, name string) (tasks.Ref, error) {
 	if name == "" {
-		return tasks.Ref{}, fmt.Errorf("qemu.DeleteSnapshot: snapshot name: %w", errMissingField)
+		return tasks.Ref{}, fmt.Errorf("qemu.DeleteSnapshot: snapshot name: %w", svcutil.ErrMissingField)
 	}
 	var upid string
 	if err := s.c.DoRequest(ctx, http.MethodDelete, s.vmPath(vmid)+"/snapshot/"+name, nil, &upid); err != nil {
 		return tasks.Ref{}, fmt.Errorf("qemu.DeleteSnapshot: %w", err)
 	}
-	return toRef("qemu.DeleteSnapshot", upid)
+	return svcutil.TaskRef("qemu.DeleteSnapshot", upid)
 }

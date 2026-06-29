@@ -106,6 +106,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /api2/json/nodes/{node}/tasks/{upid}/status", s.handleTaskStatus)
 	s.mux.HandleFunc("GET /api2/json/nodes/{node}/tasks/{upid}/log", s.handleTaskLog)
 	s.registerQEMURoutes()
+	s.registerLXCRoutes()
 }
 
 // Serve starts an httptest.Server for this mock (HTTPS when [WithTLS] is set,

@@ -3,7 +3,6 @@ package mockpve
 import (
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -281,17 +280,7 @@ func (s *Server) handleQEMUSetConfig(w http.ResponseWriter, r *http.Request) {
 	s.st.mu.Lock()
 	rec := s.lookupVM(node, vmid)
 	if rec != nil {
-		if del := r.PostForm.Get("delete"); del != "" {
-			for _, k := range strings.Split(del, ",") {
-				delete(rec.Config, strings.TrimSpace(k))
-			}
-		}
-		for key := range r.PostForm {
-			if key == "delete" {
-				continue
-			}
-			rec.Config[key] = parseConfigValue(r.PostForm.Get(key))
-		}
+		applyConfigForm(rec, r.PostForm)
 	}
 	s.st.mu.Unlock()
 	if rec == nil {

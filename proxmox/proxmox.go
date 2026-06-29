@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/lxc"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/qemu"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/tasks"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/version"
@@ -70,4 +71,10 @@ func (c *Client) Tasks() *tasks.Service { return c.tasks }
 // client's transport and capability snapshot and is safe for concurrent use.
 func (c *Client) QEMU(node string) *qemu.Service {
 	return qemu.NewService(c.api, node, c.caps)
+}
+
+// LXC returns an LXC container service scoped to node (e.g. "pve"). It shares
+// the client's transport and capability snapshot and is safe for concurrent use.
+func (c *Client) LXC(node string) *lxc.Service {
+	return lxc.NewService(c.api, node, c.caps)
 }

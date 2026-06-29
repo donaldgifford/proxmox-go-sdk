@@ -1,0 +1,283 @@
+package mockpve
+
+import (
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+)
+
+// lxcState is the LXC slice of the mock model, embedded in state and guarded by
+// state.mu. Containers reuse the shared vmRecord type.
+type lxcState struct {
+	cts map[string]map[int]*vmRecord // node -> vmid -> record.
+}
+
+// AddContainer seeds a container on node with the given name and status
+// ("stopped" or "running"). Call before serving.
+func (s *Server) AddContainer(node string, vmid int, name, status string) {
+	s.st.mu.Lock()
+	defer s.st.mu.Unlock()
+	if s.st.lxc.cts == nil {
+		s.st.lxc.cts = make(map[string]map[int]*vmRecord)
+	}
+	if s.st.lxc.cts[node] == nil {
+		s.st.lxc.cts[node] = make(map[int]*vmRecord)
+	}
+	s.st.lxc.cts[node][vmid] = &vmRecord{
+		VMID:      vmid,
+		Node:      node,
+		Name:      name,
+		Status:    status,
+		Config:    make(map[string]any),
+		Snapshots: make(map[string]*snapRecord),
+	}
+}
+
+// SetCTConfig merges fields into a seeded container's config. It is a no-op if
+// the container does not exist.
+func (s *Server) SetCTConfig(node string, vmid int, fields map[string]any) {
+	s.st.mu.Lock()
+	defer s.st.mu.Unlock()
+	if rec := s.lookupCT(node, vmid); rec != nil {
+		for k, v := range fields {
+			rec.Config[k] = v
+		}
+	}
+}
+
+// lookupCT returns the record for node/vmid, or nil. The caller must hold st.mu.
+func (s *Server) lookupCT(node string, vmid int) *vmRecord {
+	n, ok := s.st.lxc.cts[node]
+	if !ok {
+		return nil
+	}
+	return n[vmid]
+}
+
+// ctExists reports whether node/vmid is seeded. It locks st.mu itself.
+func (s *Server) ctExists(node string, vmid int) bool {
+	s.st.mu.Lock()
+	defer s.st.mu.Unlock()
+	return s.lookupCT(node, vmid) != nil
+}
+
+func (s *Server) registerLXCRoutes() {
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/lxc", s.handleLXCList)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/lxc", s.handleLXCCreate)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/lxc/{vmid}/status/current", s.handleLXCStatus)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/lxc/{vmid}/config", s.handleLXCConfig)
+	s.mux.HandleFunc("PUT /api2/json/nodes/{node}/lxc/{vmid}/config", s.handleLXCSetConfig)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/lxc/{vmid}/clone", s.handleLXCClone)
+	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/lxc/{vmid}", s.handleLXCDelete)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/lxc/{vmid}/status/{action}", s.handleLXCPower)
+}
+
+func (s *Server) handleLXCList(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	s.st.mu.Lock()
+	entries := make([]qemuListEntry, 0, len(s.st.lxc.cts[node]))
+	for _, rec := range s.st.lxc.cts[node] {
+		entries = append(entries, qemuListEntry{VMID: rec.VMID, Name: rec.Name, Status: rec.Status})
+	}
+	s.st.mu.Unlock()
+	s.writeData(w, entries)
+}
+
+func (s *Server) handleLXCStatus(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	s.st.mu.Lock()
+	rec := s.lookupCT(node, vmid)
+	var payload qemuStatusPayload
+	if rec != nil {
+		payload = qemuStatusPayload{VMID: rec.VMID, Name: rec.Name, Status: rec.Status}
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	s.writeData(w, payload)
+}
+
+func (s *Server) handleLXCConfig(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	s.st.mu.Lock()
+	rec := s.lookupCT(node, vmid)
+	var cfg map[string]any
+	if rec != nil {
+		cfg = make(map[string]any, len(rec.Config))
+		for k, v := range rec.Config {
+			cfg[k] = v
+		}
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	s.writeData(w, cfg)
+}
+
+func (s *Server) handleLXCSetConfig(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if perr := r.ParseForm(); perr != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	s.st.mu.Lock()
+	rec := s.lookupCT(node, vmid)
+	if rec != nil {
+		applyConfigForm(rec, r.PostForm)
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	s.writeData(w, nil)
+}
+
+func (s *Server) handleLXCCreate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if err := r.ParseForm(); err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	id, err := strconv.Atoi(r.PostForm.Get("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	s.AddContainer(node, id, r.PostForm.Get("hostname"), vmStatusStopped)
+	s.writeData(w, s.finishedTask(node, "vzcreate", strconv.Itoa(id)))
+}
+
+func (s *Server) handleLXCClone(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	src, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	if !s.ctExists(node, src) {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if perr := r.ParseForm(); perr != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	newID, err := strconv.Atoi(r.PostForm.Get("newid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid newid")
+		return
+	}
+	s.AddContainer(node, newID, r.PostForm.Get("hostname"), vmStatusStopped)
+	s.writeData(w, s.finishedTask(node, "vzclone", strconv.Itoa(src)))
+}
+
+func (s *Server) handleLXCDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	if !s.ctExists(node, vmid) {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	s.st.mu.Lock()
+	if n, ok := s.st.lxc.cts[node]; ok {
+		delete(n, vmid)
+	}
+	s.st.mu.Unlock()
+	s.writeData(w, s.finishedTask(node, "vzdestroy", strconv.Itoa(vmid)))
+}
+
+func (s *Server) handleLXCPower(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	action := r.PathValue("action")
+	newStatus, ok := qemuPowerStatus[action]
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "unknown power action")
+		return
+	}
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	s.st.mu.Lock()
+	rec := s.lookupCT(node, vmid)
+	if rec != nil {
+		rec.Status = newStatus
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	s.writeData(w, s.finishedTask(node, "vz"+action, strconv.Itoa(vmid)))
+}
+
+// applyConfigForm merges a config PUT's form fields into rec.Config, honoring
+// the PVE "delete" parameter (comma-separated keys to unset). Numeric values are
+// stored as ints so a Config read round-trips their JSON type. It is shared by
+// the qemu and lxc config handlers.
+func applyConfigForm(rec *vmRecord, form url.Values) {
+	if del := form.Get("delete"); del != "" {
+		for _, k := range strings.Split(del, ",") {
+			delete(rec.Config, strings.TrimSpace(k))
+		}
+	}
+	for key := range form {
+		if key == "delete" {
+			continue
+		}
+		rec.Config[key] = parseConfigValue(form.Get(key))
+	}
+}

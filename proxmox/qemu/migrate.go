@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/internal/svcutil"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/tasks"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/types"
 )
@@ -26,12 +27,12 @@ type MigrateSpec struct {
 // the migration task, which runs on the source node.
 func (s *Service) Migrate(ctx context.Context, vmid int, spec *MigrateSpec) (tasks.Ref, error) {
 	if spec == nil {
-		return tasks.Ref{}, fmt.Errorf("qemu.Migrate: %w", errNilSpec)
+		return tasks.Ref{}, fmt.Errorf("qemu.Migrate: %w", svcutil.ErrNilSpec)
 	}
 	if spec.Target == "" {
-		return tasks.Ref{}, fmt.Errorf("qemu.Migrate: target node: %w", errMissingField)
+		return tasks.Ref{}, fmt.Errorf("qemu.Migrate: target node: %w", svcutil.ErrMissingField)
 	}
-	body, err := encodeWithExtra(spec, spec.Extra)
+	body, err := svcutil.EncodeWithExtra(spec, spec.Extra)
 	if err != nil {
 		return tasks.Ref{}, fmt.Errorf("qemu.Migrate: %w", err)
 	}
@@ -39,5 +40,5 @@ func (s *Service) Migrate(ctx context.Context, vmid int, spec *MigrateSpec) (tas
 	if derr := s.c.DoRequest(ctx, http.MethodPost, s.vmPath(vmid)+"/migrate", body, &upid); derr != nil {
 		return tasks.Ref{}, fmt.Errorf("qemu.Migrate: %w", derr)
 	}
-	return toRef("qemu.Migrate", upid)
+	return svcutil.TaskRef("qemu.Migrate", upid)
 }
