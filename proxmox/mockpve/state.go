@@ -15,6 +15,7 @@ type state struct {
 	nodes   map[string]*nodeState   // keyed by node name
 	tickets map[string]ticketRecord // keyed by minted ticket value
 	users   map[string]string       // username -> password, for /access/ticket
+	qemu    qemuState
 }
 
 // versionData backs GET /version.
