@@ -43,6 +43,13 @@ type API interface {
 	Reboot(ctx context.Context, vmid int) (tasks.Ref, error)
 	Suspend(ctx context.Context, vmid int) (tasks.Ref, error)
 	Resume(ctx context.Context, vmid int) (tasks.Ref, error)
+
+	// Snapshots (require a snapshot-capable backing store: ZFS, btrfs, or
+	// LVM-thin; see SnapshotSpec).
+	Snapshots(ctx context.Context, vmid int) ([]Snapshot, error)
+	CreateSnapshot(ctx context.Context, vmid int, spec *SnapshotSpec) (tasks.Ref, error)
+	RollbackSnapshot(ctx context.Context, vmid int, name string, opts ...RollbackOption) (tasks.Ref, error)
+	DeleteSnapshot(ctx context.Context, vmid int, name string, opts ...DeleteSnapshotOption) (tasks.Ref, error)
 }
 
 // Compile-time assertion that *Service implements the full contract.

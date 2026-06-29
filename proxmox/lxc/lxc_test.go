@@ -281,6 +281,121 @@ func TestShutdownForceStop(t *testing.T) {
 	wantStatus(t, svc, types.PowerStateStopped)
 }
 
+func TestSnapshotLifecycle(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddContainer(testNode, 200, "web", "stopped")
+	svc, ts := newServices(t, mock)
+	ctx := context.Background()
+
+	// Create.
+	ref, err := svc.CreateSnapshot(ctx, 200, &lxc.SnapshotSpec{Name: "pre-upgrade", Description: "before apt upgrade"})
+	if err != nil {
+		t.Fatalf("CreateSnapshot: %v", err)
+	}
+	awaitOK(t, ts, ref)
+
+	// List: the named snapshot plus PVE's synthetic "current".
+	snaps, err := svc.Snapshots(ctx, 200)
+	if err != nil {
+		t.Fatalf("Snapshots: %v", err)
+	}
+	var found, current bool
+	for _, snap := range snaps {
+		switch snap.Name {
+		case "pre-upgrade":
+			found = true
+			if snap.Description != "before apt upgrade" {
+				t.Errorf("snapshot description = %q, want %q", snap.Description, "before apt upgrade")
+			}
+		case "current":
+			current = true
+		}
+	}
+	if !found {
+		t.Error("Snapshots did not include the created snapshot")
+	}
+	if !current {
+		t.Error("Snapshots did not include the synthetic current entry")
+	}
+
+	// Rollback (with the start-after option).
+	ref, err = svc.RollbackSnapshot(ctx, 200, "pre-upgrade", lxc.WithStartAfterRollback())
+	if err != nil {
+		t.Fatalf("RollbackSnapshot: %v", err)
+	}
+	awaitOK(t, ts, ref)
+
+	// Delete.
+	ref, err = svc.DeleteSnapshot(ctx, 200, "pre-upgrade")
+	if err != nil {
+		t.Fatalf("DeleteSnapshot: %v", err)
+	}
+	awaitOK(t, ts, ref)
+
+	snaps, err = svc.Snapshots(ctx, 200)
+	if err != nil {
+		t.Fatalf("Snapshots after delete: %v", err)
+	}
+	for _, snap := range snaps {
+		if snap.Name == "pre-upgrade" {
+			t.Error("snapshot survived deletion")
+		}
+	}
+}
+
+func TestSnapshotValidation(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddContainer(testNode, 200, "web", "stopped")
+	svc, _ := newServices(t, mock)
+	ctx := context.Background()
+
+	if _, err := svc.CreateSnapshot(ctx, 200, nil); err == nil {
+		t.Error("CreateSnapshot(nil) error = nil, want non-nil")
+	}
+	if _, err := svc.CreateSnapshot(ctx, 200, &lxc.SnapshotSpec{}); err == nil {
+		t.Error("CreateSnapshot(no name) error = nil, want non-nil")
+	}
+	if _, err := svc.RollbackSnapshot(ctx, 200, ""); err == nil {
+		t.Error("RollbackSnapshot(no name) error = nil, want non-nil")
+	}
+	if _, err := svc.DeleteSnapshot(ctx, 200, ""); err == nil {
+		t.Error("DeleteSnapshot(no name) error = nil, want non-nil")
+	}
+}
+
+func TestDeleteSnapshotForce(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddContainer(testNode, 200, "web", "stopped")
+	svc, ts := newServices(t, mock)
+	ctx := context.Background()
+
+	ref, err := svc.CreateSnapshot(ctx, 200, &lxc.SnapshotSpec{Name: "snap"})
+	if err != nil {
+		t.Fatalf("CreateSnapshot: %v", err)
+	}
+	awaitOK(t, ts, ref)
+
+	ref, err = svc.DeleteSnapshot(ctx, 200, "snap", lxc.WithForceDeleteSnapshot())
+	if err != nil {
+		t.Fatalf("DeleteSnapshot(force): %v", err)
+	}
+	awaitOK(t, ts, ref)
+}
+
+func TestSnapshotNotFound(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddContainer(testNode, 200, "web", "stopped")
+	svc, _ := newServices(t, mock)
+
+	if _, err := svc.RollbackSnapshot(context.Background(), 200, "ghost"); !errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("RollbackSnapshot(missing) = %v, want ErrNotFound", err)
+	}
+}
+
 func TestStartNotFound(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()

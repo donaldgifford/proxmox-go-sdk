@@ -217,6 +217,18 @@ exactly — same `Service`/`API`/`var _` shape, pointer write specs, lossless
 `*Option` types + `powerConfig`) stays duplicated per service — only non-trivial
 shared logic moves to `svcutil`.
 
+**LXC snapshots** (task 7) mirror qemu's surface with two API-driven
+differences: a container snapshot has **no `vmstate`** (no live RAM/CPU state to
+capture — it is purely a rootfs/mount-point copy), and `DeleteSnapshot` takes a
+variadic `DeleteSnapshotOption` (`WithForceDeleteSnapshot` → `force=1`, to drop
+a snapshot whose backing volume is already gone). `RollbackSnapshot` keeps the
+shared `WithStartAfterRollback`. The **ZFS/btrfs/LVM-thin backing-store
+requirement is a server-side constraint** — the SDK cannot pre-validate the
+container's storage backend, so an unsupported backend surfaces through the
+`pverr` taxonomy (documented on `SnapshotSpec`). In the mock, the lxc snapshot
+handlers reuse the shared `snapRecord`/`qemuSnapshotPayload`/`finishedTask`
+plumbing (task types `vzsnapshot`/`vzrollback`/`vzdelsnapshot`).
+
 Deliberate deviations from DESIGN-0001 (each documented at its call site): (1)
 `WithCache` is deferred (nothing consumes a cache yet); (2) `Tasks()` takes no
 node (the `tasks.Ref` carries it); (3) **write specs are passed by pointer**
@@ -225,7 +237,7 @@ signature shows — the structs exceed gocritic's `hugeParam` 80-byte threshold,
 and pointer-passing is exactly Uber's "pass large structs by pointer". The
 `API`-interface-in-the-implementing-package choice is intentional (DESIGN-0001
 pins it as the test-double seam, mirroring `api.Client`), not a stutter to fix.
-Next: Phase 2 task 7 (LXC snapshots — ZFS/btrfs/LVM-thin backing).
+Next: Phase 2 task 8 (LXC from OCI image templates, 9.1+ tech-preview).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

@@ -71,6 +71,10 @@ func (s *Server) registerLXCRoutes() {
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/lxc/{vmid}/clone", s.handleLXCClone)
 	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/lxc/{vmid}", s.handleLXCDelete)
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/lxc/{vmid}/status/{action}", s.handleLXCPower)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/lxc/{vmid}/snapshot", s.handleLXCSnapshotList)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/lxc/{vmid}/snapshot", s.handleLXCSnapshotCreate)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/lxc/{vmid}/snapshot/{snap}/rollback", s.handleLXCSnapshotRollback)
+	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/lxc/{vmid}/snapshot/{snap}", s.handleLXCSnapshotDelete)
 }
 
 func (s *Server) handleLXCList(w http.ResponseWriter, r *http.Request) {
@@ -262,6 +266,128 @@ func (s *Server) handleLXCPower(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeData(w, s.finishedTask(node, "vz"+action, strconv.Itoa(vmid)))
+}
+
+func (s *Server) handleLXCSnapshotList(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	s.st.mu.Lock()
+	rec := s.lookupCT(node, vmid)
+	var snaps []qemuSnapshotPayload
+	if rec != nil {
+		snaps = make([]qemuSnapshotPayload, 0, len(rec.Snapshots)+1)
+		for _, snap := range rec.Snapshots {
+			snaps = append(snaps, qemuSnapshotPayload{
+				Name:        snap.Name,
+				Description: snap.Description,
+				SnapTime:    snap.SnapTime,
+			})
+		}
+		// PVE always appends a synthetic "current" entry for the live state.
+		snaps = append(snaps, qemuSnapshotPayload{Name: "current", Description: "You are here!"})
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	s.writeData(w, snaps)
+}
+
+func (s *Server) handleLXCSnapshotCreate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if perr := r.ParseForm(); perr != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	name := r.PostForm.Get("snapname")
+	if name == "" {
+		s.writeError(w, http.StatusBadRequest, "missing snapname")
+		return
+	}
+	s.st.mu.Lock()
+	rec := s.lookupCT(node, vmid)
+	if rec != nil {
+		rec.Snapshots[name] = &snapRecord{
+			Name:        name,
+			Description: r.PostForm.Get("description"),
+		}
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	s.writeData(w, s.finishedTask(node, "vzsnapshot", strconv.Itoa(vmid)))
+}
+
+func (s *Server) handleLXCSnapshotRollback(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node, vmid, ok := s.lxcSnapshotTarget(w, r)
+	if !ok {
+		return
+	}
+	s.writeData(w, s.finishedTask(node, "vzrollback", strconv.Itoa(vmid)))
+}
+
+func (s *Server) handleLXCSnapshotDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node, vmid, ok := s.lxcSnapshotTarget(w, r)
+	if !ok {
+		return
+	}
+	name := r.PathValue("snap")
+	s.st.mu.Lock()
+	if rec := s.lookupCT(node, vmid); rec != nil {
+		delete(rec.Snapshots, name)
+	}
+	s.st.mu.Unlock()
+	s.writeData(w, s.finishedTask(node, "vzdelsnapshot", strconv.Itoa(vmid)))
+}
+
+// lxcSnapshotTarget resolves and validates the {node}/{vmid}/{snap} of a
+// container snapshot sub-request, writing the appropriate error and returning
+// ok=false on failure.
+func (s *Server) lxcSnapshotTarget(w http.ResponseWriter, r *http.Request) (node string, vmid int, ok bool) {
+	node = r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return "", 0, false
+	}
+	name := r.PathValue("snap")
+	s.st.mu.Lock()
+	rec := s.lookupCT(node, vmid)
+	hasSnap := false
+	if rec != nil {
+		_, hasSnap = rec.Snapshots[name]
+	}
+	s.st.mu.Unlock()
+	if rec == nil || !hasSnap {
+		s.writeError(w, http.StatusNotFound, "no such snapshot")
+		return "", 0, false
+	}
+	return node, vmid, true
 }
 
 // applyConfigForm merges a config PUT's form fields into rec.Config, honoring
