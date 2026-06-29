@@ -152,6 +152,45 @@ func TestQEMUClone(t *testing.T) {
 	}
 }
 
+func TestQEMUPower(t *testing.T) {
+	mock := mockpve.New()
+	mock.AddVM("pve", 100, "box", "stopped")
+	c, cleanup := mock.NewClient()
+	defer cleanup()
+	ctx := context.Background()
+
+	var upid string
+	if err := c.DoRequest(ctx, http.MethodPost, "/nodes/pve/qemu/100/status/start", nil, &upid); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if upid == "" {
+		t.Fatal("start returned an empty UPID")
+	}
+
+	var st struct {
+		Status string `json:"status"`
+	}
+	if err := c.DoRequest(ctx, http.MethodGet, "/nodes/pve/qemu/100/status/current", nil, &st); err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	if st.Status != "running" {
+		t.Errorf("status after start = %q, want running", st.Status)
+	}
+}
+
+func TestQEMUPowerUnknownAction(t *testing.T) {
+	mock := mockpve.New()
+	mock.AddVM("pve", 100, "box", "stopped")
+	c, cleanup := mock.NewClient()
+	defer cleanup()
+
+	var out any
+	err := c.DoRequest(context.Background(), http.MethodPost, "/nodes/pve/qemu/100/status/teleport", nil, &out)
+	if err == nil {
+		t.Fatal("unknown power action error = nil, want non-nil")
+	}
+}
+
 func TestQEMUCloneSourceNotFound(t *testing.T) {
 	mock := mockpve.New()
 	c, cleanup := mock.NewClient()

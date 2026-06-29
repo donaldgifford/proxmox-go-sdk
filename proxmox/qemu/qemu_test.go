@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/mockpve"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/pverr"
@@ -13,7 +14,10 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/version"
 )
 
-const testNode = "pve"
+const (
+	testNode = "pve"
+	powerVM  = 100 // the VM the power tests drive.
+)
 
 // newServices wires a qemu and a tasks service onto one mock-backed client so
 // task-returning ops can be awaited in the same test.
@@ -255,6 +259,102 @@ func TestDeleteNotFound(t *testing.T) {
 	_, err := svc.Delete(context.Background(), 999)
 	if !errors.Is(err, pverr.ErrNotFound) {
 		t.Fatalf("Delete(999) error = %v, want ErrNotFound", err)
+	}
+}
+
+// wantStatus fails the test unless the power VM reports the expected state.
+func wantStatus(t *testing.T, svc *qemu.Service, want types.PowerState) {
+	t.Helper()
+	st, err := svc.Get(context.Background(), powerVM)
+	if err != nil {
+		t.Fatalf("Get(%d): %v", powerVM, err)
+	}
+	if st.Status != want {
+		t.Errorf("VM %d status = %q, want %q", powerVM, st.Status, want)
+	}
+}
+
+func TestPowerLifecycle(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, powerVM, "box", "stopped")
+	svc, ts := newServices(t, mock)
+	ctx := context.Background()
+
+	steps := []struct {
+		name string
+		run  func() (tasks.Ref, error)
+		want types.PowerState
+	}{
+		{"Start", func() (tasks.Ref, error) { return svc.Start(ctx, powerVM) }, types.PowerStateRunning},
+		{"Suspend", func() (tasks.Ref, error) { return svc.Suspend(ctx, powerVM) }, types.PowerStateSuspended},
+		{"Resume", func() (tasks.Ref, error) { return svc.Resume(ctx, powerVM) }, types.PowerStateRunning},
+		{"Reboot", func() (tasks.Ref, error) { return svc.Reboot(ctx, powerVM) }, types.PowerStateRunning},
+		{"Shutdown", func() (tasks.Ref, error) { return svc.Shutdown(ctx, powerVM) }, types.PowerStateStopped},
+	}
+	for _, step := range steps {
+		ref, err := step.run()
+		if err != nil {
+			t.Fatalf("%s: %v", step.name, err)
+		}
+		awaitOK(t, ts, ref)
+		wantStatus(t, svc, step.want)
+	}
+}
+
+func TestStopWithTimeout(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, powerVM, "box", "running")
+	svc, ts := newServices(t, mock)
+	ctx := context.Background()
+
+	ref, err := svc.Stop(ctx, powerVM, qemu.WithStopTimeout(30*time.Second))
+	if err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	awaitOK(t, ts, ref)
+	wantStatus(t, svc, types.PowerStateStopped)
+}
+
+func TestShutdownForceStop(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, powerVM, "box", "running")
+	svc, ts := newServices(t, mock)
+	ctx := context.Background()
+
+	ref, err := svc.Shutdown(ctx, powerVM, qemu.WithShutdownTimeout(10*time.Second), qemu.WithForceStop())
+	if err != nil {
+		t.Fatalf("Shutdown: %v", err)
+	}
+	awaitOK(t, ts, ref)
+	wantStatus(t, svc, types.PowerStateStopped)
+}
+
+func TestSuspendToDisk(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, powerVM, "box", "running")
+	svc, ts := newServices(t, mock)
+	ctx := context.Background()
+
+	ref, err := svc.Suspend(ctx, powerVM, qemu.WithSuspendToDisk("local-zfs"))
+	if err != nil {
+		t.Fatalf("Suspend: %v", err)
+	}
+	awaitOK(t, ts, ref)
+	wantStatus(t, svc, types.PowerStateSuspended)
+}
+
+func TestStartNotFound(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc, _ := newServices(t, mock)
+
+	_, err := svc.Start(context.Background(), 999)
+	if !errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("Start(999) error = %v, want ErrNotFound", err)
 	}
 }
 

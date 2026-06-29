@@ -152,7 +152,7 @@ The transport and primitives every service hangs off.
 #### Tasks
 
 - [x] QEMU: list, status, config get/set, create, clone, delete
-- [ ] QEMU power: start/stop/shutdown/reboot/suspend/resume
+- [x] QEMU power: start/stop/shutdown/reboot/suspend/resume
 - [ ] QEMU migrate (online/offline), disk + NIC add/resize/remove
 - [ ] QEMU snapshots: list/create/rollback/delete (+ TPM-state snapshots on
       NFS/CIFS/dir `(9.1+)`)

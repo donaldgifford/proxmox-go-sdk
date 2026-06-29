@@ -39,6 +39,14 @@ type API interface {
 	Create(ctx context.Context, spec *CreateSpec) (tasks.Ref, error)
 	Clone(ctx context.Context, vmid int, spec *CloneSpec) (tasks.Ref, error)
 	Delete(ctx context.Context, vmid int) (tasks.Ref, error)
+
+	// Power transitions.
+	Start(ctx context.Context, vmid int) (tasks.Ref, error)
+	Stop(ctx context.Context, vmid int, opts ...StopOption) (tasks.Ref, error)
+	Shutdown(ctx context.Context, vmid int, opts ...ShutdownOption) (tasks.Ref, error)
+	Reboot(ctx context.Context, vmid int) (tasks.Ref, error)
+	Suspend(ctx context.Context, vmid int, opts ...SuspendOption) (tasks.Ref, error)
+	Resume(ctx context.Context, vmid int) (tasks.Ref, error)
 }
 
 // Compile-time assertion that *Service implements the full contract.

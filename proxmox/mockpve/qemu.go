@@ -11,10 +11,22 @@ import (
 const (
 	mockTaskUser    = "root@pam"
 	vmStatusStopped = "stopped"
+	vmStatusRunning = "running"
 	msgNoSuchVM     = "no such VM"
 	msgInvalidVMID  = "invalid vmid"
 	msgInvalidForm  = "invalid form body"
 )
+
+// qemuPowerStatus maps a /status/{action} verb to the run state the mock VM
+// settles into once the synthetic task completes.
+var qemuPowerStatus = map[string]string{
+	"start":    vmStatusRunning,
+	"stop":     vmStatusStopped,
+	"shutdown": vmStatusStopped,
+	"reboot":   vmStatusRunning,
+	"suspend":  "suspended",
+	"resume":   vmStatusRunning,
+}
 
 // qemuState is the QEMU slice of the mock model, embedded in state and guarded
 // by state.mu.
@@ -122,6 +134,7 @@ func (s *Server) registerQEMURoutes() {
 	s.mux.HandleFunc("PUT /api2/json/nodes/{node}/qemu/{vmid}/config", s.handleQEMUSetConfig)
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/clone", s.handleQEMUClone)
 	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/qemu/{vmid}", s.handleQEMUDelete)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/status/{action}", s.handleQEMUPower)
 }
 
 func (s *Server) handleQEMUList(w http.ResponseWriter, r *http.Request) {
@@ -285,6 +298,35 @@ func (s *Server) handleQEMUDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	s.removeVM(node, vmid)
 	s.writeData(w, s.finishedTask(node, "qmdestroy", strconv.Itoa(vmid)))
+}
+
+func (s *Server) handleQEMUPower(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	action := r.PathValue("action")
+	newStatus, ok := qemuPowerStatus[action]
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "unknown power action")
+		return
+	}
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	s.st.mu.Lock()
+	rec := s.lookupVM(node, vmid)
+	if rec != nil {
+		rec.Status = newStatus
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	s.writeData(w, s.finishedTask(node, "qm"+action, strconv.Itoa(vmid)))
 }
 
 // finishedTask records a synthetic task that is already complete with exit
