@@ -75,6 +75,30 @@ func (s *Server) registerLXCRoutes() {
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/lxc/{vmid}/snapshot", s.handleLXCSnapshotCreate)
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/lxc/{vmid}/snapshot/{snap}/rollback", s.handleLXCSnapshotRollback)
 	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/lxc/{vmid}/snapshot/{snap}", s.handleLXCSnapshotDelete)
+	// Storage download-url backs lxc.PullOCITemplate; it moves to the storage
+	// mock when that service lands (Phase 3).
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/storage/{storage}/download-url", s.handleStorageDownloadURL)
+}
+
+// handleStorageDownloadURL models POST /nodes/{node}/storage/{storage}/download-url,
+// the endpoint lxc.PullOCITemplate drives to fetch an OCI image into vztmpl
+// content. It validates the form and returns a download task without modelling
+// the resulting template volume.
+func (s *Server) handleStorageDownloadURL(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if err := r.ParseForm(); err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	if r.PostForm.Get("url") == "" || r.PostForm.Get("filename") == "" {
+		s.writeError(w, http.StatusBadRequest, "missing url or filename")
+		return
+	}
+	s.writeData(w, s.finishedTask(node, "download", r.PathValue("storage")))
 }
 
 func (s *Server) handleLXCList(w http.ResponseWriter, r *http.Request) {

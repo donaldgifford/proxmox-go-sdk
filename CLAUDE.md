@@ -229,6 +229,20 @@ container's storage backend, so an unsupported backend surfaces through the
 handlers reuse the shared `snapRecord`/`qemuSnapshotPayload`/`finishedTask`
 plumbing (task types `vzsnapshot`/`vzrollback`/`vzdelsnapshot`).
 
+**LXC OCI templates** (task 8) are the SDK's first **version-gated** op:
+`PullOCITemplate(ctx, *OCITemplateSpec)` pulls an OCI image
+(`Reference`/`Storage`/`Filename`) into a storage's `vztmpl` content and returns
+the download task; the resulting volume id is usable as `CreateSpec.OSTemplate`.
+The op gates on `s.caps.Require("LXC OCI templates", "9.1")` — a pre-9.1 node
+returns a `pverr.ErrUnsupported`-wrapped error _before_ any request (the gate
+fires after the nil-spec guard, before field validation). It drives the node's
+storage `download-url` endpoint
+(`POST /nodes/{node}/storage/{storage}/download-url`, `content=vztmpl`); that
+generic storage surface — and its mock handler, parked in `mockpve/lxc.go` for
+now — moves to the storage service in Phase 3. This is the template for every
+later minor-gated op: gate with `caps.Require`, surface `ErrUnsupported`,
+document the tech-preview status on the spec.
+
 Deliberate deviations from DESIGN-0001 (each documented at its call site): (1)
 `WithCache` is deferred (nothing consumes a cache yet); (2) `Tasks()` takes no
 node (the `tasks.Ref` carries it); (3) **write specs are passed by pointer**
@@ -237,7 +251,7 @@ signature shows — the structs exceed gocritic's `hugeParam` 80-byte threshold,
 and pointer-passing is exactly Uber's "pass large structs by pointer". The
 `API`-interface-in-the-implementing-package choice is intentional (DESIGN-0001
 pins it as the test-double seam, mirroring `api.Client`), not a stutter to fix.
-Next: Phase 2 task 8 (LXC from OCI image templates, 9.1+ tech-preview).
+Next: Phase 2 task 9 (promote qemu+lxc doc.go with runnable Examples).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

@@ -159,7 +159,7 @@ The transport and primitives every service hangs off.
 - [x] Guest-agent exec + fine-grained agent privileges (9.x model)
 - [x] LXC: list, status, config, create, clone, delete, power
 - [x] LXC snapshots (ZFS/btrfs/LVM-thin backing)
-- [ ] LXC from **OCI image templates** `(9.1+ tp)` — pull/upload OCI as template
+- [x] LXC from **OCI image templates** `(9.1+ tp)` — pull/upload OCI as template
 - [ ] Promote the `doc.go` stubs for `qemu` + `lxc` — real package overview + a
       runnable `Example` (e.g. clone → start)
 

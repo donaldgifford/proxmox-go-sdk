@@ -50,6 +50,9 @@ type API interface {
 	CreateSnapshot(ctx context.Context, vmid int, spec *SnapshotSpec) (tasks.Ref, error)
 	RollbackSnapshot(ctx context.Context, vmid int, name string, opts ...RollbackOption) (tasks.Ref, error)
 	DeleteSnapshot(ctx context.Context, vmid int, name string, opts ...DeleteSnapshotOption) (tasks.Ref, error)
+
+	// PullOCITemplate pulls an OCI image as a container template (9.1+).
+	PullOCITemplate(ctx context.Context, spec *OCITemplateSpec) (tasks.Ref, error)
 }
 
 // Compile-time assertion that *Service implements the full contract.

@@ -396,6 +396,71 @@ func TestSnapshotNotFound(t *testing.T) {
 	}
 }
 
+func TestPullOCITemplate(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	c, cleanup := mock.NewClient()
+	t.Cleanup(cleanup)
+	caps, err := version.Parse("9.1")
+	if err != nil {
+		t.Fatalf("version.Parse: %v", err)
+	}
+	svc := lxc.NewService(c, testNode, caps)
+	ts := tasks.NewService(c)
+
+	ref, err := svc.PullOCITemplate(context.Background(), &lxc.OCITemplateSpec{
+		Storage:   "local",
+		Reference: "docker://library/alpine:3.20",
+		Filename:  "alpine-3.20.tar",
+	})
+	if err != nil {
+		t.Fatalf("PullOCITemplate: %v", err)
+	}
+	awaitOK(t, ts, ref)
+}
+
+func TestPullOCITemplateGated(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc, _ := newServices(t, mock) // newServices uses the zero Capabilities (gates 9.1 off).
+
+	_, err := svc.PullOCITemplate(context.Background(), &lxc.OCITemplateSpec{
+		Storage:   "local",
+		Reference: "docker://library/alpine:3.20",
+		Filename:  "alpine-3.20.tar",
+	})
+	if !errors.Is(err, pverr.ErrUnsupported) {
+		t.Fatalf("PullOCITemplate on pre-9.1 = %v, want ErrUnsupported", err)
+	}
+}
+
+func TestPullOCITemplateValidation(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	c, cleanup := mock.NewClient()
+	t.Cleanup(cleanup)
+	caps, err := version.Parse("9.1")
+	if err != nil {
+		t.Fatalf("version.Parse: %v", err)
+	}
+	svc := lxc.NewService(c, testNode, caps)
+	ctx := context.Background()
+
+	if _, err := svc.PullOCITemplate(ctx, nil); err == nil {
+		t.Error("PullOCITemplate(nil) error = nil, want non-nil")
+	}
+	cases := map[string]*lxc.OCITemplateSpec{
+		"no storage":   {Reference: "docker://alpine", Filename: "a.tar"},
+		"no reference": {Storage: "local", Filename: "a.tar"},
+		"no filename":  {Storage: "local", Reference: "docker://alpine"},
+	}
+	for name, spec := range cases {
+		if _, err := svc.PullOCITemplate(ctx, spec); err == nil {
+			t.Errorf("PullOCITemplate(%s) error = nil, want non-nil", name)
+		}
+	}
+}
+
 func TestStartNotFound(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()
