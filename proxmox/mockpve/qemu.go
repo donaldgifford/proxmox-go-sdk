@@ -45,6 +45,7 @@ type vmRecord struct {
 	Status    string
 	Config    map[string]any
 	Snapshots map[string]*snapRecord // keyed by snapshot name.
+	Agent     *agentResult           // seeded guest-agent exec result; nil = success.
 }
 
 // snapRecord models one VM snapshot in the mock.
@@ -53,6 +54,14 @@ type snapRecord struct {
 	Description string
 	VMState     bool
 	SnapTime    int64
+}
+
+// agentResult is the canned guest-agent exec result a VM returns from
+// /agent/exec-status. The mock always reports the command as exited.
+type agentResult struct {
+	ExitCode int
+	OutData  string
+	ErrData  string
 }
 
 // qemuListEntry is one element of GET /nodes/{node}/qemu.
@@ -75,6 +84,19 @@ type qemuSnapshotPayload struct {
 	Description string `json:"description,omitempty"`
 	VMState     int    `json:"vmstate,omitempty"`
 	SnapTime    int64  `json:"snaptime,omitempty"`
+}
+
+// agentExecPayload is the data of POST /nodes/{node}/qemu/{vmid}/agent/exec.
+type agentExecPayload struct {
+	PID int `json:"pid"`
+}
+
+// agentExecStatusPayload is the data of GET .../agent/exec-status.
+type agentExecStatusPayload struct {
+	Exited   int    `json:"exited"`
+	ExitCode int    `json:"exitcode"`
+	OutData  string `json:"out-data,omitempty"`
+	ErrData  string `json:"err-data,omitempty"`
 }
 
 // AddVM seeds a VM on node with the given name and status ("stopped" or
@@ -110,6 +132,16 @@ func (s *Server) SetVMConfig(node string, vmid int, fields map[string]any) {
 	}
 	for k, v := range fields {
 		rec.Config[k] = v
+	}
+}
+
+// SetVMAgentResult seeds what the VM's guest agent returns from an exec: the
+// exit code and captured stdout/stderr. It is a no-op if the VM does not exist.
+func (s *Server) SetVMAgentResult(node string, vmid, exitCode int, outData, errData string) {
+	s.st.mu.Lock()
+	defer s.st.mu.Unlock()
+	if rec := s.lookupVM(node, vmid); rec != nil {
+		rec.Agent = &agentResult{ExitCode: exitCode, OutData: outData, ErrData: errData}
 	}
 }
 
@@ -160,6 +192,9 @@ func (s *Server) registerQEMURoutes() {
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/snapshot", s.handleQEMUSnapshotCreate)
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/snapshot/{snap}/rollback", s.handleQEMUSnapshotRollback)
 	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/qemu/{vmid}/snapshot/{snap}", s.handleQEMUSnapshotDelete)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/agent/ping", s.handleQEMUAgentPing)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/agent/exec", s.handleQEMUAgentExec)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/qemu/{vmid}/agent/exec-status", s.handleQEMUAgentExecStatus)
 }
 
 func (s *Server) handleQEMUList(w http.ResponseWriter, r *http.Request) {
@@ -546,6 +581,81 @@ func (s *Server) snapshotTarget(w http.ResponseWriter, r *http.Request) (node st
 		return "", 0, false
 	}
 	return node, vmid, true
+}
+
+// agentMockPID is the fixed guest PID the mock reports for every exec; the mock
+// does not track real processes, so exec-status answers from the seeded result.
+const agentMockPID = 1000
+
+func (s *Server) handleQEMUAgentPing(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	if !s.agentVMExists(w, r) {
+		return
+	}
+	s.writeData(w, nil)
+}
+
+func (s *Server) handleQEMUAgentExec(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	if !s.agentVMExists(w, r) {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if err := r.ParseForm(); err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	if len(r.PostForm["command"]) == 0 {
+		s.writeError(w, http.StatusBadRequest, "missing command")
+		return
+	}
+	s.writeData(w, agentExecPayload{PID: agentMockPID})
+}
+
+func (s *Server) handleQEMUAgentExecStatus(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	s.st.mu.Lock()
+	rec := s.lookupVM(node, vmid)
+	payload := agentExecStatusPayload{Exited: 1}
+	if rec != nil && rec.Agent != nil {
+		payload.ExitCode = rec.Agent.ExitCode
+		payload.OutData = rec.Agent.OutData
+		payload.ErrData = rec.Agent.ErrData
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	s.writeData(w, payload)
+}
+
+// agentVMExists validates the {node}/{vmid} of an agent request, writing the
+// error and returning false when the VM is unknown.
+func (s *Server) agentVMExists(w http.ResponseWriter, r *http.Request) bool {
+	node := r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return false
+	}
+	if !s.vmExists(node, vmid) {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return false
+	}
+	return true
 }
 
 // finishedTask records a synthetic task that is already complete with exit

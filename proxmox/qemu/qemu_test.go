@@ -611,6 +611,76 @@ func TestRollbackUnknownSnapshot(t *testing.T) {
 	}
 }
 
+func TestAgentPing(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "box", "running")
+	svc, _ := newServices(t, mock)
+
+	if err := svc.AgentPing(context.Background(), 100); err != nil {
+		t.Fatalf("AgentPing: %v", err)
+	}
+}
+
+func TestAgentPingNotFound(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc, _ := newServices(t, mock)
+
+	if err := svc.AgentPing(context.Background(), 999); !errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("AgentPing(999) = %v, want ErrNotFound", err)
+	}
+}
+
+func TestAgentExecWait(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "box", "running")
+	mock.SetVMAgentResult(testNode, 100, 0, "hello from guest\n", "")
+	svc, _ := newServices(t, mock)
+
+	st, err := svc.AgentExecWait(context.Background(), 100, []string{"echo", "hello from guest"})
+	if err != nil {
+		t.Fatalf("AgentExecWait: %v", err)
+	}
+	if !st.Exited.Bool() {
+		t.Error("exec status Exited = false, want true")
+	}
+	if st.ExitCode != 0 {
+		t.Errorf("ExitCode = %d, want 0", st.ExitCode)
+	}
+	if st.OutData != "hello from guest\n" {
+		t.Errorf("OutData = %q, want the greeting", st.OutData)
+	}
+}
+
+func TestAgentExecNonZeroExit(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "box", "running")
+	mock.SetVMAgentResult(testNode, 100, 2, "", "boom\n")
+	svc, _ := newServices(t, mock)
+
+	st, err := svc.AgentExecWait(context.Background(), 100, []string{"false"})
+	if err != nil {
+		t.Fatalf("AgentExecWait: %v", err)
+	}
+	if st.ExitCode != 2 || st.ErrData != "boom\n" {
+		t.Errorf("status = %+v, want exitcode 2 / err boom", st)
+	}
+}
+
+func TestAgentExecEmptyCommand(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "box", "running")
+	svc, _ := newServices(t, mock)
+
+	if _, err := svc.AgentExec(context.Background(), 100, nil); err == nil {
+		t.Error("AgentExec(nil command) error = nil, want non-nil")
+	}
+}
+
 // TestCreateWithExtra exercises the unmodelled-param escape hatch end to end.
 func TestCreateWithExtra(t *testing.T) {
 	t.Parallel()

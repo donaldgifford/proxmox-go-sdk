@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"testing"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/mockpve"
@@ -188,6 +189,42 @@ func TestQEMUPowerUnknownAction(t *testing.T) {
 	err := c.DoRequest(context.Background(), http.MethodPost, "/nodes/pve/qemu/100/status/teleport", nil, &out)
 	if err == nil {
 		t.Fatal("unknown power action error = nil, want non-nil")
+	}
+}
+
+func TestQEMUAgent(t *testing.T) {
+	mock := mockpve.New()
+	mock.AddVM("pve", 100, "box", "running")
+	mock.SetVMAgentResult("pve", 100, 0, "ok\n", "")
+	c, cleanup := mock.NewClient()
+	defer cleanup()
+	ctx := context.Background()
+
+	if err := c.DoRequest(ctx, http.MethodPost, "/nodes/pve/qemu/100/agent/ping", nil, nil); err != nil {
+		t.Fatalf("ping: %v", err)
+	}
+
+	var exec struct {
+		PID int `json:"pid"`
+	}
+	if err := c.DoRequest(ctx, http.MethodPost, "/nodes/pve/qemu/100/agent/exec", url.Values{"command": {"echo", "hi"}}, &exec); err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	if exec.PID == 0 {
+		t.Error("exec returned pid 0")
+	}
+
+	var status struct {
+		Exited   int    `json:"exited"`
+		ExitCode int    `json:"exitcode"`
+		OutData  string `json:"out-data"`
+	}
+	path := "/nodes/pve/qemu/100/agent/exec-status?pid=" + strconv.Itoa(exec.PID)
+	if err := c.DoRequest(ctx, http.MethodGet, path, nil, &status); err != nil {
+		t.Fatalf("exec-status: %v", err)
+	}
+	if status.Exited != 1 || status.OutData != "ok\n" {
+		t.Errorf("exec-status = %+v, want exited=1 out=ok", status)
 	}
 }
 

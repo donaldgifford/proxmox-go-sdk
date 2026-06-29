@@ -156,7 +156,7 @@ The transport and primitives every service hangs off.
 - [x] QEMU migrate (online/offline), disk + NIC add/resize/remove
 - [x] QEMU snapshots: list/create/rollback/delete (+ TPM-state snapshots on
       NFS/CIFS/dir `(9.1+)`)
-- [ ] Guest-agent exec + fine-grained agent privileges (9.x model)
+- [x] Guest-agent exec + fine-grained agent privileges (9.x model)
 - [ ] LXC: list, status, config, create, clone, delete, power
 - [ ] LXC snapshots (ZFS/btrfs/LVM-thin backing)
 - [ ] LXC from **OCI image templates** `(9.1+ tp)` — pull/upload OCI as template

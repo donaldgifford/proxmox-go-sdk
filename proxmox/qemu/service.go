@@ -61,6 +61,12 @@ type API interface {
 	CreateSnapshot(ctx context.Context, vmid int, spec *SnapshotSpec) (tasks.Ref, error)
 	RollbackSnapshot(ctx context.Context, vmid int, name string, opts ...RollbackOption) (tasks.Ref, error)
 	DeleteSnapshot(ctx context.Context, vmid int, name string) (tasks.Ref, error)
+
+	// Guest agent.
+	AgentPing(ctx context.Context, vmid int) error
+	AgentExec(ctx context.Context, vmid int, command []string) (int, error)
+	AgentExecStatus(ctx context.Context, vmid, pid int) (*AgentExecStatus, error)
+	AgentExecWait(ctx context.Context, vmid int, command []string) (*AgentExecStatus, error)
 }
 
 // Compile-time assertion that *Service implements the full contract.
