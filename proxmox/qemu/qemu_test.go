@@ -40,6 +40,47 @@ func awaitOK(t *testing.T, ts *tasks.Service, ref tasks.Ref) {
 	}
 }
 
+// TestLifecycleEndToEnd exercises the Phase 2 success criterion for QEMU:
+// create → start → snapshot → rollback → stop → delete, end to end against the
+// mock, awaiting every task.
+func TestLifecycleEndToEnd(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc, ts := newServices(t, mock)
+	ctx := context.Background()
+	const vmid = 150
+
+	create, err := svc.Create(ctx, &qemu.CreateSpec{VMID: vmid, Name: "lifecycle", Memory: 1024, Cores: 2})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	awaitOK(t, ts, create)
+
+	steps := []struct {
+		name string
+		run  func() (tasks.Ref, error)
+	}{
+		{"Start", func() (tasks.Ref, error) { return svc.Start(ctx, vmid) }},
+		{"CreateSnapshot", func() (tasks.Ref, error) {
+			return svc.CreateSnapshot(ctx, vmid, &qemu.SnapshotSpec{Name: "snap1"})
+		}},
+		{"RollbackSnapshot", func() (tasks.Ref, error) { return svc.RollbackSnapshot(ctx, vmid, "snap1") }},
+		{"Stop", func() (tasks.Ref, error) { return svc.Stop(ctx, vmid) }},
+		{"Delete", func() (tasks.Ref, error) { return svc.Delete(ctx, vmid) }},
+	}
+	for _, step := range steps {
+		ref, rerr := step.run()
+		if rerr != nil {
+			t.Fatalf("%s: %v", step.name, rerr)
+		}
+		awaitOK(t, ts, ref)
+	}
+
+	if _, err := svc.Get(ctx, vmid); !errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("Get after Delete = %v, want ErrNotFound", err)
+	}
+}
+
 func TestList(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()

@@ -256,9 +256,14 @@ pins it as the test-double seam, mirroring `api.Client`), not a stutter to fix.
 `mockpve.Serve()` URL with an `// Output:` block (the Phase 1 convention) — qemu
 shows clone → start, lxc shows create → start. They are documentation _and_
 tests. The qemu/lxc `doc.go` overviews are promoted to describe the full landed
-surface (no more "lands in a later task" stubs). Next: verify Phase 2 Success
-Criteria (create→start→snapshot→rollback→stop→delete end-to-end), then Phase 3
-(storage).
+surface (no more "lands in a later task" stubs).
+
+**Phase 2 (compute) is implementation-complete** — all 9 tasks checked. The
+phase Success Criterion (create → start → snapshot → rollback → stop → delete
+end-to-end for both QEMU and LXC) is covered by `TestLifecycleEndToEnd` in each
+service's test file — **mock-verified** (the chain runs against `mockpve`,
+awaiting every task); a live 9.x node is not reachable here, so the end-to-end
+behaviour against real PVE is written-but-unverified. Next: Phase 3 (storage).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:
