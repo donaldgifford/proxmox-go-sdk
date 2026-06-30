@@ -303,9 +303,23 @@ Task 3 (volume-chain snapshots) is the SDK's first **storage** version-gated op:
 without native support (thick-LVM, dir/NFS/CIFS via qcow2 chains). **The gate is
 the firm, mock-verified part; the storage-level snapshot endpoint shape is
 unconfirmed** (no apidoc) — the path `…/content/{volid}/snapshot` mirrors the
-guest convention and is documented as needing live-node verification. Next:
-Phase 3 task 4 (ISO/disk-image streaming upload — needs the new
-`api.Client.DoUpload`).
+guest convention and is documented as needing live-node verification.
+
+Task 4 (ISO/disk-image streaming upload) extended the **transport**: the
+`api.Client` interface gained
+`DoUpload(ctx, path, body io.Reader, contentType, out)` — a multipart POST that
+applies the same auth+CSRF as a write but **does not retry** (an upload body is
+a single-use stream; a failed upload must be restarted by the caller). Only
+`*transport` implements `api.Client`, so the interface grew safely.
+`storage.UploadISO`/`UploadDiskImage` build the multipart body with an
+`io.Pipe` + `multipart.Writer` in a goroutine so the file is **never buffered
+whole**; on a DoUpload error the read end is closed to unblock the writer
+goroutine (closed through an `io.Closer`-typed value to satisfy errcheck's
+`check-blank`, since `(*io.PipeReader).Close` isn't matched by the
+`(io.Closer).Close` exclude). The mock's `NewClient` returns the real transport,
+so DoUpload is exercised end-to-end; `TestDoUpload` in the api package covers
+the auth/Content-Type/stream path directly. Next: Phase 3 task 5 (snippet/backup
+upload via the ssh/SFTP side-channel).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

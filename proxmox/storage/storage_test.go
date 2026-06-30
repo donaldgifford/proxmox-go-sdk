@@ -3,6 +3,7 @@ package storage_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/mockpve"
@@ -307,6 +308,75 @@ func TestVolumeSnapshotLifecycle(t *testing.T) {
 	}
 	if len(snaps) != 0 {
 		t.Fatalf("VolumeSnapshots after delete = %+v, want none", snaps)
+	}
+}
+
+func TestUploadISO(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc, ts := newServiceAndTasks(t, mock)
+	ctx := context.Background()
+
+	payload := "FAKE-ISO-BYTES-0123456789"
+	ref, err := svc.UploadISO(ctx, testNode, "local", &storage.UploadSpec{
+		Filename: "debian-12.iso",
+		Reader:   strings.NewReader(payload),
+	})
+	if err != nil {
+		t.Fatalf("UploadISO: %v", err)
+	}
+	awaitOK(t, ts, ref)
+
+	all, err := svc.ListContent(ctx, testNode, "local", storage.WithContentType("iso"))
+	if err != nil {
+		t.Fatalf("ListContent: %v", err)
+	}
+	if len(all) != 1 || all[0].Volid != "local:iso/debian-12.iso" {
+		t.Fatalf("ListContent after upload = %+v, want the uploaded ISO", all)
+	}
+	if all[0].Size != int64(len(payload)) {
+		t.Errorf("uploaded size = %d, want %d (the streamed byte count)", all[0].Size, len(payload))
+	}
+}
+
+func TestUploadDiskImage(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc, ts := newServiceAndTasks(t, mock)
+	ctx := context.Background()
+
+	ref, err := svc.UploadDiskImage(ctx, testNode, "local", &storage.UploadSpec{
+		Filename: "cloudimg.qcow2",
+		Reader:   strings.NewReader("QCOW2-FAKE"),
+	})
+	if err != nil {
+		t.Fatalf("UploadDiskImage: %v", err)
+	}
+	awaitOK(t, ts, ref)
+
+	all, err := svc.ListContent(ctx, testNode, "local", storage.WithContentType("import"))
+	if err != nil {
+		t.Fatalf("ListContent: %v", err)
+	}
+	if len(all) != 1 || all[0].Volid != "local:import/cloudimg.qcow2" {
+		t.Fatalf("ListContent after upload = %+v, want the uploaded image", all)
+	}
+}
+
+func TestUploadValidation(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	if _, err := svc.UploadISO(ctx, testNode, "local", nil); err == nil {
+		t.Error("UploadISO(nil) error = nil, want non-nil")
+	}
+	if _, err := svc.UploadISO(ctx, testNode, "local", &storage.UploadSpec{Reader: strings.NewReader("x")}); err == nil {
+		t.Error("UploadISO(no filename) error = nil, want non-nil")
+	}
+	if _, err := svc.UploadISO(ctx, testNode, "local", &storage.UploadSpec{Filename: "a.iso"}); err == nil {
+		t.Error("UploadISO(no reader) error = nil, want non-nil")
 	}
 }
 

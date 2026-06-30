@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"io"
 	"net/http"
 )
 
@@ -14,8 +15,15 @@ import (
 // ticket expiry. ExpandPath normalises a relative path to the full
 // /api2/json/… request path; it does not interpolate node or vmid (services
 // build those). HTTP exposes the underlying client as an escape hatch.
+//
+// DoUpload streams a multipart/form-data POST (the caller supplies the body
+// reader and its Content-Type, typically from a multipart.Writer fed by an
+// io.Pipe) and unwraps the envelope into out. It applies the same auth and CSRF
+// as a write but does NOT retry — an upload is not idempotent, so on failure the
+// caller must restart it with a fresh reader.
 type Client interface {
 	DoRequest(ctx context.Context, method, path string, body, out any) error
+	DoUpload(ctx context.Context, path string, body io.Reader, contentType string, out any) error
 	ExpandPath(path string) string
 	HTTP() *http.Client
 }

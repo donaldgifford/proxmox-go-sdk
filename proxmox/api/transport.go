@@ -188,6 +188,41 @@ func (t *transport) DoRequest(ctx context.Context, method, path string, body, ou
 	return err
 }
 
+// DoUpload streams a multipart POST to path and unwraps the envelope into out.
+// It refreshes credentials and applies auth + CSRF like a write, but does not
+// retry or fail over: an upload body is a single-use stream, so a failed upload
+// must be restarted by the caller with a fresh reader. It targets the primary
+// endpoint only.
+func (t *transport) DoUpload(ctx context.Context, path string, body io.Reader, contentType string, out any) error {
+	if t.creds.needsRefresh() {
+		if err := t.creds.refresh(ctx, t.doRaw, false); err != nil {
+			return err
+		}
+	}
+
+	expandedPath := t.ExpandPath(path)
+	fullURL := t.conn.baseURL().String() + expandedPath
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, body)
+	if err != nil {
+		return fmt.Errorf("api: build upload request: %w", err)
+	}
+	req.Header.Set("Content-Type", contentType)
+	if t.userAgent != "" {
+		req.Header.Set("User-Agent", t.userAgent)
+	}
+	t.creds.authorize(req)
+	if csrf := t.creds.csrfToken(); csrf != "" {
+		req.Header.Set("CSRFPreventionToken", csrf)
+	}
+
+	resp, err := t.http.Do(req)
+	if err != nil {
+		return pverr.ClassifyNetError(expandedPath, err)
+	}
+	return readResponse(resp, expandedPath, out)
+}
+
 // execute runs the request with per-endpoint retry and sticky failover.
 func (t *transport) execute(ctx context.Context, method, path string, body, out any) error {
 	expandedPath := t.ExpandPath(path)

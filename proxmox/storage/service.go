@@ -51,6 +51,10 @@ type API interface {
 	VolumeSnapshots(ctx context.Context, node, storage, volid string) ([]VolumeSnapshot, error)
 	CreateVolumeSnapshot(ctx context.Context, node, storage, volid string, spec *VolumeSnapshotSpec) (tasks.Ref, error)
 	DeleteVolumeSnapshot(ctx context.Context, node, storage, volid, snapname string) (tasks.Ref, error)
+
+	// Streaming uploads (task 4).
+	UploadISO(ctx context.Context, node, storage string, spec *UploadSpec) (tasks.Ref, error)
+	UploadDiskImage(ctx context.Context, node, storage string, spec *UploadSpec) (tasks.Ref, error)
 }
 
 // Compile-time assertion that *Service implements the published contract. The

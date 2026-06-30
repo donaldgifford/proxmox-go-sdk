@@ -1,10 +1,13 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -119,6 +122,68 @@ func TestFormEncodeStringRoundTrip(t *testing.T) {
 	}
 	if vals.Get("desc") != desc {
 		t.Errorf("round-trip desc = %q, want %q", vals.Get("desc"), desc)
+	}
+}
+
+func TestDoUpload(t *testing.T) {
+	var gotAuth, gotPath, gotContent, gotFile string
+	var multipartCT bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		gotPath = r.URL.Path
+		mediaType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		multipartCT = mediaType == "multipart/form-data"
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			http.Error(w, "bad multipart", http.StatusBadRequest)
+			return
+		}
+		gotContent = r.FormValue("content")
+		if f, _, err := r.FormFile("filename"); err == nil {
+			b, _ := io.ReadAll(f)
+			gotFile = string(b)
+			_ = f.Close()
+		}
+		io.WriteString(w, `{"data":"UPID:pve:0:0:0:imgcopy:local:root@pam:"}`)
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL, TokenCredentials("root@pam!t", "sec"))
+
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	if err := mw.WriteField("content", "iso"); err != nil {
+		t.Fatalf("WriteField: %v", err)
+	}
+	fw, err := mw.CreateFormFile("filename", "x.iso")
+	if err != nil {
+		t.Fatalf("CreateFormFile: %v", err)
+	}
+	io.WriteString(fw, "PAYLOAD")
+	if err := mw.Close(); err != nil {
+		t.Fatalf("multipart Close: %v", err)
+	}
+
+	var upid string
+	if err := c.DoUpload(context.Background(), "nodes/pve/storage/local/upload", &buf, mw.FormDataContentType(), &upid); err != nil {
+		t.Fatalf("DoUpload: %v", err)
+	}
+	if upid == "" {
+		t.Error("DoUpload returned empty UPID")
+	}
+	if gotPath != "/api2/json/nodes/pve/storage/local/upload" {
+		t.Errorf("server path = %q, want the expanded upload path", gotPath)
+	}
+	if want := "PVEAPIToken=root@pam!t=sec"; gotAuth != want {
+		t.Errorf("Authorization = %q, want %q", gotAuth, want)
+	}
+	if !multipartCT {
+		t.Error("server did not see a multipart/form-data Content-Type")
+	}
+	if gotContent != "iso" {
+		t.Errorf("content field = %q, want iso", gotContent)
+	}
+	if gotFile != "PAYLOAD" {
+		t.Errorf("streamed file = %q, want PAYLOAD", gotFile)
 	}
 }
 

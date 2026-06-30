@@ -1,9 +1,15 @@
 package mockpve
 
 import (
+	"io"
 	"net/http"
 	"strconv"
 )
+
+// maxUploadBytes bounds the in-memory multipart parse for the mock upload
+// handler. The mock stores no bytes (it drains the file to measure size), so a
+// modest cap is fine for tests.
+const maxUploadBytes = 32 << 20 // 32 MiB
 
 // storageState is the storage slice of the mock model, embedded in state and
 // guarded by state.mu. Datastore config is cluster-scoped (stores); content is
@@ -135,6 +141,43 @@ func (s *Server) registerStorageRoutes() {
 	s.mux.HandleFunc("GET /api2/json/nodes/{node}/storage/{storage}/content/{volid}/snapshot", s.handleVolSnapshotList)
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/storage/{storage}/content/{volid}/snapshot", s.handleVolSnapshotCreate)
 	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/storage/{storage}/content/{volid}/snapshot/{snap}", s.handleVolSnapshotDelete)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/storage/{storage}/upload", s.handleStorageUpload)
+}
+
+// handleStorageUpload models the streaming multipart upload endpoint. It reads
+// the multipart form (buffering is fine in the test responder), records the
+// uploaded object as content, and returns an import task.
+func (s *Server) handleStorageUpload(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	storage := r.PathValue("storage")
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
+	if err := r.ParseMultipartForm(maxUploadBytes); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid multipart body")
+		return
+	}
+	content := r.FormValue("content")
+	if content == "" {
+		s.writeError(w, http.StatusBadRequest, "missing content")
+		return
+	}
+	file, header, err := r.FormFile("filename")
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "missing file part")
+		return
+	}
+	n, cerr := io.Copy(io.Discard, file) // drain to measure size; the mock stores no bytes.
+	_ = file.Close()
+	if cerr != nil {
+		s.writeError(w, http.StatusBadRequest, "read upload body")
+		return
+	}
+
+	volid := storage + ":" + content + "/" + header.Filename
+	s.AddVolume(node, storage, volid, content, "", n)
+	s.writeData(w, s.finishedTask(node, "imgcopy", storage))
 }
 
 func (s *Server) handleDatastoreList(w http.ResponseWriter, r *http.Request) {
@@ -315,7 +358,7 @@ func (s *Server) handleVolumeDelete(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusNotFound, msgNoSuchVolume)
 		return
 	}
-	s.writeData(w, s.finishedTask(node, "imgdel", volid))
+	s.writeData(w, s.finishedTask(node, "imgdel", storage))
 }
 
 func (s *Server) handleVolSnapshotList(w http.ResponseWriter, r *http.Request) {
@@ -367,7 +410,7 @@ func (s *Server) handleVolSnapshotCreate(w http.ResponseWriter, r *http.Request)
 		s.writeError(w, http.StatusNotFound, msgNoSuchVolume)
 		return
 	}
-	s.writeData(w, s.finishedTask(node, "volsnapshot", volid))
+	s.writeData(w, s.finishedTask(node, "volsnapshot", storage))
 }
 
 func (s *Server) handleVolSnapshotDelete(w http.ResponseWriter, r *http.Request) {
@@ -389,7 +432,7 @@ func (s *Server) handleVolSnapshotDelete(w http.ResponseWriter, r *http.Request)
 		s.writeError(w, http.StatusNotFound, "no such snapshot")
 		return
 	}
-	s.writeData(w, s.finishedTask(node, "voldelsnapshot", volid))
+	s.writeData(w, s.finishedTask(node, "voldelsnapshot", storage))
 }
 
 func datastoreToPayload(rec *storeRecord) datastorePayload {

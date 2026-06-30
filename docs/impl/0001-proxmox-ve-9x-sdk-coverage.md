@@ -181,7 +181,9 @@ The transport and primitives every service hangs off.
 - [x] **Snapshots as volume chains** on thick-LVM + Directory/NFS/CIFS
       `(tp → maturing)` — capability-gated (`VolumeChainSnapshots` 9.1+; gate
       mock-verified, endpoint shape unconfirmed without a live node)
-- [ ] ISO / disk-image upload (large-file streaming)
+- [x] ISO / disk-image upload (large-file streaming) — `UploadISO`/
+      `UploadDiskImage` over the new `api.Client.DoUpload` (io.Pipe + multipart,
+      no buffering, no retry)
 - [ ] Snippet + backup upload `(ssh)` — SFTP via PAM account
 - [ ] ZFS pool ops incl. RAIDZ expansion `(9.x)`
 - [ ] Promote the `doc.go` stubs for `storage` (and the `ssh` side-channel) —
