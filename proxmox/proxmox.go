@@ -6,6 +6,7 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/lxc"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/qemu"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ssh"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/storage"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/tasks"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/version"
@@ -85,4 +86,14 @@ func (c *Client) LXC(node string) *lxc.Service {
 // argument. It shares the client's transport and capability snapshot.
 func (c *Client) Storage() *storage.Service {
 	return storage.NewService(c.api, c.caps)
+}
+
+// SSH returns a disconnected SSH/SFTP side-channel client configured by opts
+// (host-key verification and credentials are supplied here, not by the REST
+// transport). Unlike the REST services this client is single-use and not safe
+// for concurrent use: Connect to a node, use it, then Close. It exists for the
+// few operations the REST API cannot do — uploading snippets and backup
+// archives, and the occasional host command. See package ssh.
+func (*Client) SSH(opts ...ssh.Option) *ssh.Client {
+	return ssh.NewClient(opts...)
 }

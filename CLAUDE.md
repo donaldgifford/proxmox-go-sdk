@@ -318,8 +318,27 @@ goroutine (closed through an `io.Closer`-typed value to satisfy errcheck's
 `check-blank`, since `(*io.PipeReader).Close` isn't matched by the
 `(io.Closer).Close` exclude). The mock's `NewClient` returns the real transport,
 so DoUpload is exercised end-to-end; `TestDoUpload` in the api package covers
-the auth/Content-Type/stream path directly. Next: Phase 3 task 5 (snippet/backup
-upload via the ssh/SFTP side-channel).
+the auth/Content-Type/stream path directly.
+
+Task 5 (snippet/backup upload) added the **`proxmox/ssh` side-channel** — the
+non-REST path for the handful of ops the API can't do. It is deliberately
+separate from the REST transport: `golang.org/x/crypto/ssh` (aliased `gossh`) +
+`github.com/pkg/sftp`, with `UploadSnippet`/`UploadBackup` (SFTP create + ctx-
+aware `io.Copy`) and `Exec` (one-shot command). Reached via `Client.SSH(opts…)`,
+which returns a **fresh, single-connection `*ssh.Client`** (NOT concurrency-safe
+like the REST services — Connect, use, Close from one goroutine). **Host-key
+verification is mandatory**: `Connect` errors unless one of
+`WithKnownHostsFile`/ `WithHostKey`/`WithHostKeyCallback` is set (no
+`InsecureIgnoreHostKey` — dodges gosec G106). Fire-and-forget cleanup closes go
+through a `closeQuietly(io.Closer)` helper (concrete `Close()` calls aren't
+matched by errcheck's `(io.Closer).Close` exclude); the `Exec`/`upload`
+cancellation goroutines now wait for their watcher to exit before returning (no
+goroutine outlives the call). Tested against an **in-process SSH+SFTP server
+over a loopback TCP listener** — `net.Pipe` deadlocks pkg/sftp's concurrent
+request packets; the listener must be created with
+`(&net.ListenConfig{}).Listen(ctx, …)` (noctx rejects bare `net.Listen`). Live
+PAM auth + writes under `/var/lib/vz` are unverifiable here. Next: Phase 3 task
+6 (ZFS pool ops incl. RAIDZ expansion) and task 7 (doc.go promotion).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

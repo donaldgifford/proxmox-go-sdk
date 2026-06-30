@@ -184,7 +184,11 @@ The transport and primitives every service hangs off.
 - [x] ISO / disk-image upload (large-file streaming) — `UploadISO`/
       `UploadDiskImage` over the new `api.Client.DoUpload` (io.Pipe + multipart,
       no buffering, no retry)
-- [ ] Snippet + backup upload `(ssh)` — SFTP via PAM account
+- [x] Snippet + backup upload `(ssh)` — SFTP via PAM account; new `proxmox/ssh`
+      side-channel (`UploadSnippet`/`UploadBackup`/`Exec`), mandatory host-key
+      verification, single-connection `Client` exposed via `Client.SSH(...)`.
+      Unit-tested against an in-process SSH+SFTP server; live PAM auth + writes
+      under `/var/lib/vz` unverifiable without a reachable node.
 - [ ] ZFS pool ops incl. RAIDZ expansion `(9.x)`
 - [ ] Promote the `doc.go` stubs for `storage` (and the `ssh` side-channel) —
       real package overview + a runnable `Example`
