@@ -189,6 +189,7 @@ func (s *Server) registerQEMURoutes() {
 	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/qemu/{vmid}", s.handleQEMUDelete)
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/status/{action}", s.handleQEMUPower)
 	s.mux.HandleFunc("PUT /api2/json/nodes/{node}/qemu/{vmid}/resize", s.handleQEMUResize)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/move_disk", s.handleQEMUMoveDisk)
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/migrate", s.handleQEMUMigrate)
 	s.mux.HandleFunc("GET /api2/json/nodes/{node}/qemu/{vmid}/snapshot", s.handleQEMUSnapshotList)
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/snapshot", s.handleQEMUSnapshotCreate)
@@ -405,6 +406,32 @@ func (s *Server) handleQEMUResize(w http.ResponseWriter, r *http.Request) {
 	}
 	// PVE resizes synchronously and answers with null data.
 	s.writeData(w, nil)
+}
+
+func (s *Server) handleQEMUMoveDisk(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if perr := r.ParseForm(); perr != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	if r.PostForm.Get("disk") == "" || r.PostForm.Get("storage") == "" {
+		s.writeError(w, http.StatusBadRequest, "missing disk or storage")
+		return
+	}
+	if !s.vmExists(node, vmid) {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	s.writeData(w, s.finishedTask(node, "qmmove", strconv.Itoa(vmid)))
 }
 
 func (s *Server) handleQEMUMigrate(w http.ResponseWriter, r *http.Request) {

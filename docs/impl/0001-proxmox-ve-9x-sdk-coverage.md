@@ -176,7 +176,8 @@ The transport and primitives every service hangs off.
 
 - [x] Datastore list + status; content listing (volumes, ISOs, templates,
       backups)
-- [ ] Volume create/resize/delete/move
+- [x] Volume create/resize/delete/move (allocate/free in `storage`; resize/move
+      are guest-scoped — `qemu.ResizeDisk` + `qemu.MoveDisk`)
 - [ ] **Snapshots as volume chains** on thick-LVM + Directory/NFS/CIFS
       `(tp → maturing)` — capability-gated
 - [ ] ISO / disk-image upload (large-file streaming)

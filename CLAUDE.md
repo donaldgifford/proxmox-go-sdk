@@ -284,8 +284,18 @@ volume-chain snapshots gated on 9.1, **streaming upload via a new
 `api.Client.DoUpload`**, ssh/SFTP side-channel, ZFS pools) follow the design
 captured in the storage-module-architecture memory; several PVE 9.x endpoints
 there are unconfirmed (no apidoc in-repo) and will be kept minimal / stubbed
-with `ErrUnsupported` + documented. Next: Phase 3 task 2 (volume
-create/resize/delete/ move).
+with `ErrUnsupported` + documented.
+
+Task 2 (volume create/resize/delete/move) clarified a PVE-API reality: **PVE has
+no storage-level resize or move endpoint** — only volume _allocate_
+(`POST .../content`, synchronous → returns the new volid) and _free_
+(`DELETE .../content/{volid}` → task) live on the storage API. So
+`storage.CreateVolume` returns a `string` volid (not a task) and
+`storage.DeleteVolume` returns a `tasks.Ref`; resize/move are **guest-scoped** —
+`qemu.ResizeDisk` (Phase 2) and the new **`qemu.MoveDisk`**
+(`POST /qemu/{vmid}/move_disk`, `MoveDiskSpec`). Don't add fake storage
+resize/move endpoints. Next: Phase 3 task 3 (volume-chain snapshots, gated on
+9.1).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

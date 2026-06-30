@@ -100,7 +100,9 @@ func (s *Server) registerStorageRoutes() {
 	s.mux.HandleFunc("GET /api2/json/nodes/{node}/storage", s.handleNodeStorageList)
 	s.mux.HandleFunc("GET /api2/json/nodes/{node}/storage/{storage}/status", s.handleNodeStorageStatus)
 	s.mux.HandleFunc("GET /api2/json/nodes/{node}/storage/{storage}/content", s.handleContentList)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/storage/{storage}/content", s.handleVolumeCreate)
 	s.mux.HandleFunc("GET /api2/json/nodes/{node}/storage/{storage}/content/{volid}", s.handleVolumeGet)
+	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/storage/{storage}/content/{volid}", s.handleVolumeDelete)
 }
 
 func (s *Server) handleDatastoreList(w http.ResponseWriter, r *http.Request) {
@@ -220,6 +222,68 @@ func (s *Server) handleVolumeGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeData(w, payload)
+}
+
+// handleVolumeCreate allocates a volume and returns its synthesized volid (PVE
+// allocates synchronously, so the data is the volid string, not a task).
+func (s *Server) handleVolumeCreate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	storage := r.PathValue("storage")
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if err := r.ParseForm(); err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	filename := r.PostForm.Get("filename")
+	if filename == "" {
+		s.writeError(w, http.StatusBadRequest, "missing filename")
+		return
+	}
+	volid := storage + ":" + filename
+	s.AddVolume(node, storage, volid, "images", r.PostForm.Get("format"), 0)
+	if vmid, perr := strconv.Atoi(r.PostForm.Get("vmid")); perr == nil {
+		s.st.mu.Lock()
+		for _, v := range s.st.storage.content[node][storage] {
+			if v.Volid == volid {
+				v.VMID = vmid
+			}
+		}
+		s.st.mu.Unlock()
+	}
+	s.writeData(w, volid)
+}
+
+// handleVolumeDelete frees a volume and returns a removal task.
+func (s *Server) handleVolumeDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	storage := r.PathValue("storage")
+	volid := r.PathValue("volid")
+	s.st.mu.Lock()
+	vols := s.st.storage.content[node][storage]
+	found := false
+	kept := vols[:0]
+	for _, v := range vols {
+		if v.Volid == volid {
+			found = true
+			continue
+		}
+		kept = append(kept, v)
+	}
+	if found {
+		s.st.storage.content[node][storage] = kept
+	}
+	s.st.mu.Unlock()
+	if !found {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVolume)
+		return
+	}
+	s.writeData(w, s.finishedTask(node, "imgdel", volid))
 }
 
 func datastoreToPayload(rec *storeRecord) datastorePayload {

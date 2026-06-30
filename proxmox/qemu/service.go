@@ -51,6 +51,7 @@ type API interface {
 	// Devices and migration.
 	AddDisk(ctx context.Context, vmid int, spec *DiskSpec) (tasks.Ref, error)
 	ResizeDisk(ctx context.Context, vmid int, disk, size string) (tasks.Ref, error)
+	MoveDisk(ctx context.Context, vmid int, spec *MoveDiskSpec) (tasks.Ref, error)
 	RemoveDisk(ctx context.Context, vmid int, slot string) (tasks.Ref, error)
 	AddNIC(ctx context.Context, vmid int, spec *NICSpec) (tasks.Ref, error)
 	RemoveNIC(ctx context.Context, vmid int, slot string) (tasks.Ref, error)

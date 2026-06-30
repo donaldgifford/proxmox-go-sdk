@@ -8,6 +8,7 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/mockpve"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/pverr"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/storage"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/tasks"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/version"
 )
 
@@ -15,9 +16,26 @@ const testNode = "pve"
 
 func newService(t *testing.T, mock *mockpve.Server) *storage.Service {
 	t.Helper()
+	svc, _ := newServiceAndTasks(t, mock)
+	return svc
+}
+
+func newServiceAndTasks(t *testing.T, mock *mockpve.Server) (*storage.Service, *tasks.Service) {
+	t.Helper()
 	c, cleanup := mock.NewClient()
 	t.Cleanup(cleanup)
-	return storage.NewService(c, version.Capabilities{})
+	return storage.NewService(c, version.Capabilities{}), tasks.NewService(c)
+}
+
+func awaitOK(t *testing.T, ts *tasks.Service, ref tasks.Ref) {
+	t.Helper()
+	st, err := ts.Wait(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("Wait(%s): %v", ref.UPID, err)
+	}
+	if !st.OK() {
+		t.Fatalf("task %s exit = %q, want OK", ref.UPID, st.ExitStatus)
+	}
 }
 
 func TestListDatastores(t *testing.T) {
@@ -145,5 +163,79 @@ func TestGetVolumeNotFound(t *testing.T) {
 	_, err := svc.GetVolume(context.Background(), testNode, "local", "local:iso/ghost.iso")
 	if !errors.Is(err, pverr.ErrNotFound) {
 		t.Fatalf("GetVolume(ghost) = %v, want ErrNotFound", err)
+	}
+}
+
+func TestCreateVolume(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	volid, err := svc.CreateVolume(ctx, testNode, "local-lvm", &storage.VolumeCreateSpec{
+		Filename: "vm-100-disk-1",
+		Size:     "10G",
+		Format:   "raw",
+		VMID:     100,
+	})
+	if err != nil {
+		t.Fatalf("CreateVolume: %v", err)
+	}
+	if volid != "local-lvm:vm-100-disk-1" {
+		t.Errorf("CreateVolume volid = %q, want local-lvm:vm-100-disk-1", volid)
+	}
+
+	all, err := svc.ListContent(ctx, testNode, "local-lvm")
+	if err != nil {
+		t.Fatalf("ListContent: %v", err)
+	}
+	if len(all) != 1 || all[0].Volid != volid {
+		t.Fatalf("ListContent after create = %+v, want the new volume", all)
+	}
+}
+
+func TestCreateVolumeValidation(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	if _, err := svc.CreateVolume(ctx, testNode, "local-lvm", nil); err == nil {
+		t.Error("CreateVolume(nil) error = nil, want non-nil")
+	}
+	if _, err := svc.CreateVolume(ctx, testNode, "local-lvm", &storage.VolumeCreateSpec{Size: "10G"}); err == nil {
+		t.Error("CreateVolume(no filename) error = nil, want non-nil")
+	}
+	if _, err := svc.CreateVolume(ctx, testNode, "local-lvm", &storage.VolumeCreateSpec{Filename: "x"}); err == nil {
+		t.Error("CreateVolume(no size) error = nil, want non-nil")
+	}
+}
+
+func TestDeleteVolume(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVolume(testNode, "local-lvm", "local-lvm:vm-100-disk-0", "images", "raw", 8<<30)
+	svc, ts := newServiceAndTasks(t, mock)
+	ctx := context.Background()
+
+	ref, err := svc.DeleteVolume(ctx, testNode, "local-lvm", "local-lvm:vm-100-disk-0")
+	if err != nil {
+		t.Fatalf("DeleteVolume: %v", err)
+	}
+	awaitOK(t, ts, ref)
+
+	if _, err := svc.GetVolume(ctx, testNode, "local-lvm", "local-lvm:vm-100-disk-0"); !errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("GetVolume after delete = %v, want ErrNotFound", err)
+	}
+}
+
+func TestDeleteVolumeNotFound(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+
+	_, err := svc.DeleteVolume(context.Background(), testNode, "local-lvm", "local-lvm:ghost")
+	if !errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("DeleteVolume(ghost) = %v, want ErrNotFound", err)
 	}
 }

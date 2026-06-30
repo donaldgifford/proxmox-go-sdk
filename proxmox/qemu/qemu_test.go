@@ -81,6 +81,38 @@ func TestLifecycleEndToEnd(t *testing.T) {
 	}
 }
 
+func TestMoveDisk(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "debian12", "stopped")
+	svc, ts := newServices(t, mock)
+	ctx := context.Background()
+
+	ref, err := svc.MoveDisk(ctx, 100, &qemu.MoveDiskSpec{Disk: "scsi0", TargetStorage: "local-lvm"})
+	if err != nil {
+		t.Fatalf("MoveDisk: %v", err)
+	}
+	awaitOK(t, ts, ref)
+}
+
+func TestMoveDiskValidation(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVM(testNode, 100, "debian12", "stopped")
+	svc, _ := newServices(t, mock)
+	ctx := context.Background()
+
+	if _, err := svc.MoveDisk(ctx, 100, nil); err == nil {
+		t.Error("MoveDisk(nil) error = nil, want non-nil")
+	}
+	if _, err := svc.MoveDisk(ctx, 100, &qemu.MoveDiskSpec{TargetStorage: "local-lvm"}); err == nil {
+		t.Error("MoveDisk(no disk) error = nil, want non-nil")
+	}
+	if _, err := svc.MoveDisk(ctx, 100, &qemu.MoveDiskSpec{Disk: "scsi0"}); err == nil {
+		t.Error("MoveDisk(no storage) error = nil, want non-nil")
+	}
+}
+
 func TestList(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()

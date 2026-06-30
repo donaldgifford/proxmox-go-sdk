@@ -11,7 +11,44 @@ import (
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/internal/svcutil"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/tasks"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/types"
 )
+
+// MoveDiskSpec is the body of POST /nodes/{node}/qemu/{vmid}/move_disk: relocate
+// a VM disk to another storage. Disk and TargetStorage are required. Pass it by
+// pointer.
+type MoveDiskSpec struct {
+	Disk          string         `json:"disk"`             // required, e.g. "scsi0".
+	TargetStorage string         `json:"storage"`          // required, the destination storage.
+	Format        string         `json:"format,omitempty"` // "raw", "qcow2", "vmdk".
+	Delete        *types.PVEBool `json:"delete,omitempty"` // remove the source volume after the move.
+	// Extra carries PVE parameters the SDK does not model.
+	Extra map[string]string `json:"-"`
+}
+
+// MoveDisk relocates a VM disk to another storage and returns the move task.
+// This is the guest-scoped counterpart to the storage service's allocate/free:
+// PVE has no storage-level volume-move endpoint.
+func (s *Service) MoveDisk(ctx context.Context, vmid int, spec *MoveDiskSpec) (tasks.Ref, error) {
+	if spec == nil {
+		return tasks.Ref{}, fmt.Errorf("qemu.MoveDisk: %w", svcutil.ErrNilSpec)
+	}
+	switch {
+	case spec.Disk == "":
+		return tasks.Ref{}, fmt.Errorf("qemu.MoveDisk: disk: %w", svcutil.ErrMissingField)
+	case spec.TargetStorage == "":
+		return tasks.Ref{}, fmt.Errorf("qemu.MoveDisk: storage: %w", svcutil.ErrMissingField)
+	}
+	body, err := svcutil.EncodeWithExtra(spec, spec.Extra)
+	if err != nil {
+		return tasks.Ref{}, fmt.Errorf("qemu.MoveDisk: %w", err)
+	}
+	var upid string
+	if derr := s.c.DoRequest(ctx, http.MethodPost, s.vmPath(vmid)+"/move_disk", body, &upid); derr != nil {
+		return tasks.Ref{}, fmt.Errorf("qemu.MoveDisk: %w", derr)
+	}
+	return svcutil.TaskRef("qemu.MoveDisk", upid)
+}
 
 // DiskSpec describes a disk to attach to a VM. AddDisk renders it to the PVE
 // volume syntax "<storage>:<size-in-GiB>[,opt=val…]" and sets it on Slot.

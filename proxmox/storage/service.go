@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/tasks"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/version"
 )
 
@@ -40,6 +41,11 @@ type API interface {
 	// Content listing (task 1).
 	ListContent(ctx context.Context, node, storage string, opts ...ListContentOption) ([]Content, error)
 	GetVolume(ctx context.Context, node, storage, volid string) (*Content, error)
+
+	// Volume allocate/free (task 2). PVE has no storage-level resize or move
+	// endpoint — those are guest-scoped (qemu.ResizeDisk / qemu.MoveDisk).
+	CreateVolume(ctx context.Context, node, storage string, spec *VolumeCreateSpec) (string, error)
+	DeleteVolume(ctx context.Context, node, storage, volid string) (tasks.Ref, error)
 }
 
 // Compile-time assertion that *Service implements the published contract. The
