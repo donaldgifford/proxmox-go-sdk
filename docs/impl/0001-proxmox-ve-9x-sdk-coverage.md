@@ -178,8 +178,9 @@ The transport and primitives every service hangs off.
       backups)
 - [x] Volume create/resize/delete/move (allocate/free in `storage`; resize/move
       are guest-scoped — `qemu.ResizeDisk` + `qemu.MoveDisk`)
-- [ ] **Snapshots as volume chains** on thick-LVM + Directory/NFS/CIFS
-      `(tp → maturing)` — capability-gated
+- [x] **Snapshots as volume chains** on thick-LVM + Directory/NFS/CIFS
+      `(tp → maturing)` — capability-gated (`VolumeChainSnapshots` 9.1+; gate
+      mock-verified, endpoint shape unconfirmed without a live node)
 - [ ] ISO / disk-image upload (large-file streaming)
 - [ ] Snippet + backup upload `(ssh)` — SFTP via PAM account
 - [ ] ZFS pool ops incl. RAIDZ expansion `(9.x)`

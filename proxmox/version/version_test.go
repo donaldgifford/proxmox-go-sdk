@@ -78,10 +78,11 @@ func TestGates(t *testing.T) {
 		oci bool // OCITemplates 9.1+
 		tsr bool // TokenSecretRotation 9.2+
 		tpm bool // TPMStateSnapshots 9.1+
+		vcs bool // VolumeChainSnapshots 9.1+
 	}{
-		{ver: "9.0.0", dlb: false, oci: false, tsr: false, tpm: false},
-		{ver: "9.1.0", dlb: false, oci: true, tsr: false, tpm: true},
-		{ver: "9.2.0", dlb: true, oci: true, tsr: true, tpm: true},
+		{ver: "9.0.0", dlb: false, oci: false, tsr: false, tpm: false, vcs: false},
+		{ver: "9.1.0", dlb: false, oci: true, tsr: false, tpm: true, vcs: true},
+		{ver: "9.2.0", dlb: true, oci: true, tsr: true, tpm: true, vcs: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.ver, func(t *testing.T) {
@@ -97,6 +98,9 @@ func TestGates(t *testing.T) {
 			}
 			if got := caps.TPMStateSnapshots(); got != tt.tpm {
 				t.Errorf("TPMStateSnapshots() = %v, want %v", got, tt.tpm)
+			}
+			if got := caps.VolumeChainSnapshots(); got != tt.vcs {
+				t.Errorf("VolumeChainSnapshots() = %v, want %v", got, tt.vcs)
 			}
 		})
 	}

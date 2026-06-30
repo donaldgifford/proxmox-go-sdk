@@ -46,6 +46,11 @@ type API interface {
 	// endpoint — those are guest-scoped (qemu.ResizeDisk / qemu.MoveDisk).
 	CreateVolume(ctx context.Context, node, storage string, spec *VolumeCreateSpec) (string, error)
 	DeleteVolume(ctx context.Context, node, storage, volid string) (tasks.Ref, error)
+
+	// Volume-chain snapshots (task 3, gated on 9.1 VolumeChainSnapshots).
+	VolumeSnapshots(ctx context.Context, node, storage, volid string) ([]VolumeSnapshot, error)
+	CreateVolumeSnapshot(ctx context.Context, node, storage, volid string, spec *VolumeSnapshotSpec) (tasks.Ref, error)
+	DeleteVolumeSnapshot(ctx context.Context, node, storage, volid, snapname string) (tasks.Ref, error)
 }
 
 // Compile-time assertion that *Service implements the published contract. The

@@ -27,6 +27,17 @@ func newServiceAndTasks(t *testing.T, mock *mockpve.Server) (*storage.Service, *
 	return storage.NewService(c, version.Capabilities{}), tasks.NewService(c)
 }
 
+func newCappedServiceAndTasks(t *testing.T, mock *mockpve.Server, ver string) (*storage.Service, *tasks.Service) {
+	t.Helper()
+	c, cleanup := mock.NewClient()
+	t.Cleanup(cleanup)
+	caps, err := version.Parse(ver)
+	if err != nil {
+		t.Fatalf("version.Parse(%q): %v", ver, err)
+	}
+	return storage.NewService(c, caps), tasks.NewService(c)
+}
+
 func awaitOK(t *testing.T, ts *tasks.Service, ref tasks.Ref) {
 	t.Helper()
 	st, err := ts.Wait(context.Background(), ref)
@@ -237,5 +248,83 @@ func TestDeleteVolumeNotFound(t *testing.T) {
 	_, err := svc.DeleteVolume(context.Background(), testNode, "local-lvm", "local-lvm:ghost")
 	if !errors.Is(err, pverr.ErrNotFound) {
 		t.Fatalf("DeleteVolume(ghost) = %v, want ErrNotFound", err)
+	}
+}
+
+func TestVolumeSnapshotGatedPre91(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVolume(testNode, "dir", "dir:vm-100-disk-0.qcow2", "images", "qcow2", 8<<30)
+	svc, _ := newCappedServiceAndTasks(t, mock, "9.0.3") // below the 9.1 gate.
+	ctx := context.Background()
+	const volid = "dir:vm-100-disk-0.qcow2"
+
+	_, listErr := svc.VolumeSnapshots(ctx, testNode, "dir", volid)
+	if !errors.Is(listErr, pverr.ErrUnsupported) {
+		t.Errorf("VolumeSnapshots on 9.0 = %v, want ErrUnsupported", listErr)
+	}
+	_, createErr := svc.CreateVolumeSnapshot(ctx, testNode, "dir", volid, &storage.VolumeSnapshotSpec{Name: "s1"})
+	if !errors.Is(createErr, pverr.ErrUnsupported) {
+		t.Errorf("CreateVolumeSnapshot on 9.0 = %v, want ErrUnsupported", createErr)
+	}
+	_, delErr := svc.DeleteVolumeSnapshot(ctx, testNode, "dir", volid, "s1")
+	if !errors.Is(delErr, pverr.ErrUnsupported) {
+		t.Errorf("DeleteVolumeSnapshot on 9.0 = %v, want ErrUnsupported", delErr)
+	}
+}
+
+func TestVolumeSnapshotLifecycle(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVolume(testNode, "dir", "dir:vm-100-disk-0.qcow2", "images", "qcow2", 8<<30)
+	svc, ts := newCappedServiceAndTasks(t, mock, "9.1")
+	ctx := context.Background()
+	const volid = "dir:vm-100-disk-0.qcow2"
+
+	ref, err := svc.CreateVolumeSnapshot(ctx, testNode, "dir", volid, &storage.VolumeSnapshotSpec{Name: "pre-change"})
+	if err != nil {
+		t.Fatalf("CreateVolumeSnapshot: %v", err)
+	}
+	awaitOK(t, ts, ref)
+
+	snaps, err := svc.VolumeSnapshots(ctx, testNode, "dir", volid)
+	if err != nil {
+		t.Fatalf("VolumeSnapshots: %v", err)
+	}
+	if len(snaps) != 1 || snaps[0].Name != "pre-change" {
+		t.Fatalf("VolumeSnapshots = %+v, want one named pre-change", snaps)
+	}
+
+	ref, err = svc.DeleteVolumeSnapshot(ctx, testNode, "dir", volid, "pre-change")
+	if err != nil {
+		t.Fatalf("DeleteVolumeSnapshot: %v", err)
+	}
+	awaitOK(t, ts, ref)
+
+	snaps, err = svc.VolumeSnapshots(ctx, testNode, "dir", volid)
+	if err != nil {
+		t.Fatalf("VolumeSnapshots after delete: %v", err)
+	}
+	if len(snaps) != 0 {
+		t.Fatalf("VolumeSnapshots after delete = %+v, want none", snaps)
+	}
+}
+
+func TestVolumeSnapshotValidation(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddVolume(testNode, "dir", "dir:vm-100-disk-0.qcow2", "images", "qcow2", 8<<30)
+	svc, _ := newCappedServiceAndTasks(t, mock, "9.1")
+	ctx := context.Background()
+	const volid = "dir:vm-100-disk-0.qcow2"
+
+	if _, err := svc.CreateVolumeSnapshot(ctx, testNode, "dir", volid, nil); err == nil {
+		t.Error("CreateVolumeSnapshot(nil) error = nil, want non-nil")
+	}
+	if _, err := svc.CreateVolumeSnapshot(ctx, testNode, "dir", volid, &storage.VolumeSnapshotSpec{}); err == nil {
+		t.Error("CreateVolumeSnapshot(no name) error = nil, want non-nil")
+	}
+	if _, err := svc.DeleteVolumeSnapshot(ctx, testNode, "dir", volid, ""); err == nil {
+		t.Error("DeleteVolumeSnapshot(no name) error = nil, want non-nil")
 	}
 }

@@ -294,8 +294,18 @@ no storage-level resize or move endpoint** — only volume _allocate_
 `storage.DeleteVolume` returns a `tasks.Ref`; resize/move are **guest-scoped** —
 `qemu.ResizeDisk` (Phase 2) and the new **`qemu.MoveDisk`**
 (`POST /qemu/{vmid}/move_disk`, `MoveDiskSpec`). Don't add fake storage
-resize/move endpoints. Next: Phase 3 task 3 (volume-chain snapshots, gated on
-9.1).
+resize/move endpoints.
+
+Task 3 (volume-chain snapshots) is the SDK's first **storage** version-gated op:
+`VolumeSnapshots`/`CreateVolumeSnapshot`/`DeleteVolumeSnapshot` gate on
+`caps.Require("volume-chain snapshots", "9.1")` (new
+`version.Capabilities.VolumeChainSnapshots()`), bringing snapshots to storage
+without native support (thick-LVM, dir/NFS/CIFS via qcow2 chains). **The gate is
+the firm, mock-verified part; the storage-level snapshot endpoint shape is
+unconfirmed** (no apidoc) — the path `…/content/{volid}/snapshot` mirrors the
+guest convention and is documented as needing live-node verification. Next:
+Phase 3 task 4 (ISO/disk-image streaming upload — needs the new
+`api.Client.DoUpload`).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

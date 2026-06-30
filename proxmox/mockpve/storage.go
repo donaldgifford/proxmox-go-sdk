@@ -27,11 +27,26 @@ type storeRecord struct {
 
 // volRecord is one stored object on a node's storage.
 type volRecord struct {
-	Volid   string
-	Content string
-	Format  string
-	Size    int64
-	VMID    int
+	Volid     string
+	Content   string
+	Format    string
+	Size      int64
+	VMID      int
+	Snapshots map[string]*volSnapRecord // keyed by snapshot name.
+}
+
+// volSnapRecord models one volume-chain snapshot in the mock.
+type volSnapRecord struct {
+	Name        string
+	Description string
+	SnapTime    int64
+}
+
+// volSnapshotPayload is one element of a volume's snapshot listing.
+type volSnapshotPayload struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	SnapTime    int64  `json:"snaptime,omitempty"`
 }
 
 // datastorePayload mirrors GET /storage entries.
@@ -91,7 +106,21 @@ func (s *Server) AddVolume(node, storage, volid, content, format string, size in
 		s.st.storage.content[node] = make(map[string][]*volRecord)
 	}
 	s.st.storage.content[node][storage] = append(s.st.storage.content[node][storage],
-		&volRecord{Volid: volid, Content: content, Format: format, Size: size})
+		&volRecord{
+			Volid: volid, Content: content, Format: format, Size: size,
+			Snapshots: make(map[string]*volSnapRecord),
+		})
+}
+
+// lookupVolume returns the record for node/storage/volid, or nil. The caller
+// must hold st.mu.
+func (s *Server) lookupVolume(node, storage, volid string) *volRecord {
+	for _, v := range s.st.storage.content[node][storage] {
+		if v.Volid == volid {
+			return v
+		}
+	}
+	return nil
 }
 
 func (s *Server) registerStorageRoutes() {
@@ -103,6 +132,9 @@ func (s *Server) registerStorageRoutes() {
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/storage/{storage}/content", s.handleVolumeCreate)
 	s.mux.HandleFunc("GET /api2/json/nodes/{node}/storage/{storage}/content/{volid}", s.handleVolumeGet)
 	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/storage/{storage}/content/{volid}", s.handleVolumeDelete)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/storage/{storage}/content/{volid}/snapshot", s.handleVolSnapshotList)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/storage/{storage}/content/{volid}/snapshot", s.handleVolSnapshotCreate)
+	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/storage/{storage}/content/{volid}/snapshot/{snap}", s.handleVolSnapshotDelete)
 }
 
 func (s *Server) handleDatastoreList(w http.ResponseWriter, r *http.Request) {
@@ -284,6 +316,80 @@ func (s *Server) handleVolumeDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeData(w, s.finishedTask(node, "imgdel", volid))
+}
+
+func (s *Server) handleVolSnapshotList(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node, storage, volid := r.PathValue("node"), r.PathValue("storage"), r.PathValue("volid")
+	s.st.mu.Lock()
+	rec := s.lookupVolume(node, storage, volid)
+	var out []volSnapshotPayload
+	if rec != nil {
+		out = make([]volSnapshotPayload, 0, len(rec.Snapshots))
+		for _, snap := range rec.Snapshots {
+			out = append(out, volSnapshotPayload{
+				Name: snap.Name, Description: snap.Description, SnapTime: snap.SnapTime,
+			})
+		}
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVolume)
+		return
+	}
+	s.writeData(w, out)
+}
+
+func (s *Server) handleVolSnapshotCreate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node, storage, volid := r.PathValue("node"), r.PathValue("storage"), r.PathValue("volid")
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if err := r.ParseForm(); err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	name := r.PostForm.Get("snapname")
+	if name == "" {
+		s.writeError(w, http.StatusBadRequest, "missing snapname")
+		return
+	}
+	s.st.mu.Lock()
+	rec := s.lookupVolume(node, storage, volid)
+	if rec != nil {
+		rec.Snapshots[name] = &volSnapRecord{Name: name, Description: r.PostForm.Get("description")}
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVolume)
+		return
+	}
+	s.writeData(w, s.finishedTask(node, "volsnapshot", volid))
+}
+
+func (s *Server) handleVolSnapshotDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node, storage, volid := r.PathValue("node"), r.PathValue("storage"), r.PathValue("volid")
+	snap := r.PathValue("snap")
+	s.st.mu.Lock()
+	rec := s.lookupVolume(node, storage, volid)
+	hasSnap := false
+	if rec != nil {
+		if _, hasSnap = rec.Snapshots[snap]; hasSnap {
+			delete(rec.Snapshots, snap)
+		}
+	}
+	s.st.mu.Unlock()
+	if rec == nil || !hasSnap {
+		s.writeError(w, http.StatusNotFound, "no such snapshot")
+		return
+	}
+	s.writeData(w, s.finishedTask(node, "voldelsnapshot", volid))
 }
 
 func datastoreToPayload(rec *storeRecord) datastorePayload {

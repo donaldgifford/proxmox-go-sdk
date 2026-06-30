@@ -26,3 +26,14 @@ func nodeContentPath(node, storage string) string {
 func nodeVolumePath(node, storage, volid string) string {
 	return nodeContentPath(node, storage) + "/" + url.PathEscape(volid)
 }
+
+// Volume-chain snapshots (9.1+). The exact PVE path is unconfirmed without a
+// live node; "<volume>/snapshot" mirrors the guest snapshot convention.
+
+func volumeSnapshotsPath(node, storage, volid string) string {
+	return nodeVolumePath(node, storage, volid) + "/snapshot"
+}
+
+func volumeSnapshotPath(node, storage, volid, snapname string) string {
+	return volumeSnapshotsPath(node, storage, volid) + "/" + snapname
+}
