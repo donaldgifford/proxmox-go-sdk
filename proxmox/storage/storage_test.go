@@ -380,6 +380,121 @@ func TestUploadValidation(t *testing.T) {
 	}
 }
 
+func TestListZFSPools(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddZFSPool(testNode, "tank", 4<<40, 3<<40)
+	mock.AddZFSPool(testNode, "rpool", 200<<30, 50<<30)
+	svc := newService(t, mock)
+
+	pools, err := svc.ListZFSPools(context.Background(), testNode)
+	if err != nil {
+		t.Fatalf("ListZFSPools: %v", err)
+	}
+	if len(pools) != 2 {
+		t.Fatalf("ListZFSPools returned %d, want 2", len(pools))
+	}
+}
+
+func TestGetZFSPool(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddZFSPool(testNode, "tank", 4<<40, 3<<40)
+	svc := newService(t, mock)
+
+	pool, err := svc.GetZFSPool(context.Background(), testNode, "tank")
+	if err != nil {
+		t.Fatalf("GetZFSPool: %v", err)
+	}
+	if pool.Name != "tank" || pool.State != "ONLINE" {
+		t.Errorf("pool = %+v, want name=tank state=ONLINE", pool)
+	}
+}
+
+func TestGetZFSPoolNotFound(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+
+	if _, err := svc.GetZFSPool(context.Background(), testNode, "ghost"); !errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("GetZFSPool(ghost) = %v, want ErrNotFound", err)
+	}
+}
+
+func TestCreateZFSPool(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc, ts := newServiceAndTasks(t, mock)
+	ctx := context.Background()
+
+	ref, err := svc.CreateZFSPool(ctx, testNode, &storage.ZFSPoolSpec{
+		Name:      "tank",
+		RAIDLevel: "raidz",
+		Devices:   []string{"/dev/sdb", "/dev/sdc", "/dev/sdd"},
+	})
+	if err != nil {
+		t.Fatalf("CreateZFSPool: %v", err)
+	}
+	awaitOK(t, ts, ref)
+
+	pools, err := svc.ListZFSPools(ctx, testNode)
+	if err != nil {
+		t.Fatalf("ListZFSPools: %v", err)
+	}
+	if len(pools) != 1 || pools[0].Name != "tank" {
+		t.Fatalf("ListZFSPools after create = %+v, want the new pool", pools)
+	}
+}
+
+func TestCreateZFSPoolValidation(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	if _, err := svc.CreateZFSPool(ctx, testNode, nil); err == nil {
+		t.Error("CreateZFSPool(nil) error = nil, want non-nil")
+	}
+	if _, err := svc.CreateZFSPool(ctx, testNode, &storage.ZFSPoolSpec{RAIDLevel: "raidz", Devices: []string{"/dev/sdb"}}); err == nil {
+		t.Error("CreateZFSPool(no name) error = nil, want non-nil")
+	}
+	if _, err := svc.CreateZFSPool(ctx, testNode, &storage.ZFSPoolSpec{Name: "tank", Devices: []string{"/dev/sdb"}}); err == nil {
+		t.Error("CreateZFSPool(no raidlevel) error = nil, want non-nil")
+	}
+	if _, err := svc.CreateZFSPool(ctx, testNode, &storage.ZFSPoolSpec{Name: "tank", RAIDLevel: "raidz"}); err == nil {
+		t.Error("CreateZFSPool(no devices) error = nil, want non-nil")
+	}
+}
+
+func TestExpandRAIDZGatedPre92(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc, _ := newCappedServiceAndTasks(t, mock, "9.1") // below the 9.2 gate.
+	spec := &storage.RAIDZExpandSpec{Pool: "tank", Device: "/dev/sde"}
+
+	_, err := svc.ExpandRAIDZ(context.Background(), testNode, spec)
+	if !errors.Is(err, pverr.ErrUnsupported) {
+		t.Fatalf("ExpandRAIDZ on 9.1 = %v, want ErrUnsupported", err)
+	}
+}
+
+func TestExpandRAIDZNoRESTEndpoint(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc, _ := newCappedServiceAndTasks(t, mock, "9.2") // gate satisfied.
+	spec := &storage.RAIDZExpandSpec{Pool: "tank", Device: "/dev/sde"}
+
+	// Even on 9.2 there is no PVE REST endpoint for RAIDZ expansion: the op
+	// reports ErrUnsupported and points at the ssh side-channel.
+	_, err := svc.ExpandRAIDZ(context.Background(), testNode, spec)
+	if !errors.Is(err, pverr.ErrUnsupported) {
+		t.Fatalf("ExpandRAIDZ on 9.2 = %v, want ErrUnsupported (no REST endpoint)", err)
+	}
+	if _, err := svc.ExpandRAIDZ(context.Background(), testNode, nil); err == nil {
+		t.Error("ExpandRAIDZ(nil) error = nil, want non-nil")
+	}
+}
+
 func TestVolumeSnapshotValidation(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()

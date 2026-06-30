@@ -337,8 +337,21 @@ goroutine outlives the call). Tested against an **in-process SSH+SFTP server
 over a loopback TCP listener** — `net.Pipe` deadlocks pkg/sftp's concurrent
 request packets; the listener must be created with
 `(&net.ListenConfig{}).Listen(ctx, …)` (noctx rejects bare `net.Listen`). Live
-PAM auth + writes under `/var/lib/vz` are unverifiable here. Next: Phase 3 task
-6 (ZFS pool ops incl. RAIDZ expansion) and task 7 (doc.go promotion).
+PAM auth + writes under `/var/lib/vz` are unverifiable here.
+
+Task 6 (ZFS pool ops) added node-scoped `ListZFSPools`/`GetZFSPool`/
+`CreateZFSPool` over `/nodes/{node}/disks/zfs` (`CreateZFSPool` returns a
+`tasks.Ref`; its `Devices []string` is `json:"-"` and joined into PVE's
+comma-separated `devices` form param after `EncodeWithExtra`, since the flat
+encoder can't render a slice). `GetZFSPool` returns a `ZFSPoolStatus` with a
+recursive `ZFSVdev` tree (the parsed `zpool status`). **RAIDZ expansion has no
+PVE REST endpoint** — it's a `zpool attach`, so `ExpandRAIDZ` is gated on the
+new `version.Capabilities.ZFSRAIDZExpansion()` (9.2) but **always** returns a
+documented `pverr.ErrUnsupported` directing callers to the ssh side-channel,
+rather than fabricating a path that would 404. Its signature still returns a
+`tasks.Ref` so a real REST impl can land later non-breaking. mockpve gained
+`AddZFSPool` + the three disk/zfs routes. Next: Phase 3 task 7 (doc.go promotion
+for `storage` + `ssh`) and the end-to-end Success-Criterion test.
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

@@ -55,6 +55,13 @@ type API interface {
 	// Streaming uploads (task 4).
 	UploadISO(ctx context.Context, node, storage string, spec *UploadSpec) (tasks.Ref, error)
 	UploadDiskImage(ctx context.Context, node, storage string, spec *UploadSpec) (tasks.Ref, error)
+
+	// ZFS pool management (task 6). ExpandRAIDZ is gated on 9.2 but has no PVE
+	// REST endpoint — see its doc comment.
+	ListZFSPools(ctx context.Context, node string) ([]ZFSPool, error)
+	GetZFSPool(ctx context.Context, node, name string) (*ZFSPoolStatus, error)
+	CreateZFSPool(ctx context.Context, node string, spec *ZFSPoolSpec) (tasks.Ref, error)
+	ExpandRAIDZ(ctx context.Context, node string, spec *RAIDZExpandSpec) (tasks.Ref, error)
 }
 
 // Compile-time assertion that *Service implements the published contract. The

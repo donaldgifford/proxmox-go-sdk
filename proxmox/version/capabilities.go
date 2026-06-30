@@ -91,6 +91,12 @@ func (c Capabilities) TPMStateSnapshots() bool { return c.AtLeast(9, 1) }
 // TokenSecretRotation gates regenerating an API token secret in place (9.2+).
 func (c Capabilities) TokenSecretRotation() bool { return c.AtLeast(9, 2) }
 
+// ZFSRAIDZExpansion gates online RAIDZ vdev expansion — adding a disk to an
+// existing RAIDZ group (OpenZFS 2.3, shipped in PVE 9.2). The minor floor is the
+// SDK's best estimate; whether PVE exposes it over REST at all is unconfirmed
+// without a live node (see storage.ExpandRAIDZ).
+func (c Capabilities) ZFSRAIDZExpansion() bool { return c.AtLeast(9, 2) }
+
 // Require returns nil when the version is at least minVersion ("9.2"), and a
 // pverr.ErrUnsupported-wrapped error naming the feature otherwise. Services use
 // it to gate minor-specific operations with a uniform error.

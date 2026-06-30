@@ -37,3 +37,13 @@ func volumeSnapshotsPath(node, storage, volid string) string {
 func volumeSnapshotPath(node, storage, volid, snapname string) string {
 	return volumeSnapshotsPath(node, storage, volid) + "/" + snapname
 }
+
+// Node-scoped ZFS pool management: GET/POST /nodes/{node}/disks/zfs and
+// GET /nodes/{node}/disks/zfs/{name}. RAIDZ expansion has no confirmed PVE REST
+// endpoint (see zfs.go); these two are the established disk-management paths.
+
+func nodeZFSPath(node string) string { return "/nodes/" + node + "/disks/zfs" }
+
+func nodeZFSPoolPath(node, name string) string {
+	return nodeZFSPath(node) + "/" + name
+}

@@ -189,7 +189,12 @@ The transport and primitives every service hangs off.
       verification, single-connection `Client` exposed via `Client.SSH(...)`.
       Unit-tested against an in-process SSH+SFTP server; live PAM auth + writes
       under `/var/lib/vz` unverifiable without a reachable node.
-- [ ] ZFS pool ops incl. RAIDZ expansion `(9.x)`
+- [x] ZFS pool ops incl. RAIDZ expansion `(9.x)` — `ListZFSPools`/`GetZFSPool`/
+      `CreateZFSPool` over `/nodes/{node}/disks/zfs` (mock-verified). RAIDZ
+      expansion is gated on the new `ZFSRAIDZExpansion` capability (9.2) but PVE
+      exposes **no REST endpoint** for it (`zpool attach`), so `ExpandRAIDZ`
+      returns a documented `pverr.ErrUnsupported` pointing at the ssh
+      side-channel rather than fabricating an endpoint.
 - [ ] Promote the `doc.go` stubs for `storage` (and the `ssh` side-channel) —
       real package overview + a runnable `Example`
 

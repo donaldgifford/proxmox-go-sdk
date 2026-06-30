@@ -15,8 +15,18 @@ const maxUploadBytes = 32 << 20 // 32 MiB
 // guarded by state.mu. Datastore config is cluster-scoped (stores); content is
 // keyed by node then storage.
 type storageState struct {
-	stores  map[string]*storeRecord            // storage id -> config.
-	content map[string]map[string][]*volRecord // node -> storage -> volumes.
+	stores   map[string]*storeRecord            // storage id -> config.
+	content  map[string]map[string][]*volRecord // node -> storage -> volumes.
+	zfsPools map[string]map[string]*zfsRecord   // node -> pool name -> pool.
+}
+
+// zfsRecord is one ZFS pool local to a node.
+type zfsRecord struct {
+	Name   string
+	Size   int64
+	Free   int64
+	Health string
+	State  string
 }
 
 // storeRecord is one datastore's cluster-scoped configuration plus mock usage.
@@ -87,6 +97,20 @@ type contentPayload struct {
 	VMID    int    `json:"vmid,omitempty"`
 }
 
+// zfsListPayload mirrors GET /nodes/{node}/disks/zfs entries.
+type zfsListPayload struct {
+	Name   string `json:"name"`
+	Size   int64  `json:"size,omitempty"`
+	Free   int64  `json:"free,omitempty"`
+	Health string `json:"health,omitempty"`
+}
+
+// zfsStatusPayload mirrors GET /nodes/{node}/disks/zfs/{name}.
+type zfsStatusPayload struct {
+	Name  string `json:"name"`
+	State string `json:"state,omitempty"`
+}
+
 // AddStorage registers a datastore config (cluster-scoped). total/used seed the
 // usage metrics node-status reads report. Call before serving.
 func (s *Server) AddStorage(id, storageType, content string, total, used int64) {
@@ -118,6 +142,21 @@ func (s *Server) AddVolume(node, storage, volid, content, format string, size in
 		})
 }
 
+// AddZFSPool seeds a ZFS pool on node. Call before serving.
+func (s *Server) AddZFSPool(node, name string, size, free int64) {
+	s.st.mu.Lock()
+	defer s.st.mu.Unlock()
+	if s.st.storage.zfsPools == nil {
+		s.st.storage.zfsPools = make(map[string]map[string]*zfsRecord)
+	}
+	if s.st.storage.zfsPools[node] == nil {
+		s.st.storage.zfsPools[node] = make(map[string]*zfsRecord)
+	}
+	s.st.storage.zfsPools[node][name] = &zfsRecord{
+		Name: name, Size: size, Free: free, Health: "ONLINE", State: "ONLINE",
+	}
+}
+
 // lookupVolume returns the record for node/storage/volid, or nil. The caller
 // must hold st.mu.
 func (s *Server) lookupVolume(node, storage, volid string) *volRecord {
@@ -142,6 +181,9 @@ func (s *Server) registerStorageRoutes() {
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/storage/{storage}/content/{volid}/snapshot", s.handleVolSnapshotCreate)
 	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/storage/{storage}/content/{volid}/snapshot/{snap}", s.handleVolSnapshotDelete)
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/storage/{storage}/upload", s.handleStorageUpload)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/disks/zfs", s.handleZFSList)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/disks/zfs", s.handleZFSCreate)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/disks/zfs/{name}", s.handleZFSGet)
 }
 
 // handleStorageUpload models the streaming multipart upload endpoint. It reads
@@ -433,6 +475,61 @@ func (s *Server) handleVolSnapshotDelete(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	s.writeData(w, s.finishedTask(node, "voldelsnapshot", storage))
+}
+
+func (s *Server) handleZFSList(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	s.st.mu.Lock()
+	pools := s.st.storage.zfsPools[node]
+	out := make([]zfsListPayload, 0, len(pools))
+	for _, p := range pools {
+		out = append(out, zfsListPayload{Name: p.Name, Size: p.Size, Free: p.Free, Health: p.Health})
+	}
+	s.st.mu.Unlock()
+	s.writeData(w, out)
+}
+
+func (s *Server) handleZFSGet(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node, name := r.PathValue("node"), r.PathValue("name")
+	s.st.mu.Lock()
+	rec := s.st.storage.zfsPools[node][name]
+	var payload zfsStatusPayload
+	if rec != nil {
+		payload = zfsStatusPayload{Name: rec.Name, State: rec.State}
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchZFSPool)
+		return
+	}
+	s.writeData(w, payload)
+}
+
+// handleZFSCreate registers a new pool from the "name" form param and returns
+// the creation task. The "devices" param is accepted but not modelled.
+func (s *Server) handleZFSCreate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if err := r.ParseForm(); err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	name := r.PostForm.Get("name")
+	if name == "" {
+		s.writeError(w, http.StatusBadRequest, "missing name")
+		return
+	}
+	s.AddZFSPool(node, name, 0, 0)
+	s.writeData(w, s.finishedTask(node, "zfscreate", name))
 }
 
 func datastoreToPayload(rec *storeRecord) datastorePayload {
