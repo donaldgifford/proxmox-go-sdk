@@ -195,12 +195,16 @@ The transport and primitives every service hangs off.
       exposes **no REST endpoint** for it (`zpool attach`), so `ExpandRAIDZ`
       returns a documented `pverr.ErrUnsupported` pointing at the ssh
       side-channel rather than fabricating an endpoint.
-- [ ] Promote the `doc.go` stubs for `storage` (and the `ssh` side-channel) —
-      real package overview + a runnable `Example`
+- [x] Promote the `doc.go` stubs for `storage` (and the `ssh` side-channel) —
+      real package overview + a runnable `Example`. `storage` has a runnable
+      `Example` (upload → snapshot → cleanup, `go doc`-verified); `ssh` has a
+      compile-only `Example` (no `Output`) since it needs a live host.
 
 #### Success Criteria
 
-- Upload an ISO, create a volume-chain snapshot where supported, clean up
+- [x] Upload an ISO, create a volume-chain snapshot where supported, clean up —
+      covered by the runnable `storage` `Example` (seeds 9.1 to enable
+      volume-chain snapshots) and `TestVolumeSnapshotLifecycle`; mock-verified.
 
 ---
 

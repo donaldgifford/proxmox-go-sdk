@@ -265,26 +265,30 @@ service's test file — **mock-verified** (the chain runs against `mockpve`,
 awaiting every task); a live 9.x node is not reachable here, so the end-to-end
 behaviour against real PVE is written-but-unverified.
 
-**Phase 3 (storage) is underway** — task 1 done (datastore list/get, per-node
-status, content listing + GetVolume). The `storage` service was **go-architect
-designed** and differs from compute in one structural way: `c.Storage()` is
-**not node-scoped** (DESIGN-0001) — `storage.Service{c, caps}` holds no node;
-cluster-scoped datastore config reads (`/storage`, `/storage/{id}`) take no
-node, while per-node status/content/volume/upload/zfs ops take `node` as a
-per-call arg. `Datastore` reads are lossless (custom `UnmarshalJSON` → `Extra`;
+**Phase 3 (storage) is implementation-complete** — all 7 tasks checked in
+IMPL-0001 and the Success Criterion (upload ISO → volume-chain snapshot where
+supported → clean up) is covered by a runnable `storage` `Example` plus
+`TestVolumeSnapshotLifecycle` (mock-verified; live-node behaviour
+written-but-unverified). The `storage` service was **go-architect designed** and
+differs from compute in one structural way: `c.Storage()` is **not node-scoped**
+(DESIGN-0001) — `storage.Service{c, caps}` holds no node; cluster-scoped
+datastore config reads (`/storage`, `/storage/{id}`) take no node, while
+per-node status/content/volume/upload/zfs ops take `node` as a per-call arg.
+`Datastore` reads are lossless (custom `UnmarshalJSON` → `Extra`;
 `datastoreKnownFields` kept in sync). `ListContent` filters via functional
 options (`WithContentType`/`WithVMID`) that build a `?content=…&vmid=…` query
 appended to the GET path (GET bodies aren't form-encoded, so query goes in the
 path; the mock reads `r.URL.Query()`). Volids are single path segments escaped
 with `url.PathEscape` (colon→`%3A`, slash→`%2F`); Go's ServeMux `{volid}` +
 `PathValue` round-trips them (verified). `mockpve/storage.go` adds
-`storageState` (cluster `stores` + per-node `content`), `AddStorage`/`AddVolume`
-seeders, and `registerStorageRoutes`. The remaining tasks (volume CRUD,
-volume-chain snapshots gated on 9.1, **streaming upload via a new
-`api.Client.DoUpload`**, ssh/SFTP side-channel, ZFS pools) follow the design
-captured in the storage-module-architecture memory; several PVE 9.x endpoints
-there are unconfirmed (no apidoc in-repo) and will be kept minimal / stubbed
-with `ErrUnsupported` + documented.
+`storageState` (cluster `stores` + per-node `content` + per-node `zfsPools`),
+`AddStorage`/`AddVolume`/`AddZFSPool` seeders, and `registerStorageRoutes`. The
+later tasks (volume CRUD, volume-chain snapshots gated on 9.1, **streaming
+upload via a new `api.Client.DoUpload`**, ssh/SFTP side-channel, ZFS pools)
+followed the design captured in the storage-module-architecture memory; several
+PVE 9.x endpoints there were unconfirmed (no apidoc in-repo) and are kept
+minimal / stubbed with `ErrUnsupported` + documented (volume resize/move,
+volume-chain-snapshot paths, RAIDZ expansion).
 
 Task 2 (volume create/resize/delete/move) clarified a PVE-API reality: **PVE has
 no storage-level resize or move endpoint** — only volume _allocate_
