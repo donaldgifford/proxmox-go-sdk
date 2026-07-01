@@ -56,6 +56,11 @@ type API interface {
 	// REST path is provisional (see GetDLBStatus).
 	GetDLBStatus(ctx context.Context) (*DLBStatus, error)
 	SetDLBConfig(ctx context.Context, cfg *DLBConfig) error
+
+	// Arm/Disarm cluster-wide HA switch (task 5, 9.2+). No confirmed PVE REST
+	// endpoint — these return pverr.ErrUnsupported (see ArmHA).
+	ArmHA(ctx context.Context) error
+	DisarmHA(ctx context.Context) error
 }
 
 // Compile-time assertion that *Service implements the published contract.

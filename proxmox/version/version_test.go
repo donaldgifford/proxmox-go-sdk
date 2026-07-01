@@ -80,10 +80,11 @@ func TestGates(t *testing.T) {
 		tpm bool // TPMStateSnapshots 9.1+
 		vcs bool // VolumeChainSnapshots 9.1+
 		rzx bool // ZFSRAIDZExpansion 9.2+
+		hcs bool // HAClusterSwitch 9.2+
 	}{
-		{ver: "9.0.0", dlb: false, oci: false, tsr: false, tpm: false, vcs: false, rzx: false},
-		{ver: "9.1.0", dlb: false, oci: true, tsr: false, tpm: true, vcs: true, rzx: false},
-		{ver: "9.2.0", dlb: true, oci: true, tsr: true, tpm: true, vcs: true, rzx: true},
+		{ver: "9.0.0", dlb: false, oci: false, tsr: false, tpm: false, vcs: false, rzx: false, hcs: false},
+		{ver: "9.1.0", dlb: false, oci: true, tsr: false, tpm: true, vcs: true, rzx: false, hcs: false},
+		{ver: "9.2.0", dlb: true, oci: true, tsr: true, tpm: true, vcs: true, rzx: true, hcs: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.ver, func(t *testing.T) {
@@ -105,6 +106,9 @@ func TestGates(t *testing.T) {
 			}
 			if got := caps.ZFSRAIDZExpansion(); got != tt.rzx {
 				t.Errorf("ZFSRAIDZExpansion() = %v, want %v", got, tt.rzx)
+			}
+			if got := caps.HAClusterSwitch(); got != tt.hcs {
+				t.Errorf("HAClusterSwitch() = %v, want %v", got, tt.hcs)
 			}
 		})
 	}

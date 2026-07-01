@@ -235,7 +235,10 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       `DynamicLoadBalancer` capability. REST-with-caveat: provisional path
       `/cluster/ha/lbalancer` (mirrors ha-manager naming), gate mock-verified,
       wire shape unconfirmed without a live 9.2 node.
-- [ ] Arm/Disarm HA cluster-wide switch `(9.2+)`
+- [x] Arm/Disarm HA cluster-wide switch `(9.2+)` — `ArmHA`/`DisarmHA` + new
+      `HAClusterSwitch` (9.2) capability. No confirmed PVE REST endpoint (a
+      GUI/pvecm action), so both return a documented `pverr.ErrUnsupported`
+      rather than fabricating a path — like `storage.ExpandRAIDZ`.
 - [ ] Storage/ZFS replication jobs (respect new `VM.Replicate` privilege)
 - [ ] Promote the `doc.go` stub for `ha` — real package overview + a runnable
       `Example` (define a resource-affinity rule)

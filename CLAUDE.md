@@ -385,7 +385,11 @@ form). Task 4 (Dynamic Load Balancer, 9.2+) landed `GetDLBStatus`/
 `SetDLBConfig` gated on `caps.Require("Dynamic Load Balancer","9.2")` — the
 REST-with-caveat approach: provisional path `/cluster/ha/lbalancer`, lossless
 `DLBStatus` read (hedges the unconfirmed shape), gate + round-trip
-mock-verified. Next: task 5 (Arm/Disarm, 9.2 `ErrUnsupported` stub).
+mock-verified. Task 5 (Arm/Disarm) added `ArmHA`/`DisarmHA` + the new
+`HAClusterSwitch` (9.2) capability, but there is no confirmed PVE REST endpoint
+(a GUI/pvecm action), so both return a documented `pverr.ErrUnsupported` — the
+`storage.ExpandRAIDZ` precedent, kept in the interface so test doubles can stub
+them. Next: task 6 (replication jobs).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

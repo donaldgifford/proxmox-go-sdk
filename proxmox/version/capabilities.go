@@ -97,6 +97,10 @@ func (c Capabilities) TokenSecretRotation() bool { return c.AtLeast(9, 2) }
 // without a live node (see storage.ExpandRAIDZ).
 func (c Capabilities) ZFSRAIDZExpansion() bool { return c.AtLeast(9, 2) }
 
+// HAClusterSwitch gates the cluster-wide HA arm/disarm switch (9.2+). Whether
+// PVE exposes it over REST is unconfirmed without a live node (see ha.ArmHA).
+func (c Capabilities) HAClusterSwitch() bool { return c.AtLeast(9, 2) }
+
 // Require returns nil when the version is at least minVersion ("9.2"), and a
 // pverr.ErrUnsupported-wrapped error naming the feature otherwise. Services use
 // it to gate minor-specific operations with a uniform error.
