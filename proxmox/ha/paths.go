@@ -26,3 +26,13 @@ func clusterOptionsPath() string { return "/cluster/options" }
 // — it mirrors PVE's ha-manager "lbalancer" naming and is unconfirmed without a
 // live 9.2 node (see ha.GetDLBStatus).
 func dlbPath() string { return "/cluster/ha/lbalancer" }
+
+// Storage/ZFS replication jobs. Job IDs are "<vmid>-<jobnum>" (e.g. "100-0") —
+// a hyphen, not a colon, so url.PathEscape is effectively a no-op, but it is
+// applied for consistency and safety.
+
+func replJobsPath() string { return "/cluster/replication" }
+
+func replJobPath(id string) string {
+	return replJobsPath() + "/" + url.PathEscape(id)
+}

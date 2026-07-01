@@ -61,6 +61,14 @@ type API interface {
 	// endpoint — these return pverr.ErrUnsupported (see ArmHA).
 	ArmHA(ctx context.Context) error
 	DisarmHA(ctx context.Context) error
+
+	// Storage/ZFS replication jobs (task 6). Requires the 9.x VM.Replicate
+	// privilege. Writes are synchronous.
+	ListReplicationJobs(ctx context.Context) ([]ReplicationJob, error)
+	GetReplicationJob(ctx context.Context, id string) (*ReplicationJob, error)
+	CreateReplicationJob(ctx context.Context, spec *ReplicationSpec) error
+	UpdateReplicationJob(ctx context.Context, id string, update *ReplicationUpdate) error
+	DeleteReplicationJob(ctx context.Context, id string) error
 }
 
 // Compile-time assertion that *Service implements the published contract.

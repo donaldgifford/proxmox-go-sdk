@@ -389,7 +389,11 @@ mock-verified. Task 5 (Arm/Disarm) added `ArmHA`/`DisarmHA` + the new
 `HAClusterSwitch` (9.2) capability, but there is no confirmed PVE REST endpoint
 (a GUI/pvecm action), so both return a documented `pverr.ErrUnsupported` — the
 `storage.ExpandRAIDZ` precedent, kept in the interface so test doubles can stub
-them. Next: task 6 (replication jobs).
+them. Task 6 (replication jobs) added CRUD over `/cluster/replication`
+(`ListReplicationJobs`/`Get`/`Create`/`Update`/`DeleteReplicationJob`), lossless
+`ReplicationJob` (IDs `<vmid>-<jobnum>`), requires the 9.x `VM.Replicate`
+privilege (noted in docs). Next: task 7 (doc.go promotion + runnable
+resource-affinity Example → the phase Success Criterion).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

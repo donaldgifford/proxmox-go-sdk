@@ -15,6 +15,18 @@ type haState struct {
 	crs        string                       // the datacenter "crs" property-string.
 	dlbEnabled bool                         // Dynamic Load Balancer toggle (9.2+).
 	dlbMode    string                       // Dynamic Load Balancer scheduler mode.
+	repl       map[string]*haReplRecord     // keyed by replication job ID.
+}
+
+// haReplRecord is one storage/ZFS replication job.
+type haReplRecord struct {
+	ID       string
+	Type     string
+	Target   string
+	Schedule string
+	Rate     float64
+	Disable  bool
+	Comment  string
 }
 
 // haRuleRecord is one HA rule (node-affinity or resource-affinity).
@@ -87,6 +99,27 @@ func (s *Server) SetCRS(crs string) {
 	s.st.ha.crs = crs
 }
 
+// haReplPayload mirrors GET /cluster/replication entries.
+type haReplPayload struct {
+	ID       string  `json:"id"`
+	Type     string  `json:"type,omitempty"`
+	Target   string  `json:"target,omitempty"`
+	Schedule string  `json:"schedule,omitempty"`
+	Rate     float64 `json:"rate,omitempty"`
+	Disable  int     `json:"disable,omitempty"`
+	Comment  string  `json:"comment,omitempty"`
+}
+
+// AddReplicationJob seeds a replication job. Call before serving.
+func (s *Server) AddReplicationJob(id, target, schedule string) {
+	s.st.mu.Lock()
+	defer s.st.mu.Unlock()
+	if s.st.ha.repl == nil {
+		s.st.ha.repl = make(map[string]*haReplRecord)
+	}
+	s.st.ha.repl[id] = &haReplRecord{ID: id, Type: "local", Target: target, Schedule: schedule}
+}
+
 // sidType extracts the resource type ("vm"/"ct") from a SID like "vm:100".
 func sidType(sid string) string {
 	if i := strings.IndexByte(sid, ':'); i > 0 {
@@ -110,6 +143,150 @@ func (s *Server) registerHARoutes() {
 	s.mux.HandleFunc("PUT /api2/json/cluster/options", s.handleClusterOptionsSet)
 	s.mux.HandleFunc("GET /api2/json/cluster/ha/lbalancer", s.handleDLBGet)
 	s.mux.HandleFunc("PUT /api2/json/cluster/ha/lbalancer", s.handleDLBSet)
+	s.mux.HandleFunc("GET /api2/json/cluster/replication", s.handleReplList)
+	s.mux.HandleFunc("POST /api2/json/cluster/replication", s.handleReplCreate)
+	s.mux.HandleFunc("GET /api2/json/cluster/replication/{id}", s.handleReplGet)
+	s.mux.HandleFunc("PUT /api2/json/cluster/replication/{id}", s.handleReplUpdate)
+	s.mux.HandleFunc("DELETE /api2/json/cluster/replication/{id}", s.handleReplDelete)
+}
+
+func (s *Server) handleReplList(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	s.st.mu.Lock()
+	out := make([]haReplPayload, 0, len(s.st.ha.repl))
+	for _, rec := range s.st.ha.repl {
+		out = append(out, haReplToPayload(rec))
+	}
+	s.st.mu.Unlock()
+	s.writeData(w, out)
+}
+
+func (s *Server) handleReplGet(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	id := r.PathValue("id")
+	s.st.mu.Lock()
+	rec := s.st.ha.repl[id]
+	var payload haReplPayload
+	if rec != nil {
+		payload = haReplToPayload(rec)
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchReplJob)
+		return
+	}
+	s.writeData(w, payload)
+}
+
+// handleReplCreate defines a replication job. Synchronous (data null, no task).
+func (s *Server) handleReplCreate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if err := r.ParseForm(); err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	id := r.PostForm.Get("id")
+	if id == "" {
+		s.writeError(w, http.StatusBadRequest, "missing id")
+		return
+	}
+	rec := &haReplRecord{
+		ID: id, Type: r.PostForm.Get("type"), Target: r.PostForm.Get("target"),
+		Schedule: r.PostForm.Get("schedule"), Comment: r.PostForm.Get("comment"),
+	}
+	if rec.Type == "" {
+		rec.Type = "local"
+	}
+	if v, err := strconv.ParseFloat(r.PostForm.Get("rate"), 64); err == nil {
+		rec.Rate = v
+	}
+	s.st.mu.Lock()
+	if s.st.ha.repl == nil {
+		s.st.ha.repl = make(map[string]*haReplRecord)
+	}
+	s.st.ha.repl[id] = rec
+	s.st.mu.Unlock()
+	s.writeData(w, nil)
+}
+
+// handleReplUpdate mutates a replication job. Synchronous.
+func (s *Server) handleReplUpdate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	id := r.PathValue("id")
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if err := r.ParseForm(); err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	s.st.mu.Lock()
+	rec := s.st.ha.repl[id]
+	if rec != nil {
+		applyReplForm(rec, r.PostForm)
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchReplJob)
+		return
+	}
+	s.writeData(w, nil)
+}
+
+// applyReplForm applies a PUT form's fields to rec. The caller holds st.mu.
+func applyReplForm(rec *haReplRecord, form url.Values) {
+	if v := form.Get("target"); v != "" {
+		rec.Target = v
+	}
+	if v := form.Get("schedule"); v != "" {
+		rec.Schedule = v
+	}
+	if v := form.Get("comment"); v != "" {
+		rec.Comment = v
+	}
+	if v := form.Get("disable"); v != "" {
+		rec.Disable = v == "1"
+	}
+	if v, err := strconv.ParseFloat(form.Get("rate"), 64); err == nil {
+		rec.Rate = v
+	}
+}
+
+// handleReplDelete removes a replication job. Synchronous.
+func (s *Server) handleReplDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	id := r.PathValue("id")
+	s.st.mu.Lock()
+	_, found := s.st.ha.repl[id]
+	if found {
+		delete(s.st.ha.repl, id)
+	}
+	s.st.mu.Unlock()
+	if !found {
+		s.writeError(w, http.StatusNotFound, msgNoSuchReplJob)
+		return
+	}
+	s.writeData(w, nil)
+}
+
+func haReplToPayload(rec *haReplRecord) haReplPayload {
+	p := haReplPayload{
+		ID: rec.ID, Type: rec.Type, Target: rec.Target,
+		Schedule: rec.Schedule, Rate: rec.Rate, Comment: rec.Comment,
+	}
+	if rec.Disable {
+		p.Disable = 1
+	}
+	return p
 }
 
 // handleDLBGet returns the Dynamic Load Balancer status (the provisional 9.2

@@ -239,7 +239,11 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       `HAClusterSwitch` (9.2) capability. No confirmed PVE REST endpoint (a
       GUI/pvecm action), so both return a documented `pverr.ErrUnsupported`
       rather than fabricating a path — like `storage.ExpandRAIDZ`.
-- [ ] Storage/ZFS replication jobs (respect new `VM.Replicate` privilege)
+- [x] Storage/ZFS replication jobs (respect new `VM.Replicate` privilege) —
+      `ListReplicationJobs`/`GetReplicationJob`/`CreateReplicationJob`/
+      `UpdateReplicationJob`/`DeleteReplicationJob` over `/cluster/replication`;
+      lossless `ReplicationJob`, IDs `<vmid>-<jobnum>`; VM.Replicate noted in
+      docs. Synchronous writes. Mock-verified.
 - [ ] Promote the `doc.go` stub for `ha` — real package overview + a runnable
       `Example` (define a resource-affinity rule)
 
