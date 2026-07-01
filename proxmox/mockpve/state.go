@@ -18,6 +18,7 @@ type state struct {
 	qemu    qemuState
 	lxc     lxcState
 	storage storageState
+	ha      haState
 }
 
 // versionData backs GET /version.

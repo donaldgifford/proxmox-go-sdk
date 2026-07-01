@@ -214,8 +214,11 @@ The 9.x-reworked area — model rules, never the deprecated groups.
 
 #### Tasks
 
-- [ ] HA resources: add/remove (incl. add-after-create/restore), state
-      management
+- [x] HA resources: add/remove (incl. add-after-create/restore), state
+      management — new cluster-scoped `proxmox/ha` service
+      (`ListResources`/`GetResource`/`AddResource`/`UpdateResource`/
+      `RemoveResource`); SIDs (`vm:100`) path-escaped; config writes are
+      synchronous (return `error`, no task). Mock-verified.
 - [ ] **HA rules**: node-affinity + resource-affinity (resource-to-node,
       resource-to-resource); enable/disable
 - [ ] CRS settings read/write (static-load scheduler)

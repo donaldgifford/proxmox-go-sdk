@@ -354,8 +354,23 @@ new `version.Capabilities.ZFSRAIDZExpansion()` (9.2) but **always** returns a
 documented `pverr.ErrUnsupported` directing callers to the ssh side-channel,
 rather than fabricating a path that would 404. Its signature still returns a
 `tasks.Ref` so a real REST impl can land later non-breaking. mockpve gained
-`AddZFSPool` + the three disk/zfs routes. Next: Phase 3 task 7 (doc.go promotion
-for `storage` + `ssh`) and the end-to-end Success-Criterion test.
+`AddZFSPool` + the three disk/zfs routes.
+
+**Phase 4 (HA/scheduling/replication) is underway** — go-architect designed (see
+the ha-module-architecture memory). The `ha` service is **cluster-scoped** (like
+storage but every endpoint is under `/cluster/ha`): `c.HA()` takes no node.
+Structural rule for this phase: **all `/cluster/ha` + `/cluster/replication`
+config writes are synchronous** (PVE returns 200 with null data, no UPID), so
+those ops return `error`, **never `tasks.Ref`** — do not thread tasks into HA.
+Model the **9.x HA rules, never the deprecated `/cluster/ha/groups`**. Task 1
+(HA resources) landed the cluster-scoped `Service`/`API`, `HAResource` (lossless
+read via `UnmarshalJSON` + `haResourceKnownFields`), `HAResourceSpec`/`Update`,
+and CRUD over `/cluster/ha/resources`; SIDs (`vm:100`) carry a colon so path
+segments use `url.PathEscape`. mockpve gained `haState` + `AddHAResource` +
+`registerHARoutes`. The two unconfirmed 9.2 endpoints are decided up front:
+**Dynamic Load Balancer = REST-with-caveat** (provisional
+`/cluster/ha/lbalancer` path, gated + documented), **Arm/Disarm = documented
+`ErrUnsupported` stub** (no known REST path). Next: task 2 (HA rules).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

@@ -19,6 +19,8 @@ const (
 	msgNoSuchStorage = "no such storage"
 	msgNoSuchVolume  = "no such volume"
 	msgNoSuchZFSPool = "no such zfs pool"
+
+	msgNoSuchHAResource = "no such ha resource"
 )
 
 // qemuPowerStatus maps a /status/{action} verb to the run state the mock VM

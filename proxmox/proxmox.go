@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ha"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/lxc"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/qemu"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ssh"
@@ -86,6 +87,14 @@ func (c *Client) LXC(node string) *lxc.Service {
 // argument. It shares the client's transport and capability snapshot.
 func (c *Client) Storage() *storage.Service {
 	return storage.NewService(c.api, c.caps)
+}
+
+// HA returns the high-availability service. It is cluster-scoped (no node
+// argument): HA resources, rules, CRS settings, the Dynamic Load Balancer, and
+// replication jobs are all cluster-wide. It shares the client's transport and
+// capability snapshot.
+func (c *Client) HA() *ha.Service {
+	return ha.NewService(c.api, c.caps)
 }
 
 // SSH returns a disconnected SSH/SFTP side-channel client configured by opts
