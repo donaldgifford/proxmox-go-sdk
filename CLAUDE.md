@@ -432,9 +432,16 @@ written once, `scope.path()` switches the prefix. `RenameIPSet` gated 9.1
 (`OverlappingIPSets`); `IPSetEntry` (read) is split from `IPSetEntrySpec`
 (write, pointer `NoMatch`). Root accessors `Firewall`/`NodeFirewall`/
 `GuestFirewall`; mockpve keys `firewallState` by scope string
-("cluster"/"node:pve"/"guest:qemu:100"). Next: task 6 (doc.go promotion for
-`sdn`+`firewall`+node networking + runnable Examples — largely already done as
-each package landed; verify + close the phase).
+("cluster"/"node:pve"/"guest:qemu:100"). Task 6 promoted the `sdn`, `firewall`,
+and `nodes` `doc.go` overviews (skeletons → real package docs) and added a
+runnable nodes networking `Example`; all render under `go doc ./...`.
+
+**Phase 5 (network + SDN) is COMPLETE** — all 6 tasks checked; enumeration of
+zones/VNets/fabrics + full CRUD across every scope is mock-verified. The only
+written-but-unsupported piece is SDN live status (`SDNStatus`/`VNetStatus` →
+`ErrUnsupported`, no confirmed REST endpoint). Next: Phase 6 (cluster, access,
+nodes-admin, Ceph, PBS, console, metrics) — the first unchecked task is
+`/cluster/resources`, status, options.
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

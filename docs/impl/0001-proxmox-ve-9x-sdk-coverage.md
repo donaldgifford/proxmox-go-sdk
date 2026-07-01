@@ -293,12 +293,24 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       `/nodes/{n}/{qemu|lxc}/{vmid}/firewall`). `RenameIPSet` gated 9.1
       (`OverlappingIPSets`). Root accessors `Firewall`/`NodeFirewall`/
       `GuestFirewall`. Mock-verified across all three scopes.
-- [ ] Promote the `doc.go` stubs for `sdn` + `firewall` (and node networking in
-      `nodes`) — real package overview + a runnable `Example`
+- [x] Promote the `doc.go` stubs for `sdn` + `firewall` (and node networking in
+      `nodes`) — real package overview + a runnable `Example`. All three render
+      cleanly under `go doc ./...` and their Examples pass.
 
 #### Success Criteria
 
 - Enumerate zones/VNets/fabrics and their live status without error
+
+> **Status (all 6 tasks done):** `go build ./...`, `just lint` (0 issues), and
+> `just test` (race) are green. Enumerating zones/VNets/fabrics
+> (`ListZones`/`ListVNets`/`ListFabrics`) plus full CRUD, `ApplySDN`, node
+> networking, and the scoped firewall are **verified against the in-process
+> `mockpve` responder** across all three firewall scopes. The **live-status**
+> half of the criterion (`SDNStatus`/`VNetStatus`) has **no confirmed PVE REST
+> endpoint** and returns documented `pverr.ErrUnsupported` — it is neither mock-
+> nor live-verifiable here and is recorded as such (like `ha.ArmHA`).
+> Enumeration is satisfied; live status is written-but-unsupported pending a
+> reachable 9.x node to confirm the real endpoint.
 
 ---
 
