@@ -381,7 +381,11 @@ scheduler config lives inside datacenter options (`GET`/`PUT /cluster/options`,
 the `crs` **compound property-string** `ha=static,ha-rebalance-on-start=1`).
 `GetCRSSettings`/`SetCRSSettings` parse/encode that string to typed `Mode` +
 `HARebalanceOnStart` (no `Extra` — the body is one `crs=` param, not a flat
-form). Next: task 4 (Dynamic Load Balancer, 9.2 REST-with-caveat).
+form). Task 4 (Dynamic Load Balancer, 9.2+) landed `GetDLBStatus`/
+`SetDLBConfig` gated on `caps.Require("Dynamic Load Balancer","9.2")` — the
+REST-with-caveat approach: provisional path `/cluster/ha/lbalancer`, lossless
+`DLBStatus` read (hedges the unconfirmed shape), gate + round-trip
+mock-verified. Next: task 5 (Arm/Disarm, 9.2 `ErrUnsupported` stub).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

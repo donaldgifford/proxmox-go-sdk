@@ -10,9 +10,11 @@ import (
 // haState is the HA slice of the mock model, embedded in state and guarded by
 // state.mu. HA is cluster-scoped, so records are not keyed by node.
 type haState struct {
-	resources map[string]*haResourceRecord // keyed by SID, e.g. "vm:100".
-	rules     map[string]*haRuleRecord     // keyed by rule name.
-	crs       string                       // the datacenter "crs" property-string.
+	resources  map[string]*haResourceRecord // keyed by SID, e.g. "vm:100".
+	rules      map[string]*haRuleRecord     // keyed by rule name.
+	crs        string                       // the datacenter "crs" property-string.
+	dlbEnabled bool                         // Dynamic Load Balancer toggle (9.2+).
+	dlbMode    string                       // Dynamic Load Balancer scheduler mode.
 }
 
 // haRuleRecord is one HA rule (node-affinity or resource-affinity).
@@ -106,6 +108,39 @@ func (s *Server) registerHARoutes() {
 	s.mux.HandleFunc("DELETE /api2/json/cluster/ha/rules/{rule}", s.handleHARuleDelete)
 	s.mux.HandleFunc("GET /api2/json/cluster/options", s.handleClusterOptionsGet)
 	s.mux.HandleFunc("PUT /api2/json/cluster/options", s.handleClusterOptionsSet)
+	s.mux.HandleFunc("GET /api2/json/cluster/ha/lbalancer", s.handleDLBGet)
+	s.mux.HandleFunc("PUT /api2/json/cluster/ha/lbalancer", s.handleDLBSet)
+}
+
+// handleDLBGet returns the Dynamic Load Balancer status (the provisional 9.2
+// endpoint the SDK targets).
+func (s *Server) handleDLBGet(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	s.st.mu.Lock()
+	payload := map[string]any{"enabled": boolToInt(s.st.ha.dlbEnabled), "mode": s.st.ha.dlbMode}
+	s.st.mu.Unlock()
+	s.writeData(w, payload)
+}
+
+// handleDLBSet writes the Dynamic Load Balancer config. Synchronous.
+func (s *Server) handleDLBSet(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if err := r.ParseForm(); err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	s.st.mu.Lock()
+	s.st.ha.dlbEnabled = r.PostForm.Get("enabled") == "1"
+	if v := r.PostForm.Get("mode"); v != "" {
+		s.st.ha.dlbMode = v
+	}
+	s.st.mu.Unlock()
+	s.writeData(w, nil)
 }
 
 // handleClusterOptionsGet returns the datacenter options the mock models (just

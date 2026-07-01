@@ -19,6 +19,17 @@ func newService(t *testing.T, mock *mockpve.Server) *ha.Service {
 	return ha.NewService(c, version.Capabilities{})
 }
 
+func newCappedService(t *testing.T, mock *mockpve.Server, ver string) *ha.Service {
+	t.Helper()
+	c, cleanup := mock.NewClient()
+	t.Cleanup(cleanup)
+	caps, err := version.Parse(ver)
+	if err != nil {
+		t.Fatalf("version.Parse(%q): %v", ver, err)
+	}
+	return ha.NewService(c, caps)
+}
+
 func TestListResources(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()

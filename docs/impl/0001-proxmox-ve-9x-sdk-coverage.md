@@ -230,8 +230,11 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       `SetCRSSettings`; CRS lives inside datacenter options (`/cluster/options`,
       the `crs` compound property-string), parsed/encoded to typed `Mode` +
       `HARebalanceOnStart`. Mock-verified; sub-key names provisional.
-- [ ] **Dynamic Load Balancer** controls `(9.2+)` — continuous CRS rebalancing
-      toggle/config
+- [x] **Dynamic Load Balancer** controls `(9.2+)` — continuous CRS rebalancing
+      toggle/config — `GetDLBStatus`/`SetDLBConfig`, gated on the 9.2
+      `DynamicLoadBalancer` capability. REST-with-caveat: provisional path
+      `/cluster/ha/lbalancer` (mirrors ha-manager naming), gate mock-verified,
+      wire shape unconfirmed without a live 9.2 node.
 - [ ] Arm/Disarm HA cluster-wide switch `(9.2+)`
 - [ ] Storage/ZFS replication jobs (respect new `VM.Replicate` privilege)
 - [ ] Promote the `doc.go` stub for `ha` — real package overview + a runnable

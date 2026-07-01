@@ -21,3 +21,8 @@ func haRulePath(rule string) string {
 // clusterOptionsPath is the datacenter options endpoint. It is not under
 // /cluster/ha, but the CRS scheduler config lives here (the "crs" key).
 func clusterOptionsPath() string { return "/cluster/options" }
+
+// dlbPath is the Dynamic Load Balancer endpoint (9.2+). The path is provisional
+// — it mirrors PVE's ha-manager "lbalancer" naming and is unconfirmed without a
+// live 9.2 node (see ha.GetDLBStatus).
+func dlbPath() string { return "/cluster/ha/lbalancer" }
