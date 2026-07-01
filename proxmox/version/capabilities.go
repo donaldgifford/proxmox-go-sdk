@@ -120,6 +120,11 @@ func (c Capabilities) OverlappingIPSets() bool { return c.AtLeast(9, 1) }
 // older releases an empty comment was ignored (see access.ClearTokenComment).
 func (c Capabilities) ClearTokenComment() bool { return c.AtLeast(9, 1) }
 
+// OTelExporter gates the OpenTelemetry metrics exporter (9.1+). In 9.x this is
+// configured via files, not the REST API, so metrics.GetOTelConfig/SetOTelConfig
+// return pverr.ErrUnsupported even on a capable release (see those methods).
+func (c Capabilities) OTelExporter() bool { return c.AtLeast(9, 1) }
+
 // Require returns nil when the version is at least minVersion ("9.2"), and a
 // pverr.ErrUnsupported-wrapped error naming the feature otherwise. Services use
 // it to gate minor-specific operations with a uniform error.

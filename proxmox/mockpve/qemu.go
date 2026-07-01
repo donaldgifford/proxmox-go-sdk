@@ -42,6 +42,8 @@ const (
 	msgNoSuchRepo        = "no such apt repository"
 	msgNoSuchDisk        = "no such disk"
 	msgNoSuchACMEAccount = "no such acme account"
+
+	msgNoSuchMetricServer = "no such metric server"
 )
 
 // qemuPowerStatus maps a /status/{action} verb to the run state the mock VM

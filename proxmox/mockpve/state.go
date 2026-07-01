@@ -23,6 +23,7 @@ type state struct {
 	firewall firewallState
 	cluster  clusterState
 	access   accessState
+	metrics  metricsState
 	// acmeAccounts is cluster-scoped (/cluster/acme/account), keyed by handle.
 	acmeAccounts map[string]*acmeAccountRecord
 }

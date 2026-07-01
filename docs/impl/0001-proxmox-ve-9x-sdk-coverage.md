@@ -356,8 +356,19 @@ The 9.x-reworked area — model rules, never the deprecated groups.
 - [ ] Console: mint VNC/SPICE/term tickets, verify the **token-owned VNC
       auth-ticket** `(9.x)`, and `Connect()` a duplex byte stream to the
       console; the browser bridge is the consumer's
-- [ ] Metrics: extended metrics (CPU/mem/IO pressure stall, ZFS ARC);
-      OpenTelemetry exporter `(9.1+)`
+- [x] Metrics: extended metrics (CPU/mem/IO pressure stall, ZFS ARC);
+      OpenTelemetry exporter `(9.1+)` — new mixed-scope `metrics` package (no
+      bound node; `Metrics()` accessor). Node/guest RRD (`GetNodeRRD`/`GetVMRRD`
+      with `WithTimeframe`/`WithConsolidation` options) + `GetNodeStatus` are
+      lossless reads — pressure-stall and ZFS-ARC counters are
+      **REST-with-caveat** and land in `Extra`. Cluster-scoped external metric
+      servers
+      (`ListMetricServers`/`GetMetricServer`/`Create`/`Update`/`DeleteMetricServer`,
+      InfluxDB/Graphite, sync writes). The 9.1 OpenTelemetry exporter is
+      file-configured with **no REST endpoint**, so
+      `GetOTelConfig`/`SetOTelConfig` return documented `pverr.ErrUnsupported`
+      (new `OTelExporter` 9.1 gate reserved for the future). Mock-verified
+      (RRD/status synthesized static).
 - [ ] Promote the `doc.go` stubs for `cluster`, `access`, `nodes`, `ceph`,
       `pbs`, `console`, `metrics`, `mockpve` — real package overview + a
       runnable `Example`

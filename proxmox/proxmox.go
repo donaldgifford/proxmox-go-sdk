@@ -9,6 +9,7 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/firewall"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ha"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/lxc"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/metrics"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/nodes"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/qemu"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/sdn"
@@ -126,6 +127,13 @@ func (c *Client) Cluster() *cluster.Service {
 // API tokens under the 9.x privilege model. It is cluster-scoped.
 func (c *Client) Access() *access.Service {
 	return access.NewService(c.api, c.caps)
+}
+
+// Metrics returns the metrics service — node/guest RRD series and status, plus
+// external metric-server (InfluxDB/Graphite) configuration. Its scope is mixed
+// (reads take a node; server CRUD is cluster-scoped), so it binds no node.
+func (c *Client) Metrics() *metrics.Service {
+	return metrics.NewService(c.api, c.caps)
 }
 
 // Firewall returns the datacenter (cluster) firewall service. Use NodeFirewall

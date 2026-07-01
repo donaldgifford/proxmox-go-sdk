@@ -467,9 +467,16 @@ cluster-scoped ACME accounts + node ACME certificate order/renew/revoke. DEB822
 fields, SMART attribute tables, and the ACME cert task-vs-sync split are
 REST-with-caveat (real endpoints, provisional shapes). Custom node scripts have
 **no** SDK method — run them over `c.SSH().Exec`. mockpve gained `nodesadmin.go`
-(per-node apt/repos/disks/certs + cluster `acmeAccounts`). Next: task 5 (metrics
-— new package, mixed scope, `Metrics()` accessor; add the `OTelExporter` 9.1
-gate).
+(per-node apt/repos/disks/certs + cluster `acmeAccounts`). Task 5 landed the
+mixed-scope `metrics` package (`Metrics()` accessor, no bound node): node/guest
+RRD (`GetNodeRRD`/`GetVMRRD` with `WithTimeframe`/`WithConsolidation` options) +
+`GetNodeStatus` (lossless; pressure-stall + ZFS-ARC in `Extra`,
+REST-with-caveat), cluster-scoped metric-server CRUD (`/cluster/metrics/server`,
+sync), and OTel `GetOTelConfig`/`SetOTelConfig` that return
+`pverr.ErrUnsupported` (9.x OTel is file-configured, no REST; new `OTelExporter`
+9.1 gate reserved). mockpve `metrics.go` synthesizes RRD/status statically.
+Next: task 6 (ceph — new package, node per-call, `c.Ceph()` with **no** node
+arg).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:
