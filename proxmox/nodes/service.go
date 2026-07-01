@@ -13,8 +13,8 @@ import (
 // serves the whole cluster. It is safe for concurrent use; construct it with
 // NewService or via the root client's Nodes accessor.
 //
-// Phase 5 lands node networking; later phases extend the same Service with node
-// status, packages, disks, and certificates.
+// Phase 5 lands node networking; Phase 6 (task 4) extends the same Service with
+// node administration — package updates, disks, and certificates/ACME.
 type Service struct {
 	c    api.Client
 	caps version.Capabilities
@@ -41,6 +41,36 @@ type API interface {
 	UpdateInterface(ctx context.Context, node, iface string, update *InterfaceUpdate) error
 	DeleteInterface(ctx context.Context, node, iface string) error
 	ApplyNetworkConfig(ctx context.Context, node string) (tasks.Ref, error)
+
+	// Package management (task 4). RefreshAptCache runs a worker; the DEB822
+	// repository field shapes are provisional (REST-with-caveat, see apt.go).
+	ListAptUpdates(ctx context.Context, node string) ([]AptUpdate, error)
+	RefreshAptCache(ctx context.Context, node string) (tasks.Ref, error)
+	ListRepositories(ctx context.Context, node string) (*Repositories, error)
+	UpdateRepository(ctx context.Context, node string, update *RepositoryUpdate) error
+
+	// Disks (task 4). InitializeDisk runs a worker; the SMART attribute table
+	// shape is device-dependent (REST-with-caveat, see disks.go).
+	ListDisks(ctx context.Context, node string) ([]Disk, error)
+	GetDiskSMART(ctx context.Context, node, disk string) (*SMART, error)
+	InitializeDisk(ctx context.Context, node, disk string) (tasks.Ref, error)
+
+	// Certificates + ACME (task 4). Custom-cert writes are synchronous; ACME
+	// account and node-cert order/renew/revoke run workers (the latter are
+	// REST-with-caveat, see certificates.go). ACME accounts are cluster-scoped
+	// (no node argument). Custom node scripts have no REST endpoint — run them
+	// over the SSH side-channel (c.SSH().Exec), so no method is offered here.
+	GetNodeCertificates(ctx context.Context, node string) ([]Certificate, error)
+	UploadCustomCertificate(ctx context.Context, node string, spec *CustomCertificateSpec) ([]Certificate, error)
+	DeleteCustomCertificate(ctx context.Context, node string) error
+	ListACMEAccounts(ctx context.Context) ([]string, error)
+	GetACMEAccount(ctx context.Context, name string) (*ACMEAccount, error)
+	RegisterACMEAccount(ctx context.Context, spec *ACMEAccountSpec) (tasks.Ref, error)
+	UpdateACMEAccount(ctx context.Context, name string, update *ACMEAccountUpdate) error
+	DeactivateACMEAccount(ctx context.Context, name string) (tasks.Ref, error)
+	OrderNodeCertificate(ctx context.Context, node string) (tasks.Ref, error)
+	RenewNodeCertificate(ctx context.Context, node string) (tasks.Ref, error)
+	RevokeNodeCertificate(ctx context.Context, node string) (tasks.Ref, error)
 }
 
 // Compile-time assertion that *Service implements the published contract.

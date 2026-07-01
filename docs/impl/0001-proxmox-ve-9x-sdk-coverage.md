@@ -335,8 +335,22 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       `CreateToken`/`RegenerateTokenSecret` return the one-time `TokenSecret`.
       `ClearTokenComment` gated 9.1, `RegenerateTokenSecret` gated 9.2
       (REST-with-caveat: provisional rotate path). Gates mock-verified.
-- [ ] Node admin: package updates (DEB822 sources), disks/SMART,
-      certificates/ACME, custom scripts `(ssh)`
+- [x] Node admin: package updates (DEB822 sources), disks/SMART,
+      certificates/ACME, custom scripts `(ssh)` — extends the `nodes` package
+      (node per-call, no bound node): apt (`ListAptUpdates`,
+      `RefreshAptCache`→`tasks.Ref`) plus DEB822 repositories
+      (`ListRepositories`/`UpdateRepository`, **REST-with-caveat**: real
+      endpoint, provisional field shapes); disks (`ListDisks`, `GetDiskSMART`
+      **REST-with-caveat** on the attribute table,
+      `InitializeDisk`→`tasks.Ref`); certificates (`GetNodeCertificates`,
+      `UploadCustomCertificate`/ `DeleteCustomCertificate` sync) +
+      cluster-scoped ACME accounts
+      (`ListACMEAccounts`/`GetACMEAccount`/`RegisterACMEAccount`→`tasks.Ref`/
+      `UpdateACMEAccount`/`DeactivateACMEAccount`→`tasks.Ref`) + node ACME cert
+      `Order`/`Renew`/`RevokeNodeCertificate`→`tasks.Ref` (**REST-with-caveat**:
+      real endpoint, task-vs-sync unconfirmed). **Custom node scripts have no
+      PVE REST endpoint** — the SDK offers no method; run them over the SSH
+      side-channel (`c.SSH().Exec`). Mock-verified.
 - [ ] Ceph: pools, OSDs, RBD mirroring (Squid)
 - [ ] PBS integration: datastores, backups, verify, restore
 - [ ] Console: mint VNC/SPICE/term tickets, verify the **token-owned VNC

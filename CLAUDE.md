@@ -457,8 +457,19 @@ user/group/role CRUD, ACL grant/revoke (`SetACL`, `Delete` revokes), and API
 tokens (`CreateToken`/`RegenerateTokenSecret` return the one-time `TokenSecret`;
 `ClearTokenComment` gated 9.1, `RegenerateTokenSecret` gated 9.2). `Role`
 normalises PVE's two role-read shapes. Added `svcutil`-free mockpve `parseForm`
-helper (body-cap + ParseForm) reused by the access handlers. Next: task 4
-(nodes-admin — apt/disks/certs, extends the `nodes` package).
+helper (body-cap + ParseForm) reused by the access handlers. Task 4 extended the
+`nodes` package (still node-per-call, no bound node) with node administration —
+apt updates + DEB822 repositories (`ListAptUpdates`/`RefreshAptCache`/
+`ListRepositories`/`UpdateRepository`), disks + SMART
+(`ListDisks`/`GetDiskSMART`/ `InitializeDisk`), node certificates
+(`GetNodeCertificates`/ `UploadCustomCertificate`/`DeleteCustomCertificate`) and
+cluster-scoped ACME accounts + node ACME certificate order/renew/revoke. DEB822
+fields, SMART attribute tables, and the ACME cert task-vs-sync split are
+REST-with-caveat (real endpoints, provisional shapes). Custom node scripts have
+**no** SDK method — run them over `c.SSH().Exec`. mockpve gained `nodesadmin.go`
+(per-node apt/repos/disks/certs + cluster `acmeAccounts`). Next: task 5 (metrics
+— new package, mixed scope, `Metrics()` accessor; add the `OTelExporter` 9.1
+gate).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

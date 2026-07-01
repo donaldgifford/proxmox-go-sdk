@@ -38,6 +38,10 @@ const (
 	msgNoSuchGroup = "no such group"
 	msgNoSuchRole  = "no such role"
 	msgNoSuchToken = "no such token"
+
+	msgNoSuchRepo        = "no such apt repository"
+	msgNoSuchDisk        = "no such disk"
+	msgNoSuchACMEAccount = "no such acme account"
 )
 
 // qemuPowerStatus maps a /status/{action} verb to the run state the mock VM

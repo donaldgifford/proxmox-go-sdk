@@ -23,6 +23,8 @@ type state struct {
 	firewall firewallState
 	cluster  clusterState
 	access   accessState
+	// acmeAccounts is cluster-scoped (/cluster/acme/account), keyed by handle.
+	acmeAccounts map[string]*acmeAccountRecord
 }
 
 // versionData backs GET /version.
@@ -43,6 +45,11 @@ type ticketRecord struct {
 type nodeState struct {
 	tasks     map[string]*taskRecord     // keyed by UPID
 	netIfaces map[string]*netIfaceRecord // keyed by interface name
+	// Node administration (task 4).
+	aptUpdates []aptUpdateRecord
+	repos      []nodeRepoFileRecord
+	disks      []nodeDiskRecord
+	certs      []nodeCertRecord
 }
 
 // taskRecord models one asynchronous PVE task. Stopped=false is "running";
