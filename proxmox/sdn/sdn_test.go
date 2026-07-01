@@ -19,6 +19,19 @@ func newService(t *testing.T, mock *mockpve.Server) *sdn.Service {
 	return sdn.NewService(c, version.Capabilities{})
 }
 
+// newCappedService builds a Service whose capability snapshot is pinned to ver
+// (e.g. "9.1", "9.2"), for exercising the version-gated fabric operations.
+func newCappedService(t *testing.T, mock *mockpve.Server, ver string) *sdn.Service {
+	t.Helper()
+	caps, err := version.Parse(ver)
+	if err != nil {
+		t.Fatalf("version.Parse(%q): %v", ver, err)
+	}
+	c, cleanup := mock.NewClient()
+	t.Cleanup(cleanup)
+	return sdn.NewService(c, caps)
+}
+
 func TestListZones(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()
@@ -278,6 +291,140 @@ func TestApplySDN(t *testing.T) {
 
 	if err := svc.ApplySDN(context.Background()); err != nil {
 		t.Fatalf("ApplySDN: %v", err)
+	}
+}
+
+func TestListFabrics(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddFabric("fab0", "openfabric")
+	svc := newService(t, mock)
+
+	fabrics, err := svc.ListFabrics(context.Background())
+	if err != nil {
+		t.Fatalf("ListFabrics: %v", err)
+	}
+	if len(fabrics) != 1 {
+		t.Fatalf("ListFabrics returned %d, want 1", len(fabrics))
+	}
+}
+
+func TestGetFabric(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddFabric("fab0", "ospf")
+	svc := newService(t, mock)
+
+	f, err := svc.GetFabric(context.Background(), "fab0")
+	if err != nil {
+		t.Fatalf("GetFabric: %v", err)
+	}
+	if f.Fabric != "fab0" || f.Protocol != sdn.FabricProtocolOSPF {
+		t.Errorf("fabric = %+v, want id=fab0 protocol=ospf", f)
+	}
+}
+
+func TestGetFabricNotFound(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+
+	if _, err := svc.GetFabric(context.Background(), "ghost"); !errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("GetFabric(ghost) = %v, want ErrNotFound", err)
+	}
+}
+
+func TestCreateFabric(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	// OpenFabric is the 9.0 baseline: no version gate, so zero caps is fine.
+	if err := svc.CreateFabric(ctx, &sdn.FabricSpec{
+		Fabric:   "fab1",
+		Protocol: sdn.FabricProtocolOpenFabric,
+		Nodes:    "pve1,pve2",
+	}); err != nil {
+		t.Fatalf("CreateFabric: %v", err)
+	}
+	f, err := svc.GetFabric(ctx, "fab1")
+	if err != nil {
+		t.Fatalf("GetFabric after create: %v", err)
+	}
+	if f.Protocol != sdn.FabricProtocolOpenFabric || f.Nodes != "pve1,pve2" {
+		t.Errorf("created fabric = %+v, want protocol=openfabric nodes=pve1,pve2", f)
+	}
+}
+
+func TestCreateFabricValidation(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	if err := svc.CreateFabric(ctx, nil); err == nil {
+		t.Error("CreateFabric(nil) error = nil, want non-nil")
+	}
+	if err := svc.CreateFabric(ctx, &sdn.FabricSpec{Protocol: sdn.FabricProtocolOSPF}); err == nil {
+		t.Error("CreateFabric(no id) error = nil, want non-nil")
+	}
+	if err := svc.CreateFabric(ctx, &sdn.FabricSpec{Fabric: "f"}); err == nil {
+		t.Error("CreateFabric(no protocol) error = nil, want non-nil")
+	}
+}
+
+// TestCreateFabricAdvancedProtocolGate covers the SDNAdvancedFabrics gate: BGP
+// is a 9.2 protocol, so it must be refused below 9.2 and accepted at 9.2.
+func TestCreateFabricAdvancedProtocolGate(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	mock91 := mockpve.New()
+	svc91 := newCappedService(t, mock91, "9.1") // below the 9.2 gate.
+	err := svc91.CreateFabric(ctx, &sdn.FabricSpec{Fabric: "bgpfab", Protocol: sdn.FabricProtocolBGP})
+	if !errors.Is(err, pverr.ErrUnsupported) {
+		t.Fatalf("CreateFabric(bgp) on 9.1 = %v, want ErrUnsupported", err)
+	}
+
+	mock92 := mockpve.New()
+	svc92 := newCappedService(t, mock92, "9.2") // gate satisfied.
+	if err := svc92.CreateFabric(ctx, &sdn.FabricSpec{Fabric: "bgpfab", Protocol: sdn.FabricProtocolBGP}); err != nil {
+		t.Fatalf("CreateFabric(bgp) on 9.2 = %v, want nil", err)
+	}
+}
+
+func TestUpdateFabric(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddFabric("fab0", "openfabric")
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	if err := svc.UpdateFabric(ctx, "fab0", &sdn.FabricUpdate{Comment: "core"}); err != nil {
+		t.Fatalf("UpdateFabric: %v", err)
+	}
+	f, err := svc.GetFabric(ctx, "fab0")
+	if err != nil {
+		t.Fatalf("GetFabric after update: %v", err)
+	}
+	if f.Comment != "core" {
+		t.Errorf("comment after update = %q, want core", f.Comment)
+	}
+}
+
+func TestDeleteFabric(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddFabric("gone", "ospf")
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	if err := svc.DeleteFabric(ctx, "gone"); err != nil {
+		t.Fatalf("DeleteFabric: %v", err)
+	}
+	if _, err := svc.GetFabric(ctx, "gone"); !errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("GetFabric after delete = %v, want ErrNotFound", err)
 	}
 }
 

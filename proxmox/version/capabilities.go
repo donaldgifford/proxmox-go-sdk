@@ -101,6 +101,17 @@ func (c Capabilities) ZFSRAIDZExpansion() bool { return c.AtLeast(9, 2) }
 // PVE exposes it over REST is unconfirmed without a live node (see ha.ArmHA).
 func (c Capabilities) HAClusterSwitch() bool { return c.AtLeast(9, 2) }
 
+// SDNFabrics gates SDN fabrics — the OpenFabric/OSPF routing layer under the SDN
+// stack (9.0+). It is baseline on every supported release; the gate exists for
+// symmetry and for callers constructing a Service with an unset version.
+func (c Capabilities) SDNFabrics() bool { return c.AtLeast(9, 0) }
+
+// SDNAdvancedFabrics gates the newer fabric protocols and options layered on the
+// 9.0 fabric baseline — BGP, WireGuard-encrypted underlays, and IPv6 underlays
+// (9.2+). The exact 9.2 fabric surface is unconfirmed without a live node (see
+// sdn.CreateFabric).
+func (c Capabilities) SDNAdvancedFabrics() bool { return c.AtLeast(9, 2) }
+
 // Require returns nil when the version is at least minVersion ("9.2"), and a
 // pverr.ErrUnsupported-wrapped error naming the feature otherwise. Services use
 // it to gate minor-specific operations with a uniform error.

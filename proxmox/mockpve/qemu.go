@@ -28,6 +28,7 @@ const (
 	msgNoSuchZone   = "no such sdn zone"
 	msgNoSuchVNet   = "no such sdn vnet"
 	msgNoSuchSubnet = "no such sdn subnet"
+	msgNoSuchFabric = "no such sdn fabric"
 )
 
 // qemuPowerStatus maps a /status/{action} verb to the run state the mock VM

@@ -26,3 +26,9 @@ func sdnSubnetsPath(vnet string) string {
 func sdnSubnetPath(vnet, subnet string) string {
 	return sdnSubnetsPath(vnet) + "/" + url.PathEscape(subnet)
 }
+
+func sdnFabricsPath() string { return "/cluster/sdn/fabrics" }
+
+func sdnFabricPath(fabric string) string {
+	return sdnFabricsPath() + "/" + url.PathEscape(fabric)
+}

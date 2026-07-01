@@ -59,6 +59,15 @@ type API interface {
 	UpdateSubnet(ctx context.Context, vnet, subnet string, update *SubnetUpdate) error
 	DeleteSubnet(ctx context.Context, vnet, subnet string) error
 
+	// Fabrics (task 3, 9.0+) — the OpenFabric/OSPF routing layer. Writes stage
+	// into the pending config. The REST surface is provisional (see Fabric); a
+	// protocol beyond the 9.0 baseline requires PVE 9.2 (SDNAdvancedFabrics).
+	ListFabrics(ctx context.Context) ([]Fabric, error)
+	GetFabric(ctx context.Context, fabric string) (*Fabric, error)
+	CreateFabric(ctx context.Context, spec *FabricSpec) error
+	UpdateFabric(ctx context.Context, fabric string, update *FabricUpdate) error
+	DeleteFabric(ctx context.Context, fabric string) error
+
 	// ApplySDN commits the pending SDN config cluster-wide (task 2). It is
 	// synchronous.
 	ApplySDN(ctx context.Context) error
