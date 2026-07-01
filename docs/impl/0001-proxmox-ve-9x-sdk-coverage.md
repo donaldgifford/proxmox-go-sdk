@@ -280,8 +280,11 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       (REST-with-caveat: real 9.0 feature, path/fields unverified against a live
       node). Basic protocols (openfabric/ospf) are baseline; `FabricProtocolBGP`
       is refused below 9.2 via the new `SDNAdvancedFabrics` gate. Mock-verified.
-- [ ] SDN status reporting (connected guest NICs, EVPN learned IPs/MACs, fabric
-      routes/neighbors)
+- [x] SDN status reporting (connected guest NICs, EVPN learned IPs/MACs, fabric
+      routes/neighbors) — `SDNStatus`/`VNetStatus` with fixed forward-compatible
+      return types, but **no confirmed PVE REST endpoint** exists, so both
+      return documented `pverr.ErrUnsupported` (like `ha.ArmHA`). No mock
+      handlers.
 - [ ] Firewall: rules, ipsets (incl. overlapping ipset support `(9.1+)`)
 - [ ] Promote the `doc.go` stubs for `sdn` + `firewall` (and node networking in
       `nodes`) — real package overview + a runnable `Example`

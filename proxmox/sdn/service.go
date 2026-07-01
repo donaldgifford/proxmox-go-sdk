@@ -71,6 +71,12 @@ type API interface {
 	// ApplySDN commits the pending SDN config cluster-wide (task 2). It is
 	// synchronous.
 	ApplySDN(ctx context.Context) error
+
+	// SDN live status (task 4). No confirmed PVE REST endpoint exists for SDN
+	// status, so these return pverr.ErrUnsupported (see SDNStatus). The return
+	// types are fixed so they become real calls without a signature change.
+	SDNStatus(ctx context.Context) ([]SDNZoneStatus, error)
+	VNetStatus(ctx context.Context, vnet string) (*VNetStatus, error)
 }
 
 // Compile-time assertion that *Service implements the published contract.

@@ -428,6 +428,22 @@ func TestDeleteFabric(t *testing.T) {
 	}
 }
 
+// TestStatusUnsupported documents that the SDN live-status reads have no
+// confirmed PVE REST endpoint and therefore return pverr.ErrUnsupported.
+func TestStatusUnsupported(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	if _, err := svc.SDNStatus(ctx); !errors.Is(err, pverr.ErrUnsupported) {
+		t.Errorf("SDNStatus = %v, want ErrUnsupported", err)
+	}
+	if _, err := svc.VNetStatus(ctx, "vnet0"); !errors.Is(err, pverr.ErrUnsupported) {
+		t.Errorf("VNetStatus = %v, want ErrUnsupported", err)
+	}
+}
+
 func TestZoneUnmarshalExtra(t *testing.T) {
 	t.Parallel()
 	// Keys outside the modelled set (here "dhcp") must land in Extra so a zone

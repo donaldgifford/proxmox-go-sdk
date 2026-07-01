@@ -422,8 +422,11 @@ accessor, and `svcutil.DecodeExtra` (the shared lossless-read tail, extracted so
 the fabrics read type in task 3 reuses it). Task 3 landed SDN **fabrics**
 (`Fabric` lossless read + CRUD over the provisional `/cluster/sdn/fabrics`,
 REST-with-caveat) with `SDNFabrics`/`SDNAdvancedFabrics` gates — openfabric/ospf
-are 9.0 baseline, `FabricProtocolBGP` is refused below 9.2. Next: task 4 (SDN
-status — `ErrUnsupported` stub, no mock handlers).
+are 9.0 baseline, `FabricProtocolBGP` is refused below 9.2. Task 4 landed SDN
+status (`SDNStatus`/`VNetStatus`): fixed forward-compatible return types but a
+documented `pverr.ErrUnsupported` stub — no confirmed REST endpoint (like
+`ha.ArmHA`), no mock handlers. Next: task 5 (firewall — scope model:
+cluster/node/guest).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:
