@@ -33,7 +33,7 @@ type HARule struct {
 	Type      RuleType      `json:"type,omitempty"`      // node-affinity or resource-affinity.
 	Nodes     string        `json:"nodes,omitempty"`     // CSV of nodes; node-affinity rules.
 	Resources string        `json:"resources,omitempty"` // CSV of SIDs; resource-affinity rules.
-	Affinity  string        `json:"affinity,omitempty"`  // "positive"/"negative" for resource-affinity.
+	Affinity  string        `json:"affinity,omitempty"`  // "positive" or "negative"; resource-affinity only.
 	Disable   types.PVEBool `json:"disable,omitempty"`   // PVE stores the disabled flag, not enabled.
 	Comment   string        `json:"comment,omitempty"`
 	// Extra carries HA rule keys the SDK does not model.

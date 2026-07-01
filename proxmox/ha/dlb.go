@@ -22,7 +22,8 @@ type DLBStatus struct {
 	Extra map[string]string `json:"-"`
 }
 
-// dlbStatusKnownFields lists the JSON keys DLBStatus models directly.
+// dlbStatusKnownFields lists the JSON keys DLBStatus models directly; keep it
+// in sync with the struct so UnmarshalJSON routes only the rest into Extra.
 var dlbStatusKnownFields = map[string]bool{"enabled": true, "mode": true}
 
 // UnmarshalJSON decodes the modelled fields and routes any unknown keys into

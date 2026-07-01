@@ -356,17 +356,22 @@ rather than fabricating a path that would 404. Its signature still returns a
 `tasks.Ref` so a real REST impl can land later non-breaking. mockpve gained
 `AddZFSPool` + the three disk/zfs routes.
 
-**Phase 4 (HA/scheduling/replication) is underway** — go-architect designed (see
-the ha-module-architecture memory). The `ha` service is **cluster-scoped** (like
-storage but every endpoint is under `/cluster/ha`): `c.HA()` takes no node.
-Structural rule for this phase: **all `/cluster/ha` + `/cluster/replication`
-config writes are synchronous** (PVE returns 200 with null data, no UPID), so
-those ops return `error`, **never `tasks.Ref`** — do not thread tasks into HA.
-Model the **9.x HA rules, never the deprecated `/cluster/ha/groups`**. Task 1
-(HA resources) landed the cluster-scoped `Service`/`API`, `HAResource` (lossless
-read via `UnmarshalJSON` + `haResourceKnownFields`), `HAResourceSpec`/`Update`,
-and CRUD over `/cluster/ha/resources`; SIDs (`vm:100`) carry a colon so path
-segments use `url.PathEscape`. mockpve gained `haState` + `AddHAResource` +
+**Phase 4 (HA/scheduling/replication) is implementation-complete** — all 7 tasks
+checked in IMPL-0001; `ha` is doc-promoted with a runnable resource-affinity
+`Example` (`go doc`-verified). The Success Criterion (define a resource-affinity
+rule + read it back) is mock-verified; the _placement-honored_ observation is
+live-only (the mock does not schedule) and stays written-but-unverified.
+go-architect designed (see the ha-module-architecture memory). The `ha` service
+is **cluster-scoped** (like storage but every endpoint is under `/cluster/ha`):
+`c.HA()` takes no node. Structural rule for this phase: **all `/cluster/ha` +
+`/cluster/replication` config writes are synchronous** (PVE returns 200 with
+null data, no UPID), so those ops return `error`, **never `tasks.Ref`** — do not
+thread tasks into HA. Model the **9.x HA rules, never the deprecated
+`/cluster/ha/groups`**. Task 1 (HA resources) landed the cluster-scoped
+`Service`/`API`, `HAResource` (lossless read via `UnmarshalJSON` +
+`haResourceKnownFields`), `HAResourceSpec`/`Update`, and CRUD over
+`/cluster/ha/resources`; SIDs (`vm:100`) carry a colon so path segments use
+`url.PathEscape`. mockpve gained `haState` + `AddHAResource` +
 `registerHARoutes`. The two unconfirmed 9.2 endpoints are decided up front:
 **Dynamic Load Balancer = REST-with-caveat** (provisional
 `/cluster/ha/lbalancer` path, gated + documented), **Arm/Disarm = documented
@@ -392,8 +397,9 @@ mock-verified. Task 5 (Arm/Disarm) added `ArmHA`/`DisarmHA` + the new
 them. Task 6 (replication jobs) added CRUD over `/cluster/replication`
 (`ListReplicationJobs`/`Get`/`Create`/`Update`/`DeleteReplicationJob`), lossless
 `ReplicationJob` (IDs `<vmid>-<jobnum>`), requires the 9.x `VM.Replicate`
-privilege (noted in docs). Next: task 7 (doc.go promotion + runnable
-resource-affinity Example → the phase Success Criterion).
+privilege (noted in docs). Task 7 promoted `ha/doc.go` (full overview) and added
+the runnable resource-affinity `Example` that satisfies the phase Success
+Criterion (mock-verified). Next: Phase 5 (network + SDN).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

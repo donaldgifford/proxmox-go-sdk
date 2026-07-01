@@ -244,12 +244,18 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       `UpdateReplicationJob`/`DeleteReplicationJob` over `/cluster/replication`;
       lossless `ReplicationJob`, IDs `<vmid>-<jobnum>`; VM.Replicate noted in
       docs. Synchronous writes. Mock-verified.
-- [ ] Promote the `doc.go` stub for `ha` — real package overview + a runnable
-      `Example` (define a resource-affinity rule)
+- [x] Promote the `doc.go` stub for `ha` — real package overview + a runnable
+      `Example` (define a resource-affinity rule). `go doc`-verified; the
+      `Example` (add two resources → resource-affinity rule → read back) runs
+      against mockpve with `// Output` checked.
 
 #### Success Criteria
 
-- Define a resource-affinity rule via the SDK and observe placement honor it
+- [x] Define a resource-affinity rule via the SDK and observe placement honor it
+      — the rule definition + read-back is covered by the runnable `ha`
+      `Example` and `TestCreateResourceAffinityRule` (mock-verified). The
+      **placement-honored observation is live-only** (the mock does not
+      schedule) and remains written-but-unverified without a real cluster.
 
 ---
 
