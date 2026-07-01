@@ -439,9 +439,20 @@ runnable nodes networking `Example`; all render under `go doc ./...`.
 **Phase 5 (network + SDN) is COMPLETE** — all 6 tasks checked; enumeration of
 zones/VNets/fabrics + full CRUD across every scope is mock-verified. The only
 written-but-unsupported piece is SDN live status (`SDNStatus`/`VNetStatus` →
-`ErrUnsupported`, no confirmed REST endpoint). Next: Phase 6 (cluster, access,
-nodes-admin, Ceph, PBS, console, metrics) — the first unchecked task is
-`/cluster/resources`, status, options.
+`ErrUnsupported`, no confirmed REST endpoint).
+
+**Phase 6 (cluster, access, nodes-admin, Ceph, PBS, console, metrics) is
+underway** — go-architect designed it (see the phase6-module-architecture
+memory): 8 impl tasks in order cluster → access+tokens → nodes-admin → metrics →
+ceph → pbs → console, then doc. Key up-front decisions: `console.Connect` needs
+a new `api.Client.DoWebSocket`; PBS wraps the PVE-side only (not the PBS-native
+API); new gates `ClearTokenComment`/`OTelExporter` (both 9.1); several
+REST-with-caveat surfaces (token-secret rotation, DEB822, SMART, Ceph mirroring)
+and one ErrUnsupported stub (metrics OTel config). Task 1 landed the
+cluster-scoped `cluster` package (`ListResources`/`GetStatus`/`GetOptions`/
+`SetOptions`; `Cluster()` accessor). The mock's `/cluster/options` route is
+shared between HA (`crs`) and cluster (other keys) — do NOT double-register it.
+Next: task 2 (access — users/groups/roles/ACLs, 9.x privilege model).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

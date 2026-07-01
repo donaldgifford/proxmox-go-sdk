@@ -318,7 +318,12 @@ The 9.x-reworked area — model rules, never the deprecated groups.
 
 #### Tasks
 
-- [ ] Cluster: `/cluster/resources`, status, options
+- [x] Cluster: `/cluster/resources`, status, options — new cluster-scoped
+      `cluster` package: `ListResources` (with `WithResourceType` filter),
+      `GetStatus` (lossless `StatusEntry` list), `GetOptions`/`SetOptions`
+      (lossless; sync write). The mock's `/cluster/options` handler is shared
+      with HA (HA owns `crs`; cluster owns description/migration/…).
+      Mock-verified.
 - [ ] Access: users, groups, roles, ACLs using the **9.x privilege model**
       (`VM.Replicate`, granular agent privs; no `VM.Monitor`)
 - [ ] API tokens: create/list/revoke, clear comment `(9.1+)`, **regenerate

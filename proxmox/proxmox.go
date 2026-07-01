@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/cluster"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/firewall"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ha"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/lxc"
@@ -112,6 +113,12 @@ func (c *Client) HA() *ha.Service {
 // cluster-wide. It shares the client's transport and capability snapshot.
 func (c *Client) SDN() *sdn.Service {
 	return sdn.NewService(c.api, c.caps)
+}
+
+// Cluster returns the cluster service — cluster-wide resource inventory, status,
+// and datacenter options. It is cluster-scoped (no node argument).
+func (c *Client) Cluster() *cluster.Service {
+	return cluster.NewService(c.api, c.caps)
 }
 
 // Firewall returns the datacenter (cluster) firewall service. Use NodeFirewall

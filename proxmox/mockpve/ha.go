@@ -320,19 +320,29 @@ func (s *Server) handleDLBSet(w http.ResponseWriter, r *http.Request) {
 	s.writeData(w, nil)
 }
 
-// handleClusterOptionsGet returns the datacenter options the mock models (just
-// the "crs" key today).
+// handleClusterOptionsGet returns the datacenter options block. HA owns the
+// "crs" property-string (state.ha.crs); the cluster service's options
+// (description, migration, …) live in state.cluster.options. Both are merged
+// into one response, since PVE exposes them at the single /cluster/options.
 func (s *Server) handleClusterOptionsGet(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
 	}
 	s.st.mu.Lock()
-	crs := s.st.ha.crs
+	out := make(map[string]string, len(s.st.cluster.options)+1)
+	for k, v := range s.st.cluster.options {
+		out[k] = v
+	}
+	if s.st.ha.crs != "" {
+		out["crs"] = s.st.ha.crs
+	}
 	s.st.mu.Unlock()
-	s.writeData(w, map[string]string{"crs": crs})
+	s.writeData(w, out)
 }
 
-// handleClusterOptionsSet stores the "crs" property-string. Synchronous.
+// handleClusterOptionsSet stores datacenter options. "crs" routes to the HA
+// state (so the HA CRS handlers keep working); every other key is stored as a
+// cluster option. Synchronous.
 func (s *Server) handleClusterOptionsSet(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
@@ -342,11 +352,21 @@ func (s *Server) handleClusterOptionsSet(w http.ResponseWriter, r *http.Request)
 		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
 		return
 	}
-	if v := r.PostForm.Get("crs"); v != "" {
-		s.st.mu.Lock()
-		s.st.ha.crs = v
-		s.st.mu.Unlock()
+	s.st.mu.Lock()
+	if s.st.cluster.options == nil {
+		s.st.cluster.options = make(map[string]string)
 	}
+	for k, vs := range r.PostForm {
+		if len(vs) == 0 {
+			continue
+		}
+		if k == "crs" {
+			s.st.ha.crs = vs[0]
+			continue
+		}
+		s.st.cluster.options[k] = vs[0]
+	}
+	s.st.mu.Unlock()
 	s.writeData(w, nil)
 }
 

@@ -112,6 +112,7 @@ func (s *Server) registerRoutes() {
 	s.registerNodeNetworkRoutes()
 	s.registerSDNRoutes()
 	s.registerFirewallRoutes()
+	s.registerClusterRoutes()
 }
 
 // Serve starts an httptest.Server for this mock (HTTPS when [WithTLS] is set,
@@ -210,8 +211,9 @@ func (s *Server) AddUser(username, password string) {
 }
 
 // RegisterHandler mounts an extra handler at pattern (Go 1.22 ServeMux syntax,
-// e.g. "GET /api2/json/cluster/status"). This is the extension seam for service
-// packages and the corpus loader; call it before serving requests.
+// e.g. "GET /api2/json/cluster/nextid"). This is the extension seam for routes
+// the mock does not build in; call it before serving requests. The pattern must
+// not collide with a built-in route.
 func (s *Server) RegisterHandler(pattern string, h http.Handler) {
 	s.mux.Handle(pattern, h)
 }

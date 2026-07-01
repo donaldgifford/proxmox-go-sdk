@@ -184,7 +184,8 @@ func TestServeTLS(t *testing.T) {
 
 func TestRegisterHandler(t *testing.T) {
 	mock := mockpve.New()
-	mock.RegisterHandler("GET /api2/json/cluster/status", http.HandlerFunc(
+	// A path the mock does not build in, to exercise the extension seam.
+	mock.RegisterHandler("GET /api2/json/cluster/nextid", http.HandlerFunc(
 		func(w http.ResponseWriter, _ *http.Request) {
 			io.WriteString(w, `{"data":[{"type":"cluster","name":"mock"}]}`)
 		}))
@@ -195,7 +196,7 @@ func TestRegisterHandler(t *testing.T) {
 		Type string `json:"type"`
 		Name string `json:"name"`
 	}
-	if err := c.DoRequest(context.Background(), http.MethodGet, "/cluster/status", nil, &out); err != nil {
+	if err := c.DoRequest(context.Background(), http.MethodGet, "/cluster/nextid", nil, &out); err != nil {
 		t.Fatalf("DoRequest: %v", err)
 	}
 	if len(out) != 1 || out[0].Name != "mock" {
