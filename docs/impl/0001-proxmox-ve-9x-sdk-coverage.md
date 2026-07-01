@@ -219,8 +219,13 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       (`ListResources`/`GetResource`/`AddResource`/`UpdateResource`/
       `RemoveResource`); SIDs (`vm:100`) path-escaped; config writes are
       synchronous (return `error`, no task). Mock-verified.
-- [ ] **HA rules**: node-affinity + resource-affinity (resource-to-node,
-      resource-to-resource); enable/disable
+- [x] **HA rules**: node-affinity + resource-affinity (resource-to-node,
+      resource-to-resource); enable/disable —
+      `ListRules`/`GetRule`/`CreateRule`/ `UpdateRule`/`DeleteRule` over
+      `/cluster/ha/rules` (the 9.x replacement for the deprecated groups, which
+      the SDK never models). `RuleType` + `HARuleSpec` (Nodes/Resources
+      CSV-joined) + lossless `HARule`; disable via `HARuleUpdate.Disable`.
+      Mock-verified; per-variant param names provisional without a live node.
 - [ ] CRS settings read/write (static-load scheduler)
 - [ ] **Dynamic Load Balancer** controls `(9.2+)` — continuous CRS rebalancing
       toggle/config

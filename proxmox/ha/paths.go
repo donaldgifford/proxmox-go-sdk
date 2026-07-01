@@ -11,3 +11,9 @@ func haResourcesPath() string { return "/cluster/ha/resources" }
 func haResourcePath(sid string) string {
 	return haResourcesPath() + "/" + url.PathEscape(sid)
 }
+
+func haRulesPath() string { return "/cluster/ha/rules" }
+
+func haRulePath(rule string) string {
+	return haRulesPath() + "/" + url.PathEscape(rule)
+}

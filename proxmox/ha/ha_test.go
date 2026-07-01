@@ -8,6 +8,7 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ha"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/mockpve"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/pverr"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/types"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/version"
 )
 
@@ -155,5 +156,136 @@ func TestRemoveResourceNotFound(t *testing.T) {
 
 	if err := svc.RemoveResource(context.Background(), "vm:999"); !errors.Is(err, pverr.ErrNotFound) {
 		t.Fatalf("RemoveResource(ghost) = %v, want ErrNotFound", err)
+	}
+}
+
+func TestListRules(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddHARule("pin-web", string(ha.RuleTypeNodeAffinity))
+	mock.AddHARule("collocate-db", string(ha.RuleTypeResourceAffinity))
+	svc := newService(t, mock)
+
+	rules, err := svc.ListRules(context.Background())
+	if err != nil {
+		t.Fatalf("ListRules: %v", err)
+	}
+	if len(rules) != 2 {
+		t.Fatalf("ListRules returned %d, want 2", len(rules))
+	}
+}
+
+func TestCreateNodeAffinityRule(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	err := svc.CreateRule(ctx, &ha.HARuleSpec{
+		Rule:  "pin-web",
+		Type:  ha.RuleTypeNodeAffinity,
+		Nodes: []string{"pve1", "pve2"},
+	})
+	if err != nil {
+		t.Fatalf("CreateRule(node-affinity): %v", err)
+	}
+
+	r, err := svc.GetRule(ctx, "pin-web")
+	if err != nil {
+		t.Fatalf("GetRule: %v", err)
+	}
+	if r.Type != ha.RuleTypeNodeAffinity || r.Nodes != "pve1,pve2" {
+		t.Errorf("rule = %+v, want type=node-affinity nodes=pve1,pve2", r)
+	}
+}
+
+func TestCreateResourceAffinityRule(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	err := svc.CreateRule(ctx, &ha.HARuleSpec{
+		Rule:      "collocate-web",
+		Type:      ha.RuleTypeResourceAffinity,
+		Resources: []string{"vm:100", "vm:101"},
+		Affinity:  "positive",
+	})
+	if err != nil {
+		t.Fatalf("CreateRule(resource-affinity): %v", err)
+	}
+
+	r, err := svc.GetRule(ctx, "collocate-web")
+	if err != nil {
+		t.Fatalf("GetRule: %v", err)
+	}
+	if r.Type != ha.RuleTypeResourceAffinity || r.Resources != "vm:100,vm:101" {
+		t.Errorf("rule = %+v, want type=resource-affinity resources=vm:100,vm:101", r)
+	}
+	if r.Affinity != "positive" {
+		t.Errorf("affinity = %q, want positive", r.Affinity)
+	}
+}
+
+func TestCreateRuleValidation(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	if err := svc.CreateRule(ctx, nil); err == nil {
+		t.Error("CreateRule(nil) error = nil, want non-nil")
+	}
+	if err := svc.CreateRule(ctx, &ha.HARuleSpec{Type: ha.RuleTypeNodeAffinity}); err == nil {
+		t.Error("CreateRule(no name) error = nil, want non-nil")
+	}
+	if err := svc.CreateRule(ctx, &ha.HARuleSpec{Rule: "x"}); err == nil {
+		t.Error("CreateRule(no type) error = nil, want non-nil")
+	}
+}
+
+func TestUpdateRuleDisable(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddHARule("pin-web", string(ha.RuleTypeNodeAffinity))
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	disabled := types.PVEBool(true)
+	if err := svc.UpdateRule(ctx, "pin-web", &ha.HARuleUpdate{Disable: &disabled}); err != nil {
+		t.Fatalf("UpdateRule: %v", err)
+	}
+
+	r, err := svc.GetRule(ctx, "pin-web")
+	if err != nil {
+		t.Fatalf("GetRule after disable: %v", err)
+	}
+	if !bool(r.Disable) {
+		t.Errorf("disable after update = %v, want true", bool(r.Disable))
+	}
+}
+
+func TestDeleteRule(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddHARule("pin-web", string(ha.RuleTypeNodeAffinity))
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	if err := svc.DeleteRule(ctx, "pin-web"); err != nil {
+		t.Fatalf("DeleteRule: %v", err)
+	}
+	if _, err := svc.GetRule(ctx, "pin-web"); !errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("GetRule after delete = %v, want ErrNotFound", err)
+	}
+}
+
+func TestDeleteRuleNotFound(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+
+	if err := svc.DeleteRule(context.Background(), "ghost"); !errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("DeleteRule(ghost) = %v, want ErrNotFound", err)
 	}
 }

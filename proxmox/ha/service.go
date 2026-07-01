@@ -38,6 +38,14 @@ type API interface {
 	AddResource(ctx context.Context, spec *HAResourceSpec) error
 	UpdateResource(ctx context.Context, sid string, update *HAResourceUpdate) error
 	RemoveResource(ctx context.Context, sid string) error
+
+	// HA rules (task 2) — the 9.x replacement for HA groups: node-affinity and
+	// resource-affinity, with enable/disable. Writes are synchronous.
+	ListRules(ctx context.Context) ([]HARule, error)
+	GetRule(ctx context.Context, rule string) (*HARule, error)
+	CreateRule(ctx context.Context, spec *HARuleSpec) error
+	UpdateRule(ctx context.Context, rule string, update *HARuleUpdate) error
+	DeleteRule(ctx context.Context, rule string) error
 }
 
 // Compile-time assertion that *Service implements the published contract.

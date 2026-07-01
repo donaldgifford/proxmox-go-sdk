@@ -370,7 +370,13 @@ segments use `url.PathEscape`. mockpve gained `haState` + `AddHAResource` +
 `registerHARoutes`. The two unconfirmed 9.2 endpoints are decided up front:
 **Dynamic Load Balancer = REST-with-caveat** (provisional
 `/cluster/ha/lbalancer` path, gated + documented), **Arm/Disarm = documented
-`ErrUnsupported` stub** (no known REST path). Next: task 2 (HA rules).
+`ErrUnsupported` stub** (no known REST path). Task 2 (HA rules) added `RuleType`
+(node-affinity / resource-affinity — the 9.x replacement for the deprecated
+groups, never modelled) + lossless `HARule` + `HARuleSpec`/`Update` (the
+`Nodes`/`Resources` `[]string` fields are `json:"-"` and CSV-joined after
+`EncodeWithExtra`, same as storage ZFS `Devices`); disable via
+`HARuleUpdate.Disable` (`*types.PVEBool`; PVE stores the disable flag, not
+enable). Next: task 3 (CRS settings).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:
