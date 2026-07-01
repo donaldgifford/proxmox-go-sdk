@@ -324,10 +324,17 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       (lossless; sync write). The mock's `/cluster/options` handler is shared
       with HA (HA owns `crs`; cluster owns description/migration/…).
       Mock-verified.
-- [ ] Access: users, groups, roles, ACLs using the **9.x privilege model**
-      (`VM.Replicate`, granular agent privs; no `VM.Monitor`)
-- [ ] API tokens: create/list/revoke, clear comment `(9.1+)`, **regenerate
-      secret in place** `(9.2+)`
+- [x] Access: users, groups, roles, ACLs using the **9.x privilege model**
+      (`VM.Replicate`, granular agent privs; no `VM.Monitor`) — new
+      cluster-scoped `access` package: full user/group/role CRUD + ACL
+      grant/revoke (`SetACL`, one PUT, `Delete` revokes). `Role` normalises
+      PVE's two role-read shapes (CSV list entry vs privilege→1 object).
+      Mock-verified.
+- [x] API tokens: create/list/revoke, clear comment `(9.1+)`, **regenerate
+      secret in place** `(9.2+)` — in the `access` package;
+      `CreateToken`/`RegenerateTokenSecret` return the one-time `TokenSecret`.
+      `ClearTokenComment` gated 9.1, `RegenerateTokenSecret` gated 9.2
+      (REST-with-caveat: provisional rotate path). Gates mock-verified.
 - [ ] Node admin: package updates (DEB822 sources), disks/SMART,
       certificates/ACME, custom scripts `(ssh)`
 - [ ] Ceph: pools, OSDs, RBD mirroring (Squid)

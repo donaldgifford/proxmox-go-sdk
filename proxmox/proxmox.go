@@ -3,6 +3,7 @@ package proxmox
 import (
 	"context"
 
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/access"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/cluster"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/firewall"
@@ -119,6 +120,12 @@ func (c *Client) SDN() *sdn.Service {
 // and datacenter options. It is cluster-scoped (no node argument).
 func (c *Client) Cluster() *cluster.Service {
 	return cluster.NewService(c.api, c.caps)
+}
+
+// Access returns the access-control service — users, groups, roles, ACLs, and
+// API tokens under the 9.x privilege model. It is cluster-scoped.
+func (c *Client) Access() *access.Service {
+	return access.NewService(c.api, c.caps)
 }
 
 // Firewall returns the datacenter (cluster) firewall service. Use NodeFirewall

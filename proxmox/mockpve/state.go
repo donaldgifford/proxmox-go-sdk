@@ -22,6 +22,7 @@ type state struct {
 	sdn      sdnState
 	firewall firewallState
 	cluster  clusterState
+	access   accessState
 }
 
 // versionData backs GET /version.

@@ -33,6 +33,11 @@ const (
 	msgNoSuchRule       = "no such firewall rule"
 	msgNoSuchIPSet      = "no such firewall ipset"
 	msgNoSuchIPSetEntry = "no such firewall ipset entry"
+
+	msgNoSuchUser  = "no such user"
+	msgNoSuchGroup = "no such group"
+	msgNoSuchRole  = "no such role"
+	msgNoSuchToken = "no such token"
 )
 
 // qemuPowerStatus maps a /status/{action} verb to the run state the mock VM

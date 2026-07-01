@@ -113,6 +113,7 @@ func (s *Server) registerRoutes() {
 	s.registerSDNRoutes()
 	s.registerFirewallRoutes()
 	s.registerClusterRoutes()
+	s.registerAccessRoutes()
 }
 
 // Serve starts an httptest.Server for this mock (HTTPS when [WithTLS] is set,
@@ -251,6 +252,18 @@ func (s *Server) writeData(w http.ResponseWriter, v any) {
 	if err := json.NewEncoder(w).Encode(envelope{Data: v}); err != nil {
 		s.logger.Debug("mockpve: encode response", "err", err)
 	}
+}
+
+// parseForm caps the request body at maxFormBytes and parses its form. On
+// failure it writes a 400 and returns false, so handlers can `if !s.parseForm(w,
+// r) { return }`.
+func (s *Server) parseForm(w http.ResponseWriter, r *http.Request) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if err := r.ParseForm(); err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return false
+	}
+	return true
 }
 
 // writeError writes {"message": msg} with the given status.

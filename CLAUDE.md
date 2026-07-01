@@ -452,7 +452,13 @@ and one ErrUnsupported stub (metrics OTel config). Task 1 landed the
 cluster-scoped `cluster` package (`ListResources`/`GetStatus`/`GetOptions`/
 `SetOptions`; `Cluster()` accessor). The mock's `/cluster/options` route is
 shared between HA (`crs`) and cluster (other keys) — do NOT double-register it.
-Next: task 2 (access — users/groups/roles/ACLs, 9.x privilege model).
+Tasks 2+3 landed the cluster-scoped `access` package (`Access()` accessor):
+user/group/role CRUD, ACL grant/revoke (`SetACL`, `Delete` revokes), and API
+tokens (`CreateToken`/`RegenerateTokenSecret` return the one-time `TokenSecret`;
+`ClearTokenComment` gated 9.1, `RegenerateTokenSecret` gated 9.2). `Role`
+normalises PVE's two role-read shapes. Added `svcutil`-free mockpve `parseForm`
+helper (body-cap + ParseForm) reused by the access handlers. Next: task 4
+(nodes-admin — apt/disks/certs, extends the `nodes` package).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:
