@@ -226,7 +226,10 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       the SDK never models). `RuleType` + `HARuleSpec` (Nodes/Resources
       CSV-joined) + lossless `HARule`; disable via `HARuleUpdate.Disable`.
       Mock-verified; per-variant param names provisional without a live node.
-- [ ] CRS settings read/write (static-load scheduler)
+- [x] CRS settings read/write (static-load scheduler) — `GetCRSSettings`/
+      `SetCRSSettings`; CRS lives inside datacenter options (`/cluster/options`,
+      the `crs` compound property-string), parsed/encoded to typed `Mode` +
+      `HARebalanceOnStart`. Mock-verified; sub-key names provisional.
 - [ ] **Dynamic Load Balancer** controls `(9.2+)` — continuous CRS rebalancing
       toggle/config
 - [ ] Arm/Disarm HA cluster-wide switch `(9.2+)`

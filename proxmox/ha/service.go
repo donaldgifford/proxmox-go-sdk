@@ -46,6 +46,11 @@ type API interface {
 	CreateRule(ctx context.Context, spec *HARuleSpec) error
 	UpdateRule(ctx context.Context, rule string, update *HARuleUpdate) error
 	DeleteRule(ctx context.Context, rule string) error
+
+	// CRS settings (task 3) — the static-load scheduler config, stored in the
+	// datacenter options. The write is synchronous.
+	GetCRSSettings(ctx context.Context) (*CRSSettings, error)
+	SetCRSSettings(ctx context.Context, update *CRSSettingsUpdate) error
 }
 
 // Compile-time assertion that *Service implements the published contract.

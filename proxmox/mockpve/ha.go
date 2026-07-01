@@ -12,6 +12,7 @@ import (
 type haState struct {
 	resources map[string]*haResourceRecord // keyed by SID, e.g. "vm:100".
 	rules     map[string]*haRuleRecord     // keyed by rule name.
+	crs       string                       // the datacenter "crs" property-string.
 }
 
 // haRuleRecord is one HA rule (node-affinity or resource-affinity).
@@ -76,6 +77,14 @@ func (s *Server) AddHARule(rule, ruleType string) {
 	s.st.ha.rules[rule] = &haRuleRecord{Rule: rule, Type: ruleType}
 }
 
+// SetCRS seeds the datacenter "crs" property-string (e.g.
+// "ha=static,ha-rebalance-on-start=1"). Call before serving.
+func (s *Server) SetCRS(crs string) {
+	s.st.mu.Lock()
+	defer s.st.mu.Unlock()
+	s.st.ha.crs = crs
+}
+
 // sidType extracts the resource type ("vm"/"ct") from a SID like "vm:100".
 func sidType(sid string) string {
 	if i := strings.IndexByte(sid, ':'); i > 0 {
@@ -95,6 +104,38 @@ func (s *Server) registerHARoutes() {
 	s.mux.HandleFunc("GET /api2/json/cluster/ha/rules/{rule}", s.handleHARuleGet)
 	s.mux.HandleFunc("PUT /api2/json/cluster/ha/rules/{rule}", s.handleHARuleUpdate)
 	s.mux.HandleFunc("DELETE /api2/json/cluster/ha/rules/{rule}", s.handleHARuleDelete)
+	s.mux.HandleFunc("GET /api2/json/cluster/options", s.handleClusterOptionsGet)
+	s.mux.HandleFunc("PUT /api2/json/cluster/options", s.handleClusterOptionsSet)
+}
+
+// handleClusterOptionsGet returns the datacenter options the mock models (just
+// the "crs" key today).
+func (s *Server) handleClusterOptionsGet(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	s.st.mu.Lock()
+	crs := s.st.ha.crs
+	s.st.mu.Unlock()
+	s.writeData(w, map[string]string{"crs": crs})
+}
+
+// handleClusterOptionsSet stores the "crs" property-string. Synchronous.
+func (s *Server) handleClusterOptionsSet(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if err := r.ParseForm(); err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	if v := r.PostForm.Get("crs"); v != "" {
+		s.st.mu.Lock()
+		s.st.ha.crs = v
+		s.st.mu.Unlock()
+	}
+	s.writeData(w, nil)
 }
 
 func (s *Server) handleHAResourceList(w http.ResponseWriter, r *http.Request) {

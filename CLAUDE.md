@@ -376,7 +376,12 @@ groups, never modelled) + lossless `HARule` + `HARuleSpec`/`Update` (the
 `Nodes`/`Resources` `[]string` fields are `json:"-"` and CSV-joined after
 `EncodeWithExtra`, same as storage ZFS `Devices`); disable via
 `HARuleUpdate.Disable` (`*types.PVEBool`; PVE stores the disable flag, not
-enable). Next: task 3 (CRS settings).
+enable). Task 3 (CRS settings) is not under `/cluster/ha` at all — the CRS
+scheduler config lives inside datacenter options (`GET`/`PUT /cluster/options`,
+the `crs` **compound property-string** `ha=static,ha-rebalance-on-start=1`).
+`GetCRSSettings`/`SetCRSSettings` parse/encode that string to typed `Mode` +
+`HARebalanceOnStart` (no `Extra` — the body is one `crs=` param, not a flat
+form). Next: task 4 (Dynamic Load Balancer, 9.2 REST-with-caveat).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

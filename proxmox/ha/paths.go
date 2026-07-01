@@ -17,3 +17,7 @@ func haRulesPath() string { return "/cluster/ha/rules" }
 func haRulePath(rule string) string {
 	return haRulesPath() + "/" + url.PathEscape(rule)
 }
+
+// clusterOptionsPath is the datacenter options endpoint. It is not under
+// /cluster/ha, but the CRS scheduler config lives here (the "crs" key).
+func clusterOptionsPath() string { return "/cluster/options" }
