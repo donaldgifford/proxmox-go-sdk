@@ -474,9 +474,15 @@ RRD (`GetNodeRRD`/`GetVMRRD` with `WithTimeframe`/`WithConsolidation` options) +
 REST-with-caveat), cluster-scoped metric-server CRUD (`/cluster/metrics/server`,
 sync), and OTel `GetOTelConfig`/`SetOTelConfig` that return
 `pverr.ErrUnsupported` (9.x OTel is file-configured, no REST; new `OTelExporter`
-9.1 gate reserved). mockpve `metrics.go` synthesizes RRD/status statically.
-Next: task 6 (ceph — new package, node per-call, `c.Ceph()` with **no** node
-arg).
+9.1 gate reserved). mockpve `metrics.go` synthesizes RRD/status statically. Task
+6 landed the `ceph` package (`c.Ceph()`, **no** node arg — each op takes the MON
+node per-call; flat cluster-wide mock state): pools + OSDs
+(create/delete/destroy return `tasks.Ref`), `GetStatus`/`GetClusterConfig`
+(lossless; config is verbatim text), recursive CRUSH `OSDTree`. Baseline 9.0, no
+gates; paths provisional (centralised in paths.go). **RBD mirroring reclassified
+to ErrUnsupported** (no PVE REST endpoint — it's an `rbd`-CLI feature; use SSH),
+diverging from the memo's REST-with-caveat guess per the honesty rule. Next:
+task 7 (pbs — PVE-side backup jobs/vzdump/restore only, NOT the PBS-native API).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

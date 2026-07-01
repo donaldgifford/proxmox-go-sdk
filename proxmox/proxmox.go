@@ -5,6 +5,7 @@ import (
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/access"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ceph"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/cluster"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/firewall"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ha"
@@ -134,6 +135,13 @@ func (c *Client) Access() *access.Service {
 // (reads take a node; server CRUD is cluster-scoped), so it binds no node.
 func (c *Client) Metrics() *metrics.Service {
 	return metrics.NewService(c.api, c.caps)
+}
+
+// Ceph returns the Ceph service — pools, OSDs, and cluster status. Ceph is a
+// single cluster-wide entity reached through a MON node, so the accessor takes
+// no node; each operation takes the node used to reach the cluster.
+func (c *Client) Ceph() *ceph.Service {
+	return ceph.NewService(c.api, c.caps)
 }
 
 // Firewall returns the datacenter (cluster) firewall service. Use NodeFirewall

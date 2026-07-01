@@ -351,7 +351,18 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       real endpoint, task-vs-sync unconfirmed). **Custom node scripts have no
       PVE REST endpoint** — the SDK offers no method; run them over the SSH
       side-channel (`c.SSH().Exec`). Mock-verified.
-- [ ] Ceph: pools, OSDs, RBD mirroring (Squid)
+- [x] Ceph: pools, OSDs, RBD mirroring (Squid) — new `ceph` package (`c.Ceph()`,
+      **no** node arg; each op takes the MON node per-call, flat cluster-wide
+      state). Pools (`ListPools`/`GetPool`/`CreatePool`→`tasks.Ref`/
+      `DeletePool`→`tasks.Ref`), OSDs (`ListOSDs` → recursive CRUSH `OSDTree`,
+      `CreateOSD`/`DestroyOSD`→`tasks.Ref`), `GetStatus` (lossless health) +
+      `GetClusterConfig` (ceph.conf verbatim text). Baseline 9.0, no gates; REST
+      **paths provisional** (unconfirmed against a live cluster, centralised in
+      paths.go). **RBD mirroring** is an `rbd`-CLI feature with **no confirmed
+      PVE REST endpoint**, so `GetMirrorStatus`/`EnableMirroring`/
+      `DisableMirroring` return documented `pverr.ErrUnsupported` (drive
+      `rbd     mirror` over SSH) — reclassified from the memo's REST-with-caveat
+      guess to an honest ErrUnsupported stub. Pools/OSDs/status mock-verified.
 - [ ] PBS integration: datastores, backups, verify, restore
 - [ ] Console: mint VNC/SPICE/term tickets, verify the **token-owned VNC
       auth-ticket** `(9.x)`, and `Connect()` a duplex byte stream to the

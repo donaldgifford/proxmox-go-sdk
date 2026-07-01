@@ -24,6 +24,7 @@ type state struct {
 	cluster  clusterState
 	access   accessState
 	metrics  metricsState
+	ceph     cephState
 	// acmeAccounts is cluster-scoped (/cluster/acme/account), keyed by handle.
 	acmeAccounts map[string]*acmeAccountRecord
 }
