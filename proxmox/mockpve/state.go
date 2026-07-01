@@ -10,16 +10,17 @@ import (
 // state is the mock's mutable model. Every field is guarded by mu; handlers
 // lock, copy what they need, unlock, then write the response outside the lock.
 type state struct {
-	mu      sync.Mutex
-	version versionData
-	nodes   map[string]*nodeState   // keyed by node name
-	tickets map[string]ticketRecord // keyed by minted ticket value
-	users   map[string]string       // username -> password, for /access/ticket
-	qemu    qemuState
-	lxc     lxcState
-	storage storageState
-	ha      haState
-	sdn     sdnState
+	mu       sync.Mutex
+	version  versionData
+	nodes    map[string]*nodeState   // keyed by node name
+	tickets  map[string]ticketRecord // keyed by minted ticket value
+	users    map[string]string       // username -> password, for /access/ticket
+	qemu     qemuState
+	lxc      lxcState
+	storage  storageState
+	ha       haState
+	sdn      sdnState
+	firewall firewallState
 }
 
 // versionData backs GET /version.

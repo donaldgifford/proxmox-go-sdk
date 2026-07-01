@@ -112,6 +112,10 @@ func (c Capabilities) SDNFabrics() bool { return c.AtLeast(9, 0) }
 // sdn.CreateFabric).
 func (c Capabilities) SDNAdvancedFabrics() bool { return c.AtLeast(9, 2) }
 
+// OverlappingIPSets gates the firewall's overlapping-IPSet support — the 9.1
+// rework that also exposes IPSet rename (see firewall.RenameIPSet).
+func (c Capabilities) OverlappingIPSets() bool { return c.AtLeast(9, 1) }
+
 // Require returns nil when the version is at least minVersion ("9.2"), and a
 // pverr.ErrUnsupported-wrapped error naming the feature otherwise. Services use
 // it to gate minor-specific operations with a uniform error.

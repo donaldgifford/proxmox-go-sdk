@@ -29,6 +29,10 @@ const (
 	msgNoSuchVNet   = "no such sdn vnet"
 	msgNoSuchSubnet = "no such sdn subnet"
 	msgNoSuchFabric = "no such sdn fabric"
+
+	msgNoSuchRule       = "no such firewall rule"
+	msgNoSuchIPSet      = "no such firewall ipset"
+	msgNoSuchIPSetEntry = "no such firewall ipset entry"
 )
 
 // qemuPowerStatus maps a /status/{action} verb to the run state the mock VM

@@ -285,7 +285,14 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       return types, but **no confirmed PVE REST endpoint** exists, so both
       return documented `pverr.ErrUnsupported` (like `ha.ArmHA`). No mock
       handlers.
-- [ ] Firewall: rules, ipsets (incl. overlapping ipset support `(9.1+)`)
+- [x] Firewall: rules, ipsets (incl. overlapping ipset support `(9.1+)`) — new
+      `firewall` package with a **scope model**: ONE `Service{c,caps,scope}` and
+      three constructors (`NewClusterScope`/`NewNodeScope`/`NewGuestScope`), so
+      the rule/IPSet/options surface is written once and `scope.path()` switches
+      the prefix (cluster `/cluster/firewall`, node `/nodes/{n}/firewall`, guest
+      `/nodes/{n}/{qemu|lxc}/{vmid}/firewall`). `RenameIPSet` gated 9.1
+      (`OverlappingIPSets`). Root accessors `Firewall`/`NodeFirewall`/
+      `GuestFirewall`. Mock-verified across all three scopes.
 - [ ] Promote the `doc.go` stubs for `sdn` + `firewall` (and node networking in
       `nodes`) — real package overview + a runnable `Example`
 

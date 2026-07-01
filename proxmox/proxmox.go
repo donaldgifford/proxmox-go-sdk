@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/firewall"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ha"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/lxc"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/nodes"
@@ -111,6 +112,24 @@ func (c *Client) HA() *ha.Service {
 // cluster-wide. It shares the client's transport and capability snapshot.
 func (c *Client) SDN() *sdn.Service {
 	return sdn.NewService(c.api, c.caps)
+}
+
+// Firewall returns the datacenter (cluster) firewall service. Use NodeFirewall
+// or GuestFirewall for the node- and guest-scoped firewalls; all three expose
+// the same rule / IPSet / options surface.
+func (c *Client) Firewall() *firewall.Service {
+	return firewall.NewClusterScope(c.api, c.caps)
+}
+
+// NodeFirewall returns the firewall service scoped to node (e.g. "pve").
+func (c *Client) NodeFirewall(node string) *firewall.Service {
+	return firewall.NewNodeScope(c.api, c.caps, node)
+}
+
+// GuestFirewall returns the firewall service scoped to a single guest — a QEMU
+// VM or LXC container (select with kind) identified by vmid on node.
+func (c *Client) GuestFirewall(node string, kind firewall.GuestKind, vmid int) *firewall.Service {
+	return firewall.NewGuestScope(c.api, c.caps, kind, node, vmid)
 }
 
 // SSH returns a disconnected SSH/SFTP side-channel client configured by opts
