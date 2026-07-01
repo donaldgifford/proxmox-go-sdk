@@ -31,6 +31,33 @@ func TaskRef(op, upid string) (tasks.Ref, error) {
 	return ref, nil
 }
 
+// DecodeExtra returns every key in data not present in known, decoded to a
+// string (non-string values keep their raw JSON token). It is the shared tail
+// of the typed read structs' UnmarshalJSON: decode the modelled fields via a
+// method-stripped alias, then route the remaining keys here so a config read
+// round-trips losslessly. The result is nil when no unmodelled keys are present.
+func DecodeExtra(data []byte, known map[string]bool) (map[string]string, error) {
+	var all map[string]json.RawMessage
+	if err := json.Unmarshal(data, &all); err != nil {
+		return nil, fmt.Errorf("decode object map: %w", err)
+	}
+	var extra map[string]string
+	for key, raw := range all {
+		if known[key] {
+			continue
+		}
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil {
+			s = string(raw) // non-string field: keep the raw token.
+		}
+		if extra == nil {
+			extra = make(map[string]string)
+		}
+		extra[key] = s
+	}
+	return extra, nil
+}
+
 // EncodeWithExtra flattens a JSON-tagged spec to url.Values, then merges the
 // caller's Extra params on top. The transport accepts url.Values directly, so
 // this is how a typed spec and its unmodelled-key escape hatch reach one form

@@ -415,8 +415,12 @@ unconfirmed surfaces are decided up front: **SDN Fabrics = REST-with-caveat**
 (provisional `/cluster/sdn/fabrics`, 9.2 protocol gate), **SDN status =
 `ErrUnsupported` stub**; overlapping-ipset rename is gated 9.1. Task 1 landed
 node networking (`Interface` lossless read + CRUD + `ApplyNetworkConfig`) in
-`nodes`, plus `tasks.Ref.IsZero()` and the `Nodes()` accessor. Next: task 2 (SDN
-zones/VNets/subnets).
+`nodes`, plus `tasks.Ref.IsZero()` and the `Nodes()` accessor. Task 2 landed the
+cluster-scoped `sdn` package — `Zone`/`VNet`/`Subnet` lossless reads with full
+CRUD and a cluster-wide `ApplySDN` (all config writes synchronous), the `SDN()`
+accessor, and `svcutil.DecodeExtra` (the shared lossless-read tail, extracted so
+the fabrics read type in task 3 reuses it). Next: task 3 (SDN Fabrics,
+REST-with-caveat).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

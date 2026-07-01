@@ -19,6 +19,7 @@ type state struct {
 	lxc     lxcState
 	storage storageState
 	ha      haState
+	sdn     sdnState
 }
 
 // versionData backs GET /version.

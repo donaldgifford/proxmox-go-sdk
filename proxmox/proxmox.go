@@ -8,6 +8,7 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/lxc"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/nodes"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/qemu"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/sdn"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ssh"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/storage"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/tasks"
@@ -103,6 +104,13 @@ func (c *Client) Nodes() *nodes.Service {
 // capability snapshot.
 func (c *Client) HA() *ha.Service {
 	return ha.NewService(c.api, c.caps)
+}
+
+// SDN returns the software-defined-networking service. It is cluster-scoped (no
+// node argument): zones, VNets, subnets, and the cluster-wide apply are all
+// cluster-wide. It shares the client's transport and capability snapshot.
+func (c *Client) SDN() *sdn.Service {
+	return sdn.NewService(c.api, c.caps)
 }
 
 // SSH returns a disconnected SSH/SFTP side-channel client configured by opts

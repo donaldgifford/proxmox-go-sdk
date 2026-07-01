@@ -110,6 +110,7 @@ func (s *Server) registerRoutes() {
 	s.registerStorageRoutes()
 	s.registerHARoutes()
 	s.registerNodeNetworkRoutes()
+	s.registerSDNRoutes()
 }
 
 // Serve starts an httptest.Server for this mock (HTTPS when [WithTLS] is set,

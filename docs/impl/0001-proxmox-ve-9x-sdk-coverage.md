@@ -269,7 +269,11 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       `/nodes/{node}/network`; lossless `Interface`. `ApplyNetworkConfig` (PUT)
       returns a `tasks.Ref` (PVE may reload via a worker; zero Ref when
       synchronous). Mock-verified.
-- [ ] SDN zones (VLAN/VXLAN/EVPN) + VNets + subnets
+- [x] SDN zones (VLAN/VXLAN/EVPN) + VNets + subnets — cluster-scoped `sdn`
+      package: `Zone`/`VNet`/`Subnet` (lossless reads) with full CRUD over
+      `/cluster/sdn/{zones,vnets,vnets/{vnet}/subnets}`; all config writes are
+      synchronous (return `error`). `ApplySDN` (PUT `/cluster/sdn`) commits the
+      staged config cluster-wide. Mock-verified.
 - [ ] **SDN Fabrics** `(9.0+)` — OpenFabric/OSPF; gate newer protocols
       (WireGuard/BGP route-maps/IPv6 underlay) `(9.2+)`
 - [ ] SDN status reporting (connected guest NICs, EVPN learned IPs/MACs, fabric
