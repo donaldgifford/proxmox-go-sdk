@@ -399,7 +399,24 @@ them. Task 6 (replication jobs) added CRUD over `/cluster/replication`
 `ReplicationJob` (IDs `<vmid>-<jobnum>`), requires the 9.x `VM.Replicate`
 privilege (noted in docs). Task 7 promoted `ha/doc.go` (full overview) and added
 the runnable resource-affinity `Example` that satisfies the phase Success
-Criterion (mock-verified). Next: Phase 5 (network + SDN).
+Criterion (mock-verified).
+
+**Phase 5 (network + SDN) is underway** — go-architect designed (see the
+network-sdn-module-architecture memory). Three packages: `sdn` (cluster-scoped),
+`firewall` (a single `Service` carrying a `Scope` — cluster/node/guest
+constructors, one set of methods, `scopePath` switches the prefix; avoids 3x
+duplication), and node networking in the existing `nodes` package (OQ-8: node
+networking lives in `nodes`, node-scoped). As in HA, SDN/firewall/node-network
+config writes are **synchronous** (return `error`, not `tasks.Ref`) — the one
+exception is `nodes.ApplyNetworkConfig` (PUT `/nodes/{node}/network`), which PVE
+may answer with a reload UPID (9.1+) or null (9.0), so it returns
+`(tasks.Ref, error)` and callers check the new `tasks.Ref.IsZero()`. Two
+unconfirmed surfaces are decided up front: **SDN Fabrics = REST-with-caveat**
+(provisional `/cluster/sdn/fabrics`, 9.2 protocol gate), **SDN status =
+`ErrUnsupported` stub**; overlapping-ipset rename is gated 9.1. Task 1 landed
+node networking (`Interface` lossless read + CRUD + `ApplyNetworkConfig`) in
+`nodes`, plus `tasks.Ref.IsZero()` and the `Nodes()` accessor. Next: task 2 (SDN
+zones/VNets/subnets).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

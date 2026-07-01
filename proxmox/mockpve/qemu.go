@@ -23,6 +23,7 @@ const (
 	msgNoSuchHAResource = "no such ha resource"
 	msgNoSuchHARule     = "no such ha rule"
 	msgNoSuchReplJob    = "no such replication job"
+	msgNoSuchIface      = "no such network interface"
 )
 
 // qemuPowerStatus maps a /status/{action} verb to the run state the mock VM

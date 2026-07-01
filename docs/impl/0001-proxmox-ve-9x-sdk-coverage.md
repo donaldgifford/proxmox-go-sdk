@@ -263,8 +263,12 @@ The 9.x-reworked area — model rules, never the deprecated groups.
 
 #### Tasks
 
-- [ ] Node networking: bridges, bonds, VLAN-aware bridges, interface config
-      (package placement per **OQ-8**)
+- [x] Node networking: bridges, bonds, VLAN-aware bridges, interface config
+      (package placement per **OQ-8** — in `nodes`) — `ListInterfaces`/
+      `GetInterface`/`CreateInterface`/`UpdateInterface`/`DeleteInterface` over
+      `/nodes/{node}/network`; lossless `Interface`. `ApplyNetworkConfig` (PUT)
+      returns a `tasks.Ref` (PVE may reload via a worker; zero Ref when
+      synchronous). Mock-verified.
 - [ ] SDN zones (VLAN/VXLAN/EVPN) + VNets + subnets
 - [ ] **SDN Fabrics** `(9.0+)` — OpenFabric/OSPF; gate newer protocols
       (WireGuard/BGP route-maps/IPv6 underlay) `(9.2+)`

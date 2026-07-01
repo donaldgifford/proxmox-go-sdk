@@ -82,6 +82,11 @@ func NewRef(upid string) (Ref, error) {
 	return Ref{Node: u.Node, UPID: upid}, nil
 }
 
+// IsZero reports whether the ref is empty — carries no UPID. Operations that
+// PVE may answer either synchronously (no task) or with a worker return a zero
+// Ref in the synchronous case; callers check IsZero before waiting on it.
+func (r Ref) IsZero() bool { return r.UPID == "" }
+
 // valid reports whether the ref has both fields needed to build a path.
 func (r Ref) valid() error {
 	if r.Node == "" || r.UPID == "" {

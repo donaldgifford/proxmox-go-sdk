@@ -37,7 +37,8 @@ type ticketRecord struct {
 
 // nodeState holds per-node data.
 type nodeState struct {
-	tasks map[string]*taskRecord // keyed by UPID
+	tasks     map[string]*taskRecord     // keyed by UPID
+	netIfaces map[string]*netIfaceRecord // keyed by interface name
 }
 
 // taskRecord models one asynchronous PVE task. Stopped=false is "running";

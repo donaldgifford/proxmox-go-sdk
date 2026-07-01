@@ -6,6 +6,7 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ha"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/lxc"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/nodes"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/qemu"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ssh"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/storage"
@@ -87,6 +88,13 @@ func (c *Client) LXC(node string) *lxc.Service {
 // argument. It shares the client's transport and capability snapshot.
 func (c *Client) Storage() *storage.Service {
 	return storage.NewService(c.api, c.caps)
+}
+
+// Nodes returns the node-administration service. Every operation is node-scoped
+// (the node is a per-call argument), so one service serves the whole cluster.
+// Phase 5 covers node networking; later phases add status, packages, and disks.
+func (c *Client) Nodes() *nodes.Service {
+	return nodes.NewService(c.api, c.caps)
 }
 
 // HA returns the high-availability service. It is cluster-scoped (no node
