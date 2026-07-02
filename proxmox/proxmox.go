@@ -7,6 +7,7 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ceph"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/cluster"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/console"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/firewall"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ha"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/lxc"
@@ -151,6 +152,13 @@ func (c *Client) Ceph() *ceph.Service {
 // Proxmox Backup Server directly is a separate future concern.
 func (c *Client) PBS() *pbs.Service {
 	return pbs.NewService(c.api, c.caps)
+}
+
+// Console returns the console service — minting VNC/SPICE/terminal console
+// tickets and dialling a VNC console session (Connect). Every operation is
+// node-scoped (the node is a per-call argument), so it binds no node.
+func (c *Client) Console() *console.Service {
+	return console.NewService(c.api, c.caps)
 }
 
 // Firewall returns the datacenter (cluster) firewall service. Use NodeFirewall

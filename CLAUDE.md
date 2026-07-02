@@ -488,9 +488,33 @@ backup jobs (`/cluster/backup`, sync), `ListNodeBackups` (reuses the storage
 content route, content=backup), `CreateBackup`→`tasks.Ref`
 (`/nodes/{n}/vzdump`), and `RestoreQEMU`/`RestoreLXC`→`tasks.Ref` (reuse the
 guest-create endpoints with `archive=`/`ostemplate=`+`restore=1`).
-`VerifyBackup` returns ErrUnsupported (PBS-native, no PVE endpoint). Next: task
-8 (console — HARDEST; needs a new `api.Client.DoWebSocket` for `Connect()`),
-then task 9 (doc promotion).
+`VerifyBackup` returns ErrUnsupported (PBS-native, no PVE endpoint). Task 8
+landed the node-per-call `console` package (`Console()` accessor, no bound
+node), split cleanly in two: **ticket mint** is plain sync REST, fully
+mock-verified — guest `MintVNCTicket`/`MintSPICETicket`/`MintTermProxy(node,
+kind, vmid)` and node-shell `MintNodeVNC`/`MintNodeTerm(node)` (VNC/term tickets
++ SPICE params all lossless); **`Connect(ctx, node, *VNCTicket)`** dials
+`/nodes/{n}/vncwebsocket` and returns the raw duplex byte stream. That needed a
+new **`api.Client.DoWebSocket(ctx, path) (io.ReadWriteCloser, error)`** —
+implemented in `api/websocket.go` using Go's **native 101 upgrade** (GET with
+`Connection: Upgrade`/`Upgrade: websocket`/`Sec-WebSocket-*`; on `101 Switching
+Protocols` the `http.Transport` hands back a body that is also writable —
+`resp.Body.(io.ReadWriteCloser)` is the stream). The mock's `/vncwebsocket`
+route does a real `http.Hijacker` 101 handshake + echo, so `Connect` is tested
+end-to-end through the real transport. The RFB wire payload is REST-with-caveat
+(unverified without a live node); `VerifyVNCTicket` returns ErrUnsupported (no
+standalone verify endpoint — a ticket is checked when `Connect` presents it),
+diverging from the memo's guess per the honesty rule. **Breaking-but-safe**:
+`DoWebSocket` grew the `api.Client` interface; only `*transport` implements it,
+no external doubles. Next: task 9 (doc promotion) is the last Phase 6 task.
+
+Note the `api.Client` interface now has three verbs beyond `DoRequest`:
+`DoUpload` (Phase 3, multipart), `DoWebSocket` (Phase 6, 101 upgrade), plus
+`ExpandPath`/`HTTP`. When adding a transport method, add it to the interface
+**and** the `websocket_test.go`-style httptest coverage; `gosec`/`gocritic`/
+`errcheck check-blank` are all on, and `net.Conn.Close` is NOT covered by the
+`(io.Closer).Close` errcheck exclusion — handle hijacked-conn errors explicitly
+(log at `s.logger.Debug`), don't `_ =` them.
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

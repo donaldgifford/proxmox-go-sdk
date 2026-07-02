@@ -46,6 +46,7 @@ const (
 	msgNoSuchMetricServer = "no such metric server"
 	msgNoSuchCephPool     = "no such ceph pool"
 	msgNoSuchBackupJob    = "no such backup job"
+	msgBadVNCTicket       = "invalid or expired vnc ticket"
 )
 
 // qemuPowerStatus maps a /status/{action} verb to the run state the mock VM

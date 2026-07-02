@@ -375,9 +375,24 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       with no PVE REST endpoint**, so `VerifyBackup` returns documented
       `pverr.ErrUnsupported` (honest stub, diverging from the memo's
       REST-with-caveat guess). Mock-verified.
-- [ ] Console: mint VNC/SPICE/term tickets, verify the **token-owned VNC
+- [x] Console: mint VNC/SPICE/term tickets, verify the **token-owned VNC
       auth-ticket** `(9.x)`, and `Connect()` a duplex byte stream to the
-      console; the browser bridge is the consumer's
+      console; the browser bridge is the consumer's — new node-per-call
+      `console` package (`Console()` accessor, no bound node). Ticket mint is a
+      plain sync REST call, fully mock-verified: guest
+      `MintVNCTicket`/`MintSPICETicket`/`MintTermProxy(node, kind, vmid)` (POST
+      `/nodes/{n}/{qemu|lxc}/{vmid}/{vncproxy|spiceproxy|termproxy}`) and node
+      shell `MintNodeVNC`/`MintNodeTerm(node)` (`/nodes/{n}/{vncshell|termproxy}`);
+      VNC/term tickets are lossless, SPICE params lossless. `Connect(ctx, node,
+      *VNCTicket)` dials `/nodes/{n}/vncwebsocket` over a **new
+      `api.Client.DoWebSocket`** (native 101 upgrade → `resp.Body` duplex
+      stream) and returns the raw byte stream — the WebSocket-framed RFB payload
+      is the caller's concern (**REST-with-caveat**: wire format unverified
+      without a live node; plumbing verified against a mockpve hijack+echo
+      upgrade). **VerifyVNCTicket** has no standalone PVE REST endpoint (a ticket
+      is verified when `Connect` presents it to the upgrade), so it returns
+      documented `pverr.ErrUnsupported` — honest stub, diverging from the memo's
+      REST-with-caveat guess. Ticket mint + Connect echo mock-verified.
 - [x] Metrics: extended metrics (CPU/mem/IO pressure stall, ZFS ARC);
       OpenTelemetry exporter `(9.1+)` — new mixed-scope `metrics` package (no
       bound node; `Metrics()` accessor). Node/guest RRD (`GetNodeRRD`/`GetVMRRD`

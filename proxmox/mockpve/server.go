@@ -118,6 +118,7 @@ func (s *Server) registerRoutes() {
 	s.registerMetricsRoutes()
 	s.registerCephRoutes()
 	s.registerPBSRoutes()
+	s.registerConsoleRoutes()
 }
 
 // Serve starts an httptest.Server for this mock (HTTPS when [WithTLS] is set,
