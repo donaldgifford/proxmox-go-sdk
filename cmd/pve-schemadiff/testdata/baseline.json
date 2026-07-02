@@ -1,0 +1,30 @@
+[
+  {
+    "method": "GET",
+    "path": "/access/users"
+  },
+  {
+    "method": "POST",
+    "path": "/access/users"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/vncproxy"
+  },
+  {
+    "method": "GET",
+    "path": "/version"
+  }
+]

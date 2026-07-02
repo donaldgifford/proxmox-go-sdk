@@ -549,8 +549,13 @@ environment.** This shapes how we test and what "done" means:
 - Release workflows fire only on `v*` tag push; `goreleaser` consumes
   `.goreleaser.yml` and the appropriate token (`GITEA_TOKEN` for Forgejo,
   `GITHUB_TOKEN` for GitHub).
-- A `version`-drift step (planned, IMPL-0001) regenerates types from `apidoc.js`
-  and fails on schema drift across 9.x minors.
+- A schema-drift step (`just schemadiff`, in the test-go job) runs
+  `cmd/pve-schemadiff`: it parses a Proxmox `apidoc.js` into a (method, path)
+  set and fails CI on drift from the committed baseline
+  (`cmd/pve-schemadiff/testdata/baseline.json`). It guards a synthetic fixture
+  by default; point `-apidoc` at a real 9.x dump (and `-update` to rebaseline)
+  to guard the live REST surface. Parse/diff logic lives in the importable
+  `cmd/pve-schemadiff/schema` package and is unit-tested against a fixture.
 
 ## Gotchas
 

@@ -459,20 +459,34 @@ file. This table maps the real code to phases. Column widths are re-aligned by
 | `proxmox/mockpve/`                                          | Create | mock server (all phases) + `cmd/mockpve/` runnable server |
 | `proxmox/{proxmox,options}.go`                              | Create | Phase 1 — root: client + options, no aliases (OQ-1)       |
 | `proxmox/ssh/`                                              | Create | SFTP/exec side-channel (Phase 3/6 ops)                    |
-| `cmd/pve-schemadiff/`                                       | Create | CI schema-drift tool (OQ-7)                               |
+| `cmd/pve-schemadiff/`                                       | Done   | CI schema-drift tool (OQ-7) — parse+diff, CI-wired        |
 | `LICENSE`                                                   | Done   | Apache-2.0                                                |
 
 ## Testing Plan
 
-- [ ] Unit tests for every exported operation against `mockpve` (model per
-      **OQ-4**)
+- [x] Unit tests for every exported operation against `mockpve` (model per
+      **OQ-4**) — every service package unit-tests its exported ops against the
+      in-process `mockpve` responder; `just test` (race + coverage) is green
+      module-wide.
 - [ ] Integration tests against a live 9.x node (and a 9.2 node for `(9.2+)`
-      rows); harness per **OQ-5**
-- [ ] Table-driven tests for the `0/1`→bool + config-struct (un)marshalling
-- [ ] CI `version`-diff step: regenerate from `apidoc.js`, flag drift across 9.x
-      minors
-- [ ] `Example` functions compile + run under `go test`; `go doc ./...` renders
-      every package's overview (godoc coverage gate)
+      rows); harness per **OQ-5** — **written-but-unverified**: not runnable in
+      this environment (no live 9.x node / recorded cassettes). The
+      `//go:build     integration` harness reads `PVE_ENDPOINT`/`PVE_TOKEN_*`;
+      this is the sole cross-cutting item that is genuinely blocked here.
+- [x] Table-driven tests for the `0/1`→bool + config-struct (un)marshalling —
+      `proxmox/types/types_test.go` covers `PVEBool` both directions; the
+      per-service lossless-decode tests cover config-struct (un)marshalling +
+      `Extra` round-trips.
+- [x] CI `version`-diff step: regenerate from `apidoc.js`, flag drift across 9.x
+      minors — `cmd/pve-schemadiff` (OQ-7) parses an `apidoc.js` dump into a
+      (method, path) set and diffs it against a committed baseline (`-update`
+      rebaselines); unit-tested against a synthetic fixture, wired into CI via
+      `just schemadiff` (test-go job). It runs against a committed synthetic
+      fixture here; pointing `-apidoc` at a real 9.x dump to guard the live REST
+      surface is the live-only remainder.
+- [x] `Example` functions compile + run under `go test`; `go doc ./...` renders
+      every package's overview (godoc coverage gate) — every service + `mockpve`
+      package ships a runnable `Example`; no `Skeleton` doc stubs remain.
 
 ## Dependencies
 
