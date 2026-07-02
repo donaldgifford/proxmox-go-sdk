@@ -382,15 +382,16 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       plain sync REST call, fully mock-verified: guest
       `MintVNCTicket`/`MintSPICETicket`/`MintTermProxy(node, kind, vmid)` (POST
       `/nodes/{n}/{qemu|lxc}/{vmid}/{vncproxy|spiceproxy|termproxy}`) and node
-      shell `MintNodeVNC`/`MintNodeTerm(node)` (`/nodes/{n}/{vncshell|termproxy}`);
-      VNC/term tickets are lossless, SPICE params lossless. `Connect(ctx, node,
-      *VNCTicket)` dials `/nodes/{n}/vncwebsocket` over a **new
-      `api.Client.DoWebSocket`** (native 101 upgrade → `resp.Body` duplex
-      stream) and returns the raw byte stream — the WebSocket-framed RFB payload
-      is the caller's concern (**REST-with-caveat**: wire format unverified
-      without a live node; plumbing verified against a mockpve hijack+echo
-      upgrade). **VerifyVNCTicket** has no standalone PVE REST endpoint (a ticket
-      is verified when `Connect` presents it to the upgrade), so it returns
+      shell `MintNodeVNC`/`MintNodeTerm(node)`
+      (`/nodes/{n}/{vncshell|termproxy}`); VNC/term tickets are lossless, SPICE
+      params lossless. `Connect(ctx, node,     *VNCTicket)` dials
+      `/nodes/{n}/vncwebsocket` over a **new `api.Client.DoWebSocket`** (native
+      101 upgrade → `resp.Body` duplex stream) and returns the raw byte stream —
+      the WebSocket-framed RFB payload is the caller's concern
+      (**REST-with-caveat**: wire format unverified without a live node;
+      plumbing verified against a mockpve hijack+echo upgrade).
+      **VerifyVNCTicket** has no standalone PVE REST endpoint (a ticket is
+      verified when `Connect` presents it to the upgrade), so it returns
       documented `pverr.ErrUnsupported` — honest stub, diverging from the memo's
       REST-with-caveat guess. Ticket mint + Connect echo mock-verified.
 - [x] Metrics: extended metrics (CPU/mem/IO pressure stall, ZFS ARC);
@@ -406,14 +407,33 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       `GetOTelConfig`/`SetOTelConfig` return documented `pverr.ErrUnsupported`
       (new `OTelExporter` 9.1 gate reserved for the future). Mock-verified
       (RRD/status synthesized static).
-- [ ] Promote the `doc.go` stubs for `cluster`, `access`, `nodes`, `ceph`,
+- [x] Promote the `doc.go` stubs for `cluster`, `access`, `nodes`, `ceph`,
       `pbs`, `console`, `metrics`, `mockpve` — real package overview + a
-      runnable `Example`
+      runnable `Example`. All Phase-6 packages carry a promoted `doc.go` (no
+      `Skeleton` placeholders remain) and a runnable `Example`; `mockpve` gained
+      its own (`New` → `NewClient` → read capabilities). The Phase-6 success
+      flow ships as `proxmox.Example_consoleAndAccess`: mock → `NewClient` →
+      `Access().ListUsers`/`ListTokens` → `Console().MintVNCTicket`, with
+      deterministic seeded output.
 
 #### Success Criteria
 
 - Mint a VNC console session through the SDK; list users/tokens under the 9.x
   privilege model
+
+> **Status (all 9 tasks done):** `go build ./...`, `just lint` (0 issues), and
+> `just test` (race) are green; every Phase-6 package is doc-promoted with a
+> runnable `Example`. The success flow is **mock-verified** end-to-end
+> (`proxmox.Example_consoleAndAccess`): `Access().ListUsers`/`ListTokens` under
+> the 9.x privilege model, and `Console().MintVNCTicket` mints a session ticket.
+> `Console().Connect` dials the ticket over `api.DoWebSocket` and is exercised
+> against a `mockpve` hijack+echo `/vncwebsocket` upgrade, so the SDK plumbing
+> is verified; the **live VNC (RFB) wire payload** is the one **live-only**
+> piece, written-but-unverified here (no live 9.x node / recorded cassettes —
+> see CLAUDE.md). Several Phase-6 surfaces are REST-with-caveat (DEB822, SMART,
+> ACME task-vs-sync, Ceph/PBS paths, RRD pressure-stall/ZFS-ARC) or documented
+> `pverr.ErrUnsupported` stubs (Ceph RBD mirroring, PBS verify, metrics OTel,
+> console VerifyVNCTicket) where no PVE 9.x REST endpoint is confirmed.
 
 ---
 

@@ -491,22 +491,30 @@ guest-create endpoints with `archive=`/`ostemplate=`+`restore=1`).
 `VerifyBackup` returns ErrUnsupported (PBS-native, no PVE endpoint). Task 8
 landed the node-per-call `console` package (`Console()` accessor, no bound
 node), split cleanly in two: **ticket mint** is plain sync REST, fully
-mock-verified — guest `MintVNCTicket`/`MintSPICETicket`/`MintTermProxy(node,
-kind, vmid)` and node-shell `MintNodeVNC`/`MintNodeTerm(node)` (VNC/term tickets
-+ SPICE params all lossless); **`Connect(ctx, node, *VNCTicket)`** dials
-`/nodes/{n}/vncwebsocket` and returns the raw duplex byte stream. That needed a
-new **`api.Client.DoWebSocket(ctx, path) (io.ReadWriteCloser, error)`** —
-implemented in `api/websocket.go` using Go's **native 101 upgrade** (GET with
-`Connection: Upgrade`/`Upgrade: websocket`/`Sec-WebSocket-*`; on `101 Switching
-Protocols` the `http.Transport` hands back a body that is also writable —
-`resp.Body.(io.ReadWriteCloser)` is the stream). The mock's `/vncwebsocket`
-route does a real `http.Hijacker` 101 handshake + echo, so `Connect` is tested
-end-to-end through the real transport. The RFB wire payload is REST-with-caveat
-(unverified without a live node); `VerifyVNCTicket` returns ErrUnsupported (no
-standalone verify endpoint — a ticket is checked when `Connect` presents it),
-diverging from the memo's guess per the honesty rule. **Breaking-but-safe**:
-`DoWebSocket` grew the `api.Client` interface; only `*transport` implements it,
-no external doubles. Next: task 9 (doc promotion) is the last Phase 6 task.
+mock-verified — guest
+`MintVNCTicket`/`MintSPICETicket`/`MintTermProxy(node, kind, vmid)` and
+node-shell `MintNodeVNC`/`MintNodeTerm(node)` (VNC/term tickets
+
+- SPICE params all lossless); **`Connect(ctx, node, *VNCTicket)`** dials
+  `/nodes/{n}/vncwebsocket` and returns the raw duplex byte stream. That needed
+  a new **`api.Client.DoWebSocket(ctx, path) (io.ReadWriteCloser, error)`** —
+  implemented in `api/websocket.go` using Go's **native 101 upgrade** (GET with
+  `Connection: Upgrade`/`Upgrade: websocket`/`Sec-WebSocket-*`; on
+  `101 Switching Protocols` the `http.Transport` hands back a body that is also
+  writable — `resp.Body.(io.ReadWriteCloser)` is the stream). The mock's
+  `/vncwebsocket` route does a real `http.Hijacker` 101 handshake + echo, so
+  `Connect` is tested end-to-end through the real transport. The RFB wire
+  payload is REST-with-caveat (unverified without a live node);
+  `VerifyVNCTicket` returns ErrUnsupported (no standalone verify endpoint — a
+  ticket is checked when `Connect` presents it), diverging from the memo's guess
+  per the honesty rule. **Breaking-but-safe**: `DoWebSocket` grew the
+  `api.Client` interface; only `*transport` implements it, no external doubles.
+  Task 9 (doc promotion) closed the phase: every Phase-6 package is doc-promoted
+  with a runnable `Example`, `mockpve` gained its own, and the phase success
+  flow ships as `proxmox.Example_consoleAndAccess` (mock →
+  `Access().ListUsers`/`ListTokens` → `Console().MintVNCTicket`, deterministic
+  output). **Phase 6 is implementation-complete** — all 9 tasks checked; the
+  only live-only piece is the VNC (RFB) wire payload.
 
 Note the `api.Client` interface now has three verbs beyond `DoRequest`:
 `DoUpload` (Phase 3, multipart), `DoWebSocket` (Phase 6, 101 upgrade), plus
