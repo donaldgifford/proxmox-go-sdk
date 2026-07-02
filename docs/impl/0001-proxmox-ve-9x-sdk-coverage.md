@@ -476,8 +476,10 @@ file. This table maps the real code to phases. Column widths are re-aligned by
   `PVE_NODE`/`PVE_INSECURE_TLS`) that skips when unset, read-only tests mapping
   to each phase's live criteria (version round-trip,
   QEMU/LXC/storage/cluster/HA/SDN listings, access user/token reads, VNC ticket
-  mint), and a destructive QEMU create→start→snapshot→rollback→stop→delete
-  lifecycle gated on `PVE_TEST_STORAGE`+`PVE_TEST_VMID` (with cleanup). It
+  mint), and destructive create→start→snapshot→rollback→stop→delete lifecycles
+  for **both QEMU** (gated on `PVE_TEST_STORAGE`+`PVE_TEST_VMID`) **and LXC**
+  (gated on `PVE_TEST_STORAGE`+`PVE_TEST_LXC_VMID`+`PVE_TEST_LXC_TEMPLATE`),
+  each with cleanup — matching the Phase 2 criterion's "both QEMU and LXC". It
   compiles under `go vet -tags=integration` and skips cleanly with no node here;
   **running it against a live 9.x node (and capturing the go-vcr cassettes for
   CI replay) is the deferred, environment-blocked remainder.**

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/lxc"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/qemu"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/tasks"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/types"
@@ -83,6 +84,85 @@ func TestQEMULifecycle(t *testing.T) {
 
 	// Stop (delete happens in cleanup).
 	ref, err = q.Stop(testCtx(t), vmid)
+	if err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	mustSucceed(t, ts, ref, "stop")
+}
+
+// TestLXCLifecycle is the LXC half of the Phase 2 destructive criterion:
+// create -> start -> snapshot -> rollback -> stop -> delete against a live node.
+// It is gated on PVE_TEST_STORAGE, PVE_TEST_LXC_VMID, and PVE_TEST_LXC_TEMPLATE
+// (an OS template volid), and skips otherwise. The container is deleted in
+// cleanup even if a step fails.
+func TestLXCLifecycle(t *testing.T) {
+	c := newClient(t)
+	node := testNode()
+
+	storage := os.Getenv(envTestStorage)
+	rawVMID := os.Getenv(envTestLXCVMID)
+	template := os.Getenv(envTestLXCTemplate)
+	if storage == "" || rawVMID == "" || template == "" {
+		t.Skipf("destructive LXC lifecycle disabled (set %s, %s, %s)", envTestStorage, envTestLXCVMID, envTestLXCTemplate)
+	}
+	vmid, err := strconv.Atoi(rawVMID)
+	if err != nil {
+		t.Fatalf("%s=%q is not an integer: %v", envTestLXCVMID, rawVMID, err)
+	}
+
+	ct := c.LXC(node)
+	ts := c.Tasks()
+
+	// Create.
+	ref, err := ct.Create(testCtx(t), &lxc.CreateSpec{
+		VMID:       types.VMID(vmid),
+		OSTemplate: template,
+		Hostname:   "sdk-itest",
+		Storage:    storage,
+		RootFS:     storage + ":8",
+		Cores:      1,
+		Memory:     512,
+		Swap:       0,
+		Net0:       "name=eth0,bridge=vmbr0,ip=dhcp",
+		Password:   "sdk-itest-pw",
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	t.Cleanup(func() {
+		dref, derr := ct.Delete(context.Background(), vmid)
+		if derr != nil {
+			t.Logf("cleanup Delete(%d): %v", vmid, derr)
+			return
+		}
+		if _, werr := ts.Wait(context.Background(), dref); werr != nil {
+			t.Logf("cleanup Wait(delete): %v", werr)
+		}
+	})
+	mustSucceed(t, ts, ref, "create")
+
+	// Start.
+	ref, err = ct.Start(testCtx(t), vmid)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	mustSucceed(t, ts, ref, "start")
+
+	// Snapshot, then roll back to it.
+	ref, err = ct.CreateSnapshot(testCtx(t), vmid, &lxc.SnapshotSpec{Name: "itest0"})
+	if err != nil {
+		t.Fatalf("CreateSnapshot: %v", err)
+	}
+	mustSucceed(t, ts, ref, "snapshot")
+
+	ref, err = ct.RollbackSnapshot(testCtx(t), vmid, "itest0")
+	if err != nil {
+		t.Fatalf("RollbackSnapshot: %v", err)
+	}
+	mustSucceed(t, ts, ref, "rollback")
+
+	// Stop (delete happens in cleanup).
+	ref, err = ct.Stop(testCtx(t), vmid)
 	if err != nil {
 		t.Fatalf("Stop: %v", err)
 	}

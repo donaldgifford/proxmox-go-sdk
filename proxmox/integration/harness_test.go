@@ -23,8 +23,10 @@ const (
 	envInsecureTLS = "PVE_INSECURE_TLS" // "1" to skip TLS verify (self-signed)
 
 	// Destructive-test gates (compute lifecycle). Absent -> those tests skip.
-	envTestStorage = "PVE_TEST_STORAGE" // target storage for a scratch VM disk
-	envTestVMID    = "PVE_TEST_VMID"    // scratch VMID the suite may create/destroy
+	envTestStorage     = "PVE_TEST_STORAGE"      // target storage for a scratch guest disk
+	envTestVMID        = "PVE_TEST_VMID"         // scratch QEMU VMID the suite may create/destroy
+	envTestLXCVMID     = "PVE_TEST_LXC_VMID"     // scratch LXC VMID the suite may create/destroy
+	envTestLXCTemplate = "PVE_TEST_LXC_TEMPLATE" // OS template volid, e.g. local:vztmpl/debian-12-...tar.zst
 )
 
 // newClient builds a live client from the environment, skipping the test when
