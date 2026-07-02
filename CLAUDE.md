@@ -481,8 +481,16 @@ node per-call; flat cluster-wide mock state): pools + OSDs
 (lossless; config is verbatim text), recursive CRUSH `OSDTree`. Baseline 9.0, no
 gates; paths provisional (centralised in paths.go). **RBD mirroring reclassified
 to ErrUnsupported** (no PVE REST endpoint — it's an `rbd`-CLI feature; use SSH),
-diverging from the memo's REST-with-caveat guess per the honesty rule. Next:
-task 7 (pbs — PVE-side backup jobs/vzdump/restore only, NOT the PBS-native API).
+diverging from the memo's REST-with-caveat guess per the honesty rule. Task 7
+landed the `pbs` package (`PBS()` accessor, **PVE-side only** — the PBS-native
+datastore API is a future `pbsclient`; mixed scope, no bound node): scheduled
+backup jobs (`/cluster/backup`, sync), `ListNodeBackups` (reuses the storage
+content route, content=backup), `CreateBackup`→`tasks.Ref`
+(`/nodes/{n}/vzdump`), and `RestoreQEMU`/`RestoreLXC`→`tasks.Ref` (reuse the
+guest-create endpoints with `archive=`/`ostemplate=`+`restore=1`).
+`VerifyBackup` returns ErrUnsupported (PBS-native, no PVE endpoint). Next: task
+8 (console — HARDEST; needs a new `api.Client.DoWebSocket` for `Connect()`),
+then task 9 (doc promotion).
 
 **No live PVE node and no recorded `go-vcr` cassettes exist in this dev
 environment.** This shapes how we test and what "done" means:

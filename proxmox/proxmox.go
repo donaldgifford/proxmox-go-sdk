@@ -12,6 +12,7 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/lxc"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/metrics"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/nodes"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/pbs"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/qemu"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/sdn"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ssh"
@@ -142,6 +143,14 @@ func (c *Client) Metrics() *metrics.Service {
 // no node; each operation takes the node used to reach the cluster.
 func (c *Client) Ceph() *ceph.Service {
 	return ceph.NewService(c.api, c.caps)
+}
+
+// PBS returns the PVE-side backup service — scheduled backup jobs, immediate
+// vzdump backups, backup listing, and restore. It binds no node (jobs are
+// cluster-scoped; vzdump/list/restore take a node per-call). Talking to a
+// Proxmox Backup Server directly is a separate future concern.
+func (c *Client) PBS() *pbs.Service {
+	return pbs.NewService(c.api, c.caps)
 }
 
 // Firewall returns the datacenter (cluster) firewall service. Use NodeFirewall

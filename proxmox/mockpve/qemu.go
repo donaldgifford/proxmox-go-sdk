@@ -45,6 +45,7 @@ const (
 
 	msgNoSuchMetricServer = "no such metric server"
 	msgNoSuchCephPool     = "no such ceph pool"
+	msgNoSuchBackupJob    = "no such backup job"
 )
 
 // qemuPowerStatus maps a /status/{action} verb to the run state the mock VM

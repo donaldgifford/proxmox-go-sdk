@@ -363,7 +363,18 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       `DisableMirroring` return documented `pverr.ErrUnsupported` (drive
       `rbd     mirror` over SSH) — reclassified from the memo's REST-with-caveat
       guess to an honest ErrUnsupported stub. Pools/OSDs/status mock-verified.
-- [ ] PBS integration: datastores, backups, verify, restore
+- [x] PBS integration: datastores, backups, verify, restore — new `pbs` package
+      (**PVE-side only**; the PBS-native datastore API is a future `pbsclient`).
+      Mixed scope, no bound node (`PBS()` accessor): scheduled backup jobs
+      (cluster `/cluster/backup` — `ListBackupJobs`/`GetBackupJob`/`Create`/
+      `Update`/`DeleteBackupJob`, sync), node backups (`ListNodeBackups` via the
+      storage content listing, `CreateBackup`→`tasks.Ref` via
+      `/nodes/{n}/vzdump`), and restore (`RestoreQEMU`/`RestoreLXC`→`tasks.Ref`,
+      reusing the guest-create endpoints with
+      `archive=`/`ostemplate=`+`restore=1`). **Backup verification is PBS-native
+      with no PVE REST endpoint**, so `VerifyBackup` returns documented
+      `pverr.ErrUnsupported` (honest stub, diverging from the memo's
+      REST-with-caveat guess). Mock-verified.
 - [ ] Console: mint VNC/SPICE/term tickets, verify the **token-owned VNC
       auth-ticket** `(9.x)`, and `Connect()` a duplex byte stream to the
       console; the browser bridge is the consumer's
