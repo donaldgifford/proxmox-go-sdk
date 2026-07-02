@@ -532,10 +532,16 @@ environment.** This shapes how we test and what "done" means:
   fuzzed-`mockpve` pipeline (OQ-4/5/10) is a capture step deferred until a live
   9.x node is reachable; `mockpve` is built so that corpus can seed it later
   without redesign.
-- Integration tests live behind `//go:build integration`, read the node from
-  `PVE_ENDPOINT` / `PVE_TOKEN_ID` / `PVE_TOKEN_SECRET`, and are **not runnable
-  here**. Never claim a phase's live-only Success Criteria pass when they cannot
-  be verified — mark them written-but-unverified instead.
+- Integration tests live in `proxmox/integration/` behind
+  `//go:build integration`, read the node from `PVE_ENDPOINT` / `PVE_TOKEN_ID` /
+  `PVE_TOKEN_SECRET` (optional `PVE_NODE` / `PVE_INSECURE_TLS`; destructive
+  lifecycle gated on `PVE_TEST_STORAGE` + `PVE_TEST_VMID`), and are **not
+  runnable here** — they `t.Skip` without a node. The harness is
+  compile-verified (`go vet -tags=integration ./proxmox/integration/`) but its
+  execution + the go-vcr cassette capture are live-only. The package keeps an
+  untagged `doc.go` so the default `go build ./...` sees a non-empty package.
+  Never claim a phase's live-only Success Criteria pass when they cannot be
+  verified — mark them written-but-unverified instead.
 - Working definition of "done" for a task in this environment: typed op exists,
   `go build ./...` is clean, it is unit-tested against `mockpve`, and
   `just lint`

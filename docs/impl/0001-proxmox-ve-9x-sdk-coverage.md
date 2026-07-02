@@ -468,11 +468,19 @@ file. This table maps the real code to phases. Column widths are re-aligned by
       **OQ-4**) — every service package unit-tests its exported ops against the
       in-process `mockpve` responder; `just test` (race + coverage) is green
       module-wide.
-- [ ] Integration tests against a live 9.x node (and a 9.2 node for `(9.2+)`
-      rows); harness per **OQ-5** — **written-but-unverified**: not runnable in
-      this environment (no live 9.x node / recorded cassettes). The
-      `//go:build     integration` harness reads `PVE_ENDPOINT`/`PVE_TOKEN_*`;
-      this is the sole cross-cutting item that is genuinely blocked here.
+- [~] Integration tests against a live 9.x node (and a 9.2 node for `(9.2+)`
+  rows); harness per **OQ-5** — **harness written & compile-verified, execution
+  live-only.** `proxmox/integration/` holds the build-tagged
+  (`//go:build integration`) suite: an env-configured client
+  (`PVE_ENDPOINT`/`PVE_TOKEN_ID`/`PVE_TOKEN_SECRET`, optional
+  `PVE_NODE`/`PVE_INSECURE_TLS`) that skips when unset, read-only tests mapping
+  to each phase's live criteria (version round-trip,
+  QEMU/LXC/storage/cluster/HA/SDN listings, access user/token reads, VNC ticket
+  mint), and a destructive QEMU create→start→snapshot→rollback→stop→delete
+  lifecycle gated on `PVE_TEST_STORAGE`+`PVE_TEST_VMID` (with cleanup). It
+  compiles under `go vet -tags=integration` and skips cleanly with no node here;
+  **running it against a live 9.x node (and capturing the go-vcr cassettes for
+  CI replay) is the deferred, environment-blocked remainder.**
 - [x] Table-driven tests for the `0/1`→bool + config-struct (un)marshalling —
       `proxmox/types/types_test.go` covers `PVEBool` both directions; the
       per-service lossless-decode tests cover config-struct (un)marshalling +
