@@ -72,7 +72,10 @@ func EncodeWithExtra(spec any, extra map[string]string) (url.Values, error) {
 		return nil, fmt.Errorf("spec must encode to a JSON object: %w", err)
 	}
 
-	vals := make(url.Values, len(flat)+len(extra))
+	// No capacity hint: flat/extra are tiny (a spec's field count), so
+	// preallocation buys nothing, and summing two lengths trips CodeQL's
+	// allocation-size-overflow rule (CWE-190) for no real-world benefit.
+	vals := make(url.Values)
 	for key, raw := range flat {
 		s := string(raw)
 		if s != "" && s[0] == '"' {
