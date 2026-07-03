@@ -109,9 +109,15 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # commons is a source-only library release. This snapshot validates
-      # the .goreleaser.yml config and that the source archive builds; it
-      # produces no binaries to SBOM-scan.
+      # syft is required by the .goreleaser.yml sboms block, which catalogs the
+      # mockpve helper archives. mise installs it (per mise.toml) onto PATH.
+      - name: Set up mise (for syft)
+        uses: jdx/mise-action@v4
+        with:
+          experimental: true
+
+      # This snapshot validates the .goreleaser.yml config end to end: it builds
+      # the mockpve helper archives and SBOM-scans them with syft.
       - name: Validate goreleaser config (snapshot)
         uses: goreleaser/goreleaser-action@v7.1.0
         with:
