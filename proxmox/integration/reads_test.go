@@ -62,7 +62,9 @@ func TestClusterAndHAReads(t *testing.T) {
 	}
 }
 
-// TestNetworkReads covers Phase 5's read side: SDN zone/VNet listing.
+// TestNetworkReads covers Phase 5's read criterion: enumerating zones, VNets,
+// and fabrics without error. (The live-status half is pverr.ErrUnsupported in
+// 9.x, so it is not exercised here.)
 func TestNetworkReads(t *testing.T) {
 	c := newClient(t)
 	ctx := testCtx(t)
@@ -72,5 +74,8 @@ func TestNetworkReads(t *testing.T) {
 	}
 	if _, err := c.SDN().ListVNets(ctx); err != nil {
 		t.Fatalf("SDN().ListVNets: %v", err)
+	}
+	if _, err := c.SDN().ListFabrics(ctx); err != nil {
+		t.Fatalf("SDN().ListFabrics: %v", err)
 	}
 }

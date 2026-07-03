@@ -471,18 +471,26 @@ file. This table maps the real code to phases. Column widths are re-aligned by
 - [~] Integration tests against a live 9.x node (and a 9.2 node for `(9.2+)`
   rows); harness per **OQ-5** — **harness written & compile-verified, execution
   live-only.** `proxmox/integration/` holds the build-tagged
-  (`//go:build integration`) suite: an env-configured client
+  (`//go:build integration`) suite, an env-configured client
   (`PVE_ENDPOINT`/`PVE_TOKEN_ID`/`PVE_TOKEN_SECRET`, optional
-  `PVE_NODE`/`PVE_INSECURE_TLS`) that skips when unset, read-only tests mapping
-  to each phase's live criteria (version round-trip,
-  QEMU/LXC/storage/cluster/HA/SDN listings, access user/token reads, VNC ticket
-  mint), and destructive create→start→snapshot→rollback→stop→delete lifecycles
-  for **both QEMU** (gated on `PVE_TEST_STORAGE`+`PVE_TEST_VMID`) **and LXC**
-  (gated on `PVE_TEST_STORAGE`+`PVE_TEST_LXC_VMID`+`PVE_TEST_LXC_TEMPLATE`),
-  each with cleanup — matching the Phase 2 criterion's "both QEMU and LXC". It
-  compiles under `go vet -tags=integration` and skips cleanly with no node here;
-  **running it against a live 9.x node (and capturing the go-vcr cassettes for
-  CI replay) is the deferred, environment-blocked remainder.**
+  `PVE_NODE`/`PVE_INSECURE_TLS`) that skips when unset, with a test mapped to
+  **every phase's Success Criterion**:
+  - **P1** version round-trip + task waiter (exercised by the lifecycle Waits);
+  - **P2** destructive create→start→snapshot→rollback→stop→delete for **both
+    QEMU** (`PVE_TEST_STORAGE`+`PVE_TEST_VMID`) **and LXC**
+    (`PVE_TEST_STORAGE`+`PVE_TEST_LXC_VMID`+`PVE_TEST_LXC_TEMPLATE`);
+  - **P3** ISO upload (`PVE_TEST_ISO_PATH`) + volume-chain snapshot lifecycle
+    (`PVE_TEST_VOLID`);
+  - **P4** define a resource-affinity HA rule + read-back (`PVE_TEST_HA_SIDS`);
+  - **P5** enumerate zones/VNets/fabrics;
+  - **P6** access user/token reads + VNC ticket mint (`PVE_TEST_VMID`).
+
+  Read-only tests are safe against any cluster; destructive tests are env-gated
+  and clean up after themselves. It compiles under `go vet -tags=integration`
+  and skips cleanly with no node here; **running it against a live 9.x node (and
+  capturing the go-vcr cassettes for CI replay) is the deferred,
+  environment-blocked remainder.**
+
 - [x] Table-driven tests for the `0/1`→bool + config-struct (un)marshalling —
       `proxmox/types/types_test.go` covers `PVEBool` both directions; the
       per-service lossless-decode tests cover config-struct (un)marshalling +

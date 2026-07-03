@@ -22,11 +22,14 @@ const (
 	envNode        = "PVE_NODE"         // node under test, default "pve"
 	envInsecureTLS = "PVE_INSECURE_TLS" // "1" to skip TLS verify (self-signed)
 
-	// Destructive-test gates (compute lifecycle). Absent -> those tests skip.
-	envTestStorage     = "PVE_TEST_STORAGE"      // target storage for a scratch guest disk
+	// Destructive-test gates. Absent -> the corresponding test skips.
+	envTestStorage     = "PVE_TEST_STORAGE"      // target storage for a scratch guest disk / uploads
 	envTestVMID        = "PVE_TEST_VMID"         // scratch QEMU VMID the suite may create/destroy
 	envTestLXCVMID     = "PVE_TEST_LXC_VMID"     // scratch LXC VMID the suite may create/destroy
 	envTestLXCTemplate = "PVE_TEST_LXC_TEMPLATE" // OS template volid, e.g. local:vztmpl/debian-12-...tar.zst
+	envTestISOPath     = "PVE_TEST_ISO_PATH"     // local path to a (small) ISO to upload (Phase 3)
+	envTestVolID       = "PVE_TEST_VOLID"        // existing volume to snapshot + clean up (Phase 3)
+	envTestHASIDs      = "PVE_TEST_HA_SIDS"      // CSV of >=2 HA-managed SIDs for a resource-affinity rule (Phase 4)
 )
 
 // newClient builds a live client from the environment, skipping the test when

@@ -534,9 +534,11 @@ environment.** This shapes how we test and what "done" means:
   without redesign.
 - Integration tests live in `proxmox/integration/` behind
   `//go:build integration`, read the node from `PVE_ENDPOINT` / `PVE_TOKEN_ID` /
-  `PVE_TOKEN_SECRET` (optional `PVE_NODE` / `PVE_INSECURE_TLS`; destructive QEMU
-  lifecycle gated on `PVE_TEST_STORAGE` + `PVE_TEST_VMID`, LXC lifecycle on
-  `PVE_TEST_STORAGE` + `PVE_TEST_LXC_VMID` + `PVE_TEST_LXC_TEMPLATE`), and are
+  `PVE_TOKEN_SECRET` (optional `PVE_NODE` / `PVE_INSECURE_TLS`). Read-only tests
+  cover every phase; destructive tests are env-gated: QEMU lifecycle
+  (`PVE_TEST_STORAGE` + `PVE_TEST_VMID`), LXC lifecycle (`+PVE_TEST_LXC_VMID` +
+  `PVE_TEST_LXC_TEMPLATE`), ISO upload (`PVE_TEST_ISO_PATH`), volume snapshot
+  (`PVE_TEST_VOLID`), HA resource-affinity rule (`PVE_TEST_HA_SIDS`). They are
   **not runnable here** — they `t.Skip` without a node. The harness is
   compile-verified (`go vet -tags=integration ./proxmox/integration/`) but its
   execution + the go-vcr cassette capture are live-only. The package keeps an
