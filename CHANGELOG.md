@@ -73,4 +73,5 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(lint)* Exclude local/generated files from yamlfmt + markdownlint
 - *(tooling)* Make yamlfmt config auto-discoverable + tidy perms
 - Fix Test Go / TruffleHog / Build snapshot failures
+- Skip signing in the goreleaser snapshot validation
 
