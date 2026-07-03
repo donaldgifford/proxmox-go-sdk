@@ -108,24 +108,24 @@ The transport and primitives every service hangs off.
 
 #### Tasks
 
-- [ ] `DoRequest(ctx, method, path, req, resp)` + `ExpandPath` path templating
-- [ ] `Connection`: primary endpoint + optional ordered cluster-node failover
+- [x] `DoRequest(ctx, method, path, req, resp)` + `ExpandPath` path templating
+- [x] `Connection`: primary endpoint + optional ordered cluster-node failover
       set (`WithClusterEndpoints`), TLS (self-signed/IP, min-TLS), retry/backoff
       that rotates across nodes
-- [ ] Credentials + precedence: auth-ticket > API token > user/pass; 2 h ticket
+- [x] Credentials + precedence: auth-ticket > API token > user/pass; 2 h ticket
       refresh; CSRF on writes
-- [ ] `version` service: `MinimumProxmoxVersion = 9.0` + `Support*()` per-minor
+- [x] `version` service: `MinimumProxmoxVersion = 9.0` + `Support*()` per-minor
       gates
-- [ ] `tasks`: UPID parse, `WaitForTask` / `WaitForStatus` waiters, task-log
+- [x] `tasks`: UPID parse, `WaitForTask` / `WaitForStatus` waiters, task-log
       read
-- [ ] `0`/`1` → bool handling, typed error taxonomy
-      (NotFound/Conflict/AuthExpired/TaskFailed/Transient)
-- [ ] `mockpve` server + mockable interfaces; functional options
+- [x] `0`/`1` → bool handling (`types.PVEBool`), typed error taxonomy (`pverr`:
+      NotFound/Conflict/AuthExpired/TaskFailed/Transient/…)
+- [x] `mockpve` server + mockable interfaces; functional options
       (`WithLogger`/`WithCache`/`WithHTTPClient`/`WithTLS`)
-- [ ] Root `proxmox` package: `NewClient` (seeds `Capabilities` from `/version`,
+- [x] Root `proxmox` package: `NewClient` (seeds `Capabilities` from `/version`,
       rejects < 9.0) + `Client` accessors + functional options; placement of
       shared primitives & the error taxonomy per **OQ-1**
-- [ ] Promote the `doc.go` stubs (created in the skeleton commit) for every
+- [x] Promote the `doc.go` stubs (created in the skeleton commit) for every
       Phase 1 package — `api`, `types`, `pverr`, `version`, `tasks`, root
       `proxmox`: replace the "Skeleton: no implementation yet" placeholder with
       a real package overview + a runnable `Example`; `go doc ./...` renders
@@ -137,22 +137,30 @@ The transport and primitives every service hangs off.
   live 9.x
 - Waiters drive a real start/stop task to completion
 
+> **Status (all 9 tasks done):** `go build ./...` and `just lint`/`just test`
+> (race) are green. Auth (token / pre-minted ticket / user-pass mint+refresh) +
+> `GET /version` round-trip and the task waiters (running→stopped OK/failed) are
+> **verified against the in-process `mockpve` responder**, not a live 9.x node.
+> The two live-only criteria above are therefore **written-but-unverified** in
+> this environment (no live node / recorded cassettes — see CLAUDE.md); they
+> stand to be confirmed once a 9.x node is reachable.
+
 ---
 
 ### Phase 2: Compute — QEMU + LXC
 
 #### Tasks
 
-- [ ] QEMU: list, status, config get/set, create, clone, delete
-- [ ] QEMU power: start/stop/shutdown/reboot/suspend/resume
-- [ ] QEMU migrate (online/offline), disk + NIC add/resize/remove
-- [ ] QEMU snapshots: list/create/rollback/delete (+ TPM-state snapshots on
+- [x] QEMU: list, status, config get/set, create, clone, delete
+- [x] QEMU power: start/stop/shutdown/reboot/suspend/resume
+- [x] QEMU migrate (online/offline), disk + NIC add/resize/remove
+- [x] QEMU snapshots: list/create/rollback/delete (+ TPM-state snapshots on
       NFS/CIFS/dir `(9.1+)`)
-- [ ] Guest-agent exec + fine-grained agent privileges (9.x model)
-- [ ] LXC: list, status, config, create, clone, delete, power
-- [ ] LXC snapshots (ZFS/btrfs/LVM-thin backing)
-- [ ] LXC from **OCI image templates** `(9.1+ tp)` — pull/upload OCI as template
-- [ ] Promote the `doc.go` stubs for `qemu` + `lxc` — real package overview + a
+- [x] Guest-agent exec + fine-grained agent privileges (9.x model)
+- [x] LXC: list, status, config, create, clone, delete, power
+- [x] LXC snapshots (ZFS/btrfs/LVM-thin backing)
+- [x] LXC from **OCI image templates** `(9.1+ tp)` — pull/upload OCI as template
+- [x] Promote the `doc.go` stubs for `qemu` + `lxc` — real package overview + a
       runnable `Example` (e.g. clone → start)
 
 #### Success Criteria
@@ -166,20 +174,37 @@ The transport and primitives every service hangs off.
 
 #### Tasks
 
-- [ ] Datastore list + status; content listing (volumes, ISOs, templates,
+- [x] Datastore list + status; content listing (volumes, ISOs, templates,
       backups)
-- [ ] Volume create/resize/delete/move
-- [ ] **Snapshots as volume chains** on thick-LVM + Directory/NFS/CIFS
-      `(tp → maturing)` — capability-gated
-- [ ] ISO / disk-image upload (large-file streaming)
-- [ ] Snippet + backup upload `(ssh)` — SFTP via PAM account
-- [ ] ZFS pool ops incl. RAIDZ expansion `(9.x)`
-- [ ] Promote the `doc.go` stubs for `storage` (and the `ssh` side-channel) —
-      real package overview + a runnable `Example`
+- [x] Volume create/resize/delete/move (allocate/free in `storage`; resize/move
+      are guest-scoped — `qemu.ResizeDisk` + `qemu.MoveDisk`)
+- [x] **Snapshots as volume chains** on thick-LVM + Directory/NFS/CIFS
+      `(tp → maturing)` — capability-gated (`VolumeChainSnapshots` 9.1+; gate
+      mock-verified, endpoint shape unconfirmed without a live node)
+- [x] ISO / disk-image upload (large-file streaming) — `UploadISO`/
+      `UploadDiskImage` over the new `api.Client.DoUpload` (io.Pipe + multipart,
+      no buffering, no retry)
+- [x] Snippet + backup upload `(ssh)` — SFTP via PAM account; new `proxmox/ssh`
+      side-channel (`UploadSnippet`/`UploadBackup`/`Exec`), mandatory host-key
+      verification, single-connection `Client` exposed via `Client.SSH(...)`.
+      Unit-tested against an in-process SSH+SFTP server; live PAM auth + writes
+      under `/var/lib/vz` unverifiable without a reachable node.
+- [x] ZFS pool ops incl. RAIDZ expansion `(9.x)` — `ListZFSPools`/`GetZFSPool`/
+      `CreateZFSPool` over `/nodes/{node}/disks/zfs` (mock-verified). RAIDZ
+      expansion is gated on the new `ZFSRAIDZExpansion` capability (9.2) but PVE
+      exposes **no REST endpoint** for it (`zpool attach`), so `ExpandRAIDZ`
+      returns a documented `pverr.ErrUnsupported` pointing at the ssh
+      side-channel rather than fabricating an endpoint.
+- [x] Promote the `doc.go` stubs for `storage` (and the `ssh` side-channel) —
+      real package overview + a runnable `Example`. `storage` has a runnable
+      `Example` (upload → snapshot → cleanup, `go doc`-verified); `ssh` has a
+      compile-only `Example` (no `Output`) since it needs a live host.
 
 #### Success Criteria
 
-- Upload an ISO, create a volume-chain snapshot where supported, clean up
+- [x] Upload an ISO, create a volume-chain snapshot where supported, clean up —
+      covered by the runnable `storage` `Example` (seeds 9.1 to enable
+      volume-chain snapshots) and `TestVolumeSnapshotLifecycle`; mock-verified.
 
 ---
 
@@ -189,21 +214,48 @@ The 9.x-reworked area — model rules, never the deprecated groups.
 
 #### Tasks
 
-- [ ] HA resources: add/remove (incl. add-after-create/restore), state
-      management
-- [ ] **HA rules**: node-affinity + resource-affinity (resource-to-node,
-      resource-to-resource); enable/disable
-- [ ] CRS settings read/write (static-load scheduler)
-- [ ] **Dynamic Load Balancer** controls `(9.2+)` — continuous CRS rebalancing
-      toggle/config
-- [ ] Arm/Disarm HA cluster-wide switch `(9.2+)`
-- [ ] Storage/ZFS replication jobs (respect new `VM.Replicate` privilege)
-- [ ] Promote the `doc.go` stub for `ha` — real package overview + a runnable
-      `Example` (define a resource-affinity rule)
+- [x] HA resources: add/remove (incl. add-after-create/restore), state
+      management — new cluster-scoped `proxmox/ha` service
+      (`ListResources`/`GetResource`/`AddResource`/`UpdateResource`/
+      `RemoveResource`); SIDs (`vm:100`) path-escaped; config writes are
+      synchronous (return `error`, no task). Mock-verified.
+- [x] **HA rules**: node-affinity + resource-affinity (resource-to-node,
+      resource-to-resource); enable/disable —
+      `ListRules`/`GetRule`/`CreateRule`/ `UpdateRule`/`DeleteRule` over
+      `/cluster/ha/rules` (the 9.x replacement for the deprecated groups, which
+      the SDK never models). `RuleType` + `HARuleSpec` (Nodes/Resources
+      CSV-joined) + lossless `HARule`; disable via `HARuleUpdate.Disable`.
+      Mock-verified; per-variant param names provisional without a live node.
+- [x] CRS settings read/write (static-load scheduler) — `GetCRSSettings`/
+      `SetCRSSettings`; CRS lives inside datacenter options (`/cluster/options`,
+      the `crs` compound property-string), parsed/encoded to typed `Mode` +
+      `HARebalanceOnStart`. Mock-verified; sub-key names provisional.
+- [x] **Dynamic Load Balancer** controls `(9.2+)` — continuous CRS rebalancing
+      toggle/config — `GetDLBStatus`/`SetDLBConfig`, gated on the 9.2
+      `DynamicLoadBalancer` capability. REST-with-caveat: provisional path
+      `/cluster/ha/lbalancer` (mirrors ha-manager naming), gate mock-verified,
+      wire shape unconfirmed without a live 9.2 node.
+- [x] Arm/Disarm HA cluster-wide switch `(9.2+)` — `ArmHA`/`DisarmHA` + new
+      `HAClusterSwitch` (9.2) capability. No confirmed PVE REST endpoint (a
+      GUI/pvecm action), so both return a documented `pverr.ErrUnsupported`
+      rather than fabricating a path — like `storage.ExpandRAIDZ`.
+- [x] Storage/ZFS replication jobs (respect new `VM.Replicate` privilege) —
+      `ListReplicationJobs`/`GetReplicationJob`/`CreateReplicationJob`/
+      `UpdateReplicationJob`/`DeleteReplicationJob` over `/cluster/replication`;
+      lossless `ReplicationJob`, IDs `<vmid>-<jobnum>`; VM.Replicate noted in
+      docs. Synchronous writes. Mock-verified.
+- [x] Promote the `doc.go` stub for `ha` — real package overview + a runnable
+      `Example` (define a resource-affinity rule). `go doc`-verified; the
+      `Example` (add two resources → resource-affinity rule → read back) runs
+      against mockpve with `// Output` checked.
 
 #### Success Criteria
 
-- Define a resource-affinity rule via the SDK and observe placement honor it
+- [x] Define a resource-affinity rule via the SDK and observe placement honor it
+      — the rule definition + read-back is covered by the runnable `ha`
+      `Example` and `TestCreateResourceAffinityRule` (mock-verified). The
+      **placement-honored observation is live-only** (the mock does not
+      schedule) and remains written-but-unverified without a real cluster.
 
 ---
 
@@ -211,20 +263,54 @@ The 9.x-reworked area — model rules, never the deprecated groups.
 
 #### Tasks
 
-- [ ] Node networking: bridges, bonds, VLAN-aware bridges, interface config
-      (package placement per **OQ-8**)
-- [ ] SDN zones (VLAN/VXLAN/EVPN) + VNets + subnets
-- [ ] **SDN Fabrics** `(9.0+)` — OpenFabric/OSPF; gate newer protocols
-      (WireGuard/BGP route-maps/IPv6 underlay) `(9.2+)`
-- [ ] SDN status reporting (connected guest NICs, EVPN learned IPs/MACs, fabric
-      routes/neighbors)
-- [ ] Firewall: rules, ipsets (incl. overlapping ipset support `(9.1+)`)
-- [ ] Promote the `doc.go` stubs for `sdn` + `firewall` (and node networking in
-      `nodes`) — real package overview + a runnable `Example`
+- [x] Node networking: bridges, bonds, VLAN-aware bridges, interface config
+      (package placement per **OQ-8** — in `nodes`) — `ListInterfaces`/
+      `GetInterface`/`CreateInterface`/`UpdateInterface`/`DeleteInterface` over
+      `/nodes/{node}/network`; lossless `Interface`. `ApplyNetworkConfig` (PUT)
+      returns a `tasks.Ref` (PVE may reload via a worker; zero Ref when
+      synchronous). Mock-verified.
+- [x] SDN zones (VLAN/VXLAN/EVPN) + VNets + subnets — cluster-scoped `sdn`
+      package: `Zone`/`VNet`/`Subnet` (lossless reads) with full CRUD over
+      `/cluster/sdn/{zones,vnets,vnets/{vnet}/subnets}`; all config writes are
+      synchronous (return `error`). `ApplySDN` (PUT `/cluster/sdn`) commits the
+      staged config cluster-wide. Mock-verified.
+- [x] **SDN Fabrics** `(9.0+)` — OpenFabric/OSPF; gate newer protocols
+      (WireGuard/BGP route-maps/IPv6 underlay) `(9.2+)`. `Fabric` lossless
+      read + CRUD over the **provisional** `/cluster/sdn/fabrics`
+      (REST-with-caveat: real 9.0 feature, path/fields unverified against a live
+      node). Basic protocols (openfabric/ospf) are baseline; `FabricProtocolBGP`
+      is refused below 9.2 via the new `SDNAdvancedFabrics` gate. Mock-verified.
+- [x] SDN status reporting (connected guest NICs, EVPN learned IPs/MACs, fabric
+      routes/neighbors) — `SDNStatus`/`VNetStatus` with fixed forward-compatible
+      return types, but **no confirmed PVE REST endpoint** exists, so both
+      return documented `pverr.ErrUnsupported` (like `ha.ArmHA`). No mock
+      handlers.
+- [x] Firewall: rules, ipsets (incl. overlapping ipset support `(9.1+)`) — new
+      `firewall` package with a **scope model**: ONE `Service{c,caps,scope}` and
+      three constructors (`NewClusterScope`/`NewNodeScope`/`NewGuestScope`), so
+      the rule/IPSet/options surface is written once and `scope.path()` switches
+      the prefix (cluster `/cluster/firewall`, node `/nodes/{n}/firewall`, guest
+      `/nodes/{n}/{qemu|lxc}/{vmid}/firewall`). `RenameIPSet` gated 9.1
+      (`OverlappingIPSets`). Root accessors `Firewall`/`NodeFirewall`/
+      `GuestFirewall`. Mock-verified across all three scopes.
+- [x] Promote the `doc.go` stubs for `sdn` + `firewall` (and node networking in
+      `nodes`) — real package overview + a runnable `Example`. All three render
+      cleanly under `go doc ./...` and their Examples pass.
 
 #### Success Criteria
 
 - Enumerate zones/VNets/fabrics and their live status without error
+
+> **Status (all 6 tasks done):** `go build ./...`, `just lint` (0 issues), and
+> `just test` (race) are green. Enumerating zones/VNets/fabrics
+> (`ListZones`/`ListVNets`/`ListFabrics`) plus full CRUD, `ApplySDN`, node
+> networking, and the scoped firewall are **verified against the in-process
+> `mockpve` responder** across all three firewall scopes. The **live-status**
+> half of the criterion (`SDNStatus`/`VNetStatus`) has **no confirmed PVE REST
+> endpoint** and returns documented `pverr.ErrUnsupported` — it is neither mock-
+> nor live-verifiable here and is recorded as such (like `ha.ArmHA`).
+> Enumeration is satisfied; live status is written-but-unsupported pending a
+> reachable 9.x node to confirm the real endpoint.
 
 ---
 
@@ -232,28 +318,122 @@ The 9.x-reworked area — model rules, never the deprecated groups.
 
 #### Tasks
 
-- [ ] Cluster: `/cluster/resources`, status, options
-- [ ] Access: users, groups, roles, ACLs using the **9.x privilege model**
-      (`VM.Replicate`, granular agent privs; no `VM.Monitor`)
-- [ ] API tokens: create/list/revoke, clear comment `(9.1+)`, **regenerate
-      secret in place** `(9.2+)`
-- [ ] Node admin: package updates (DEB822 sources), disks/SMART,
-      certificates/ACME, custom scripts `(ssh)`
-- [ ] Ceph: pools, OSDs, RBD mirroring (Squid)
-- [ ] PBS integration: datastores, backups, verify, restore
-- [ ] Console: mint VNC/SPICE/term tickets, verify the **token-owned VNC
+- [x] Cluster: `/cluster/resources`, status, options — new cluster-scoped
+      `cluster` package: `ListResources` (with `WithResourceType` filter),
+      `GetStatus` (lossless `StatusEntry` list), `GetOptions`/`SetOptions`
+      (lossless; sync write). The mock's `/cluster/options` handler is shared
+      with HA (HA owns `crs`; cluster owns description/migration/…).
+      Mock-verified.
+- [x] Access: users, groups, roles, ACLs using the **9.x privilege model**
+      (`VM.Replicate`, granular agent privs; no `VM.Monitor`) — new
+      cluster-scoped `access` package: full user/group/role CRUD + ACL
+      grant/revoke (`SetACL`, one PUT, `Delete` revokes). `Role` normalises
+      PVE's two role-read shapes (CSV list entry vs privilege→1 object).
+      Mock-verified.
+- [x] API tokens: create/list/revoke, clear comment `(9.1+)`, **regenerate
+      secret in place** `(9.2+)` — in the `access` package;
+      `CreateToken`/`RegenerateTokenSecret` return the one-time `TokenSecret`.
+      `ClearTokenComment` gated 9.1, `RegenerateTokenSecret` gated 9.2
+      (REST-with-caveat: provisional rotate path). Gates mock-verified.
+- [x] Node admin: package updates (DEB822 sources), disks/SMART,
+      certificates/ACME, custom scripts `(ssh)` — extends the `nodes` package
+      (node per-call, no bound node): apt (`ListAptUpdates`,
+      `RefreshAptCache`→`tasks.Ref`) plus DEB822 repositories
+      (`ListRepositories`/`UpdateRepository`, **REST-with-caveat**: real
+      endpoint, provisional field shapes); disks (`ListDisks`, `GetDiskSMART`
+      **REST-with-caveat** on the attribute table,
+      `InitializeDisk`→`tasks.Ref`); certificates (`GetNodeCertificates`,
+      `UploadCustomCertificate`/ `DeleteCustomCertificate` sync) +
+      cluster-scoped ACME accounts
+      (`ListACMEAccounts`/`GetACMEAccount`/`RegisterACMEAccount`→`tasks.Ref`/
+      `UpdateACMEAccount`/`DeactivateACMEAccount`→`tasks.Ref`) + node ACME cert
+      `Order`/`Renew`/`RevokeNodeCertificate`→`tasks.Ref` (**REST-with-caveat**:
+      real endpoint, task-vs-sync unconfirmed). **Custom node scripts have no
+      PVE REST endpoint** — the SDK offers no method; run them over the SSH
+      side-channel (`c.SSH().Exec`). Mock-verified.
+- [x] Ceph: pools, OSDs, RBD mirroring (Squid) — new `ceph` package (`c.Ceph()`,
+      **no** node arg; each op takes the MON node per-call, flat cluster-wide
+      state). Pools (`ListPools`/`GetPool`/`CreatePool`→`tasks.Ref`/
+      `DeletePool`→`tasks.Ref`), OSDs (`ListOSDs` → recursive CRUSH `OSDTree`,
+      `CreateOSD`/`DestroyOSD`→`tasks.Ref`), `GetStatus` (lossless health) +
+      `GetClusterConfig` (ceph.conf verbatim text). Baseline 9.0, no gates; REST
+      **paths provisional** (unconfirmed against a live cluster, centralised in
+      paths.go). **RBD mirroring** is an `rbd`-CLI feature with **no confirmed
+      PVE REST endpoint**, so `GetMirrorStatus`/`EnableMirroring`/
+      `DisableMirroring` return documented `pverr.ErrUnsupported` (drive
+      `rbd     mirror` over SSH) — reclassified from the memo's REST-with-caveat
+      guess to an honest ErrUnsupported stub. Pools/OSDs/status mock-verified.
+- [x] PBS integration: datastores, backups, verify, restore — new `pbs` package
+      (**PVE-side only**; the PBS-native datastore API is a future `pbsclient`).
+      Mixed scope, no bound node (`PBS()` accessor): scheduled backup jobs
+      (cluster `/cluster/backup` — `ListBackupJobs`/`GetBackupJob`/`Create`/
+      `Update`/`DeleteBackupJob`, sync), node backups (`ListNodeBackups` via the
+      storage content listing, `CreateBackup`→`tasks.Ref` via
+      `/nodes/{n}/vzdump`), and restore (`RestoreQEMU`/`RestoreLXC`→`tasks.Ref`,
+      reusing the guest-create endpoints with
+      `archive=`/`ostemplate=`+`restore=1`). **Backup verification is PBS-native
+      with no PVE REST endpoint**, so `VerifyBackup` returns documented
+      `pverr.ErrUnsupported` (honest stub, diverging from the memo's
+      REST-with-caveat guess). Mock-verified.
+- [x] Console: mint VNC/SPICE/term tickets, verify the **token-owned VNC
       auth-ticket** `(9.x)`, and `Connect()` a duplex byte stream to the
-      console; the browser bridge is the consumer's
-- [ ] Metrics: extended metrics (CPU/mem/IO pressure stall, ZFS ARC);
-      OpenTelemetry exporter `(9.1+)`
-- [ ] Promote the `doc.go` stubs for `cluster`, `access`, `nodes`, `ceph`,
+      console; the browser bridge is the consumer's — new node-per-call
+      `console` package (`Console()` accessor, no bound node). Ticket mint is a
+      plain sync REST call, fully mock-verified: guest
+      `MintVNCTicket`/`MintSPICETicket`/`MintTermProxy(node, kind, vmid)` (POST
+      `/nodes/{n}/{qemu|lxc}/{vmid}/{vncproxy|spiceproxy|termproxy}`) and node
+      shell `MintNodeVNC`/`MintNodeTerm(node)`
+      (`/nodes/{n}/{vncshell|termproxy}`); VNC/term tickets are lossless, SPICE
+      params lossless. `Connect(ctx, node,     *VNCTicket)` dials
+      `/nodes/{n}/vncwebsocket` over a **new `api.Client.DoWebSocket`** (native
+      101 upgrade → `resp.Body` duplex stream) and returns the raw byte stream —
+      the WebSocket-framed RFB payload is the caller's concern
+      (**REST-with-caveat**: wire format unverified without a live node;
+      plumbing verified against a mockpve hijack+echo upgrade).
+      **VerifyVNCTicket** has no standalone PVE REST endpoint (a ticket is
+      verified when `Connect` presents it to the upgrade), so it returns
+      documented `pverr.ErrUnsupported` — honest stub, diverging from the memo's
+      REST-with-caveat guess. Ticket mint + Connect echo mock-verified.
+- [x] Metrics: extended metrics (CPU/mem/IO pressure stall, ZFS ARC);
+      OpenTelemetry exporter `(9.1+)` — new mixed-scope `metrics` package (no
+      bound node; `Metrics()` accessor). Node/guest RRD (`GetNodeRRD`/`GetVMRRD`
+      with `WithTimeframe`/`WithConsolidation` options) + `GetNodeStatus` are
+      lossless reads — pressure-stall and ZFS-ARC counters are
+      **REST-with-caveat** and land in `Extra`. Cluster-scoped external metric
+      servers
+      (`ListMetricServers`/`GetMetricServer`/`Create`/`Update`/`DeleteMetricServer`,
+      InfluxDB/Graphite, sync writes). The 9.1 OpenTelemetry exporter is
+      file-configured with **no REST endpoint**, so
+      `GetOTelConfig`/`SetOTelConfig` return documented `pverr.ErrUnsupported`
+      (new `OTelExporter` 9.1 gate reserved for the future). Mock-verified
+      (RRD/status synthesized static).
+- [x] Promote the `doc.go` stubs for `cluster`, `access`, `nodes`, `ceph`,
       `pbs`, `console`, `metrics`, `mockpve` — real package overview + a
-      runnable `Example`
+      runnable `Example`. All Phase-6 packages carry a promoted `doc.go` (no
+      `Skeleton` placeholders remain) and a runnable `Example`; `mockpve` gained
+      its own (`New` → `NewClient` → read capabilities). The Phase-6 success
+      flow ships as `proxmox.Example_consoleAndAccess`: mock → `NewClient` →
+      `Access().ListUsers`/`ListTokens` → `Console().MintVNCTicket`, with
+      deterministic seeded output.
 
 #### Success Criteria
 
 - Mint a VNC console session through the SDK; list users/tokens under the 9.x
   privilege model
+
+> **Status (all 9 tasks done):** `go build ./...`, `just lint` (0 issues), and
+> `just test` (race) are green; every Phase-6 package is doc-promoted with a
+> runnable `Example`. The success flow is **mock-verified** end-to-end
+> (`proxmox.Example_consoleAndAccess`): `Access().ListUsers`/`ListTokens` under
+> the 9.x privilege model, and `Console().MintVNCTicket` mints a session ticket.
+> `Console().Connect` dials the ticket over `api.DoWebSocket` and is exercised
+> against a `mockpve` hijack+echo `/vncwebsocket` upgrade, so the SDK plumbing
+> is verified; the **live VNC (RFB) wire payload** is the one **live-only**
+> piece, written-but-unverified here (no live 9.x node / recorded cassettes —
+> see CLAUDE.md). Several Phase-6 surfaces are REST-with-caveat (DEB822, SMART,
+> ACME task-vs-sync, Ceph/PBS paths, RRD pressure-stall/ZFS-ARC) or documented
+> `pverr.ErrUnsupported` stubs (Ceph RBD mirroring, PBS verify, metrics OTel,
+> console VerifyVNCTicket) where no PVE 9.x REST endpoint is confirmed.
 
 ---
 
@@ -279,20 +459,52 @@ file. This table maps the real code to phases. Column widths are re-aligned by
 | `proxmox/mockpve/`                                          | Create | mock server (all phases) + `cmd/mockpve/` runnable server |
 | `proxmox/{proxmox,options}.go`                              | Create | Phase 1 — root: client + options, no aliases (OQ-1)       |
 | `proxmox/ssh/`                                              | Create | SFTP/exec side-channel (Phase 3/6 ops)                    |
-| `cmd/pve-schemadiff/`                                       | Create | CI schema-drift tool (OQ-7)                               |
+| `cmd/pve-schemadiff/`                                       | Done   | CI schema-drift tool (OQ-7) — parse+diff, CI-wired        |
 | `LICENSE`                                                   | Done   | Apache-2.0                                                |
 
 ## Testing Plan
 
-- [ ] Unit tests for every exported operation against `mockpve` (model per
-      **OQ-4**)
-- [ ] Integration tests against a live 9.x node (and a 9.2 node for `(9.2+)`
-      rows); harness per **OQ-5**
-- [ ] Table-driven tests for the `0/1`→bool + config-struct (un)marshalling
-- [ ] CI `version`-diff step: regenerate from `apidoc.js`, flag drift across 9.x
-      minors
-- [ ] `Example` functions compile + run under `go test`; `go doc ./...` renders
-      every package's overview (godoc coverage gate)
+- [x] Unit tests for every exported operation against `mockpve` (model per
+      **OQ-4**) — every service package unit-tests its exported ops against the
+      in-process `mockpve` responder; `just test` (race + coverage) is green
+      module-wide.
+- [~] Integration tests against a live 9.x node (and a 9.2 node for `(9.2+)`
+  rows); harness per **OQ-5** — **harness written & compile-verified, execution
+  live-only.** `proxmox/integration/` holds the build-tagged
+  (`//go:build integration`) suite, an env-configured client
+  (`PVE_ENDPOINT`/`PVE_TOKEN_ID`/`PVE_TOKEN_SECRET`, optional
+  `PVE_NODE`/`PVE_INSECURE_TLS`) that skips when unset, with a test mapped to
+  **every phase's Success Criterion**:
+  - **P1** version round-trip + task waiter (exercised by the lifecycle Waits);
+  - **P2** destructive create→start→snapshot→rollback→stop→delete for **both
+    QEMU** (`PVE_TEST_STORAGE`+`PVE_TEST_VMID`) **and LXC**
+    (`PVE_TEST_STORAGE`+`PVE_TEST_LXC_VMID`+`PVE_TEST_LXC_TEMPLATE`);
+  - **P3** ISO upload (`PVE_TEST_ISO_PATH`) + volume-chain snapshot lifecycle
+    (`PVE_TEST_VOLID`);
+  - **P4** define a resource-affinity HA rule + read-back (`PVE_TEST_HA_SIDS`);
+  - **P5** enumerate zones/VNets/fabrics;
+  - **P6** access user/token reads + VNC ticket mint (`PVE_TEST_VMID`).
+
+  Read-only tests are safe against any cluster; destructive tests are env-gated
+  and clean up after themselves. It compiles under `go vet -tags=integration`
+  and skips cleanly with no node here; **running it against a live 9.x node (and
+  capturing the go-vcr cassettes for CI replay) is the deferred,
+  environment-blocked remainder.**
+
+- [x] Table-driven tests for the `0/1`→bool + config-struct (un)marshalling —
+      `proxmox/types/types_test.go` covers `PVEBool` both directions; the
+      per-service lossless-decode tests cover config-struct (un)marshalling +
+      `Extra` round-trips.
+- [x] CI `version`-diff step: regenerate from `apidoc.js`, flag drift across 9.x
+      minors — `cmd/pve-schemadiff` (OQ-7) parses an `apidoc.js` dump into a
+      (method, path) set and diffs it against a committed baseline (`-update`
+      rebaselines); unit-tested against a synthetic fixture, wired into CI via
+      `just schemadiff` (test-go job). It runs against a committed synthetic
+      fixture here; pointing `-apidoc` at a real 9.x dump to guard the live REST
+      surface is the live-only remainder.
+- [x] `Example` functions compile + run under `go test`; `go doc ./...` renders
+      every package's overview (godoc coverage gate) — every service + `mockpve`
+      package ships a runnable `Example`; no `Skeleton` doc stubs remain.
 
 ## Dependencies
 

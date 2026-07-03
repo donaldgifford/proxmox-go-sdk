@@ -1,5 +1,77 @@
 # Changelog
 
-All notable changes to this project are documented here. The format is based on
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
-adheres to [Semantic Versioning](https://semver.org/).
+All notable changes to this project are documented here. The format is
+based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
+this project adheres to [Semantic Versioning](https://semver.org/).
+
+## [unreleased]
+
+### Features
+
+- *(types,pverr)* Primitives + typed error taxonomy
+- *(api)* Low-level transport, connection failover, credentials
+- *(version)* Capability snapshot + per-minor 9.x gates
+- *(tasks)* UPID decode + completion waiters
+- *(mockpve)* In-memory PVE responder + standalone server
+- *(proxmox)* Unified client NewClient + accessors + options
+- *(qemu)* VM list/status/config/create/clone/delete service
+- *(qemu)* Power ops start/stop/shutdown/reboot/suspend/resume
+- *(qemu)* Migrate + disk/NIC add/resize/remove
+- *(qemu)* Snapshots list/create/rollback/delete
+- *(qemu)* Guest-agent exec, ping, and exec-wait
+- *(lxc)* Container CRUD + power on a shared svcutil base
+- *(lxc)* Container snapshots (list/create/rollback/delete)
+- *(lxc)* Pull OCI images as container templates (9.1+)
+- *(storage)* Datastore list/status + content listing
+- *(storage,qemu)* Volume allocate/free + guest-scoped disk move
+- *(storage)* Volume-chain snapshots, gated on 9.1
+- *(storage,api)* Streaming ISO/disk-image upload via DoUpload
+- *(ssh)* SFTP/exec side-channel for non-REST ops
+- *(storage)* ZFS pool ops + RAIDZ-expansion capability gate
+- *(ha)* Cluster-scoped HA resource management
+- *(ha)* HA rules — node-affinity + resource-affinity
+- *(ha)* CRS scheduler settings read/write
+- *(ha)* Dynamic Load Balancer controls (9.2+)
+- *(ha)* Arm/Disarm cluster-wide HA switch (9.2, stub)
+- *(ha)* Storage/ZFS replication jobs
+- *(nodes)* Node networking (Phase 5 task 1)
+- *(sdn)* SDN zones, VNets, subnets + ApplySDN (Phase 5 task 2)
+- *(sdn)* SDN fabrics with 9.2 protocol gate (Phase 5 task 3)
+- *(sdn)* SDN live-status stubs returning ErrUnsupported (Phase 5 task 4)
+- *(firewall)* Scoped firewall — cluster/node/guest (Phase 5 task 5)
+- *(cluster)* Cluster resources, status, options (Phase 6 task 1)
+- *(access)* Users, groups, roles, ACLs, API tokens (Phase 6 tasks 2-3)
+- *(nodes)* Apt, disks/SMART, certificates + ACME node admin (Phase 6 task 4)
+- *(metrics)* RRD/status reads, metric servers, OTel stub (Phase 6 task 5)
+- *(ceph)* Pools, OSDs, status; RBD mirroring stub (Phase 6 task 6)
+- *(pbs)* PVE-side backup jobs, vzdump, restore (Phase 6 task 7)
+- *(console)* Mint console tickets + VNC Connect over DoWebSocket
+- *(schemadiff)* Add pve-schemadiff API schema-drift tool (OQ-7)
+
+### Bug Fixes
+
+- *(security)* Address PR security-scanner findings
+
+### Documentation
+
+- *(proxmox)* Promote Phase 1 doc.go stubs + runnable examples
+- *(qemu,lxc)* Runnable package Examples + promote doc.go overviews
+- *(storage,ssh)* Runnable Examples; complete Phase 3
+- *(ha)* Promote doc.go + runnable Example; complete Phase 4
+- *(sdn,firewall,nodes)* Promote doc.go + node-network Example (Phase 5 task 6)
+- *(examples)* Promote Phase 6 docs + success-flow examples
+
+### Testing
+
+- *(qemu,lxc)* End-to-end lifecycle covering the Phase 2 criterion
+- *(integration)* Add build-tagged live-node harness (OQ-5)
+- *(integration)* Add LXC lifecycle to cover Phase 2 "both QEMU and LXC"
+- *(integration)* Cover phases 3-5 criteria in the live harness
+
+### Miscellaneous Tasks
+
+- *(lint)* Exclude local/generated files from yamlfmt + markdownlint
+- *(tooling)* Make yamlfmt config auto-discoverable + tidy perms
+- Fix Test Go / TruffleHog / Build snapshot failures
+- Skip signing in the goreleaser snapshot validation
+

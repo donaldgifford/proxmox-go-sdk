@@ -15,6 +15,14 @@ test:
 run *args:
     go run ./cmd/mockpve {{args}}
 
+# Guard the API schema against drift (OQ-7). Runs against the committed synthetic
+# fixture by default; point --apidoc at a real Proxmox apidoc.js (from a live 9.x
+# node) to guard the live REST surface, and re-run with `-update` to rebaseline.
+schemadiff *args:
+    go run ./cmd/pve-schemadiff \
+        -apidoc cmd/pve-schemadiff/testdata/apidoc.sample.js \
+        -baseline cmd/pve-schemadiff/testdata/baseline.json {{args}}
+
 # Lint Go + yaml + Actions workflows + markdown + format
 lint:
     golangci-lint run

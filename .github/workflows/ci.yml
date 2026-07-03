@@ -56,6 +56,9 @@ jobs:
       - name: Run unit tests
         run: just test
 
+      - name: Check API schema drift
+        run: just schemadiff
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v6
         with:
@@ -106,11 +109,19 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # commons is a source-only library release. This snapshot validates
-      # the .goreleaser.yml config and that the source archive builds; it
-      # produces no binaries to SBOM-scan.
+      # syft is required by the .goreleaser.yml sboms block, which catalogs the
+      # mockpve helper archives. mise installs it (per mise.toml) onto PATH.
+      - name: Set up mise (for syft)
+        uses: jdx/mise-action@v4
+        with:
+          experimental: true
+
+      # This snapshot validates the .goreleaser.yml config end to end: it builds
+      # the mockpve helper archives and SBOM-scans them with syft. Signing is
+      # skipped — the signs block needs GPG_FINGERPRINT + a key, which are
+      # release-only secrets absent from a PR snapshot.
       - name: Validate goreleaser config (snapshot)
         uses: goreleaser/goreleaser-action@v7.1.0
         with:
           version: "~> v2"
-          args: release --snapshot --skip=publish --clean
+          args: release --snapshot --skip=publish,sign --clean

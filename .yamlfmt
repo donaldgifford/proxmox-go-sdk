@@ -1,0 +1,31 @@
+# $schema=https://www.schemastore.org/yamlfmt.json
+# yamlfmt configuration.
+#
+# This file MUST be named `.yamlfmt` (no extension): yamlfmt auto-discovers
+# `.yamlfmt`, `yamlfmt.yml`, and `yamlfmt.yaml`, but NOT `.yamlfmt.yml`. Keep
+# every setting here so `just fmt`'s bare `yamlfmt .` picks them up.
+formatter:
+  type: basic
+  indent: 2
+  # include_document_start keeps the leading `---` that yamllint's document-start
+  # rule wants; retain_line_breaks preserves curated blank-line grouping. Without
+  # them yamlfmt's defaults fight yamllint and churn every config file.
+  include_document_start: true
+  line_ending: lf
+  retain_line_breaks: true
+  max_line_length: 120
+  scan_folded_as_literal: false
+  indentless_arrays: false
+  drop_merge_tag: false
+  pad_line_comments: 2
+  trim_trailing_whitespace: true
+  # Don't force array/map style - preserve existing flow/block formatting
+  # This allows compact inline syntax like {name: foo, key: bar} and [ALL]
+  retain_line_breaks_single: true
+
+# Mirror the yamllint ignore for mkdocs.yml: it follows MkDocs conventions
+# (4-space nav-sequence indentation) that yamlfmt would otherwise rewrite,
+# producing churn on every `just fmt`. Keep `just fmt` and `just lint` agreed
+# on leaving it alone.
+exclude:
+  - mkdocs.yml
