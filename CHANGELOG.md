@@ -15,6 +15,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 ### Testing
 
 - *(integration)* Add go-vcr record/replay harness with secret redaction
+- Autoload .env for the integration suite (1Password/op run friendly)
 
 ## [0.1.0] - 2026-07-03
 
