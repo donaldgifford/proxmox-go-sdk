@@ -145,6 +145,45 @@ Every variable:
 | `PVE_TEST_VOLID`        | gate     | existing volume to snapshot + clean up    |
 | `PVE_TEST_HA_SIDS`      | gate     | CSV of ≥2 HA-managed SIDs                 |
 
+### How the harness finds these values
+
+The suite reads the variables from the process environment. There are three ways
+to get them there — the harness makes all three work, and **a value already
+present in the environment always wins**:
+
+1. **Export + run** (what Step 4 shows) — `source` a file of `export KEY=…`
+   lines, then `go test`; the child process inherits the exported vars.
+2. **`op run`** (1Password secret references) — if your file holds `op://…`
+   references rather than literal values, the SDK does **not** resolve them; run
+   the suite under 1Password's own resolver:
+
+   ```sh
+   op run --env-file=.env -- \
+     go test -tags=integration ./proxmox/integration/... -run 'Reads|Version' -v
+   ```
+
+   `op run` reads the file once, resolves each `op://…` ref, and hands real
+   values to `go test`. The vars are then already set, so the autoloader (below)
+   does nothing.
+
+3. **Autoload a dotenv file** — if the required vars are **not** already set, a
+   `TestMain` in the suite loads `.env.local` (then `.env`) from the repo root
+   with `godotenv`, so a plain `go test -tags=integration …` picks them up with
+   no `source` at all. It only reads a file when the creds are missing and never
+   overrides a var you set yourself. Because it does not resolve `op://…`, a
+   file of raw 1Password references autoloaded this way sets the literal
+   `op://…` strings and the node answers **401** (not a skip) — that is the
+   signal to use `op run` (option 2) instead.
+
+> **1Password `.env` mounted as a FIFO.** If 1Password mounts your `.env` as a
+> named pipe (`prw-------` in `ls -l`), it is **single-use and blocks until a
+> reader connects** — `source .env` twice, or letting both `op run` _and_ the
+> autoloader read it, drains it. Pick **one** reader: either
+> `op run --env-file=.env -- …` (resolves `op://…` refs), or, if the pipe
+> already yields resolved `KEY=value` pairs, `set -a; source .env; set +a` once
+> and then `go test`. The autoloader deliberately skips the file whenever the
+> creds are already exported, so it never competes with your `op run`.
+
 ## Step 4 — Smoke test (read-only, safe anywhere)
 
 Start with the read-only tests. They mutate nothing and prove auth + TLS + the

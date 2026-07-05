@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,11 +13,82 @@ import (
 	"testing"
 	"time"
 
+	"github.com/joho/godotenv"
 	"gopkg.in/dnaeon/go-vcr.v4/pkg/recorder"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
 )
+
+// TestMain autoloads PVE_* credentials from a .env (or .env.local) at the module
+// root before the live suite runs, so a contributor can keep their token in a
+// file instead of exporting it into every shell. Precedence is the important
+// part: if the three required vars are already set in the environment, no file is
+// read at all — explicit `export`s, CI-injected secrets, and
+// `op run --env-file=… -- go test …` all take priority. A 1Password-mounted .env
+// works too, but because it is typically a single-use FIFO, the loader only opens
+// it when the creds are otherwise unset (opening a pipe twice would block or
+// consume a one-shot secret). The loader never resolves `op://` references
+// itself; a file of literal `op://…` refs must be run under `op run`.
+func TestMain(m *testing.M) {
+	loadDotEnv()
+	os.Exit(m.Run())
+}
+
+// loadDotEnv fills the PVE credential vars from a dotenv file at the module root,
+// but only when they are not already present. Under `go test` the working
+// directory is the package dir, so a repo-root .env would otherwise be missed. It
+// stats (never opens) each candidate first, so a missing file is skipped and a
+// 1Password FIFO is left untouched unless it is actually needed, then stops as
+// soon as the creds are satisfied so a second candidate (possibly a single-use
+// pipe) is not opened needlessly.
+func loadDotEnv() {
+	if credsSet() {
+		return // env already has them (explicit export / op run / CI): leave files alone
+	}
+	root := moduleRoot()
+	if root == "" {
+		return
+	}
+	// .env.local (git-ignored, personal) wins over a shared .env.
+	for _, name := range []string{".env.local", ".env"} {
+		path := filepath.Join(root, name)
+		if _, err := os.Stat(path); err != nil {
+			continue // missing/unstattable: nothing to load (stat never opens a FIFO)
+		}
+		if err := godotenv.Load(path); err != nil {
+			fmt.Fprintf(os.Stderr, "integration: load %s: %v\n", name, err)
+			return
+		}
+		if credsSet() {
+			return
+		}
+	}
+}
+
+// credsSet reports whether the three required credential vars are all present.
+func credsSet() bool {
+	return os.Getenv(envEndpoint) != "" && os.Getenv(envTokenID) != "" && os.Getenv(envTokenSecret) != ""
+}
+
+// moduleRoot returns the nearest ancestor of the working directory that contains
+// a go.mod, or "" if none is found.
+func moduleRoot() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	for {
+		if _, statErr := os.Stat(filepath.Join(dir, "go.mod")); statErr == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+}
 
 // Environment variables the harness reads. Endpoint + token are required;
 // without them every test skips, so the suite is a no-op unless a live 9.x node
