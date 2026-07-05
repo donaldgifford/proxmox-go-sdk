@@ -9,6 +9,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 ### Bug Fixes
 
 - *(integration)* Record every task-status poll, bound teardown
+- *(tasks)* Treat task exit status "WARNINGS: N" as success
 
 ### Documentation
 
