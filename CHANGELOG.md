@@ -10,6 +10,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Add SECURITY, CONTRIBUTING, USAGE, and DEVELOPMENT guides
 - Add TESTING.md live-node + recording walkthrough
+- *(inv)* Add INV-0001 — nested Proxmox nodes for live SDK testing
 
 ### Testing
 
