@@ -1,0 +1,9 @@
+# Recorded go-vcr cassettes are captured locally against a live node
+# (PVE_RECORD=1; see TESTING.md) and reviewed before committing. Ignore them by
+# default so a record run cannot accidentally commit un-reviewed cluster data.
+#
+# To commit a reviewed cassette, force-add it:  git add -f <name>.yaml
+*.yaml
+*.yml
+!.gitignore
+!README.md

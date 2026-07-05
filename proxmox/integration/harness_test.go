@@ -4,9 +4,15 @@ package integration
 
 import (
 	"context"
+	"crypto/tls"
+	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	"gopkg.in/dnaeon/go-vcr.v4/pkg/recorder"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
@@ -21,6 +27,7 @@ const (
 	envTokenSecret = "PVE_TOKEN_SECRET" // the token's secret UUID
 	envNode        = "PVE_NODE"         // node under test, default "pve"
 	envInsecureTLS = "PVE_INSECURE_TLS" // "1" to skip TLS verify (self-signed)
+	envRecord      = "PVE_RECORD"       // "1" to record go-vcr cassettes while running
 
 	// Destructive-test gates. Absent -> the corresponding test skips.
 	envTestStorage     = "PVE_TEST_STORAGE"      // target storage for a scratch guest disk / uploads
@@ -43,8 +50,21 @@ func newClient(t *testing.T) *proxmox.Client {
 		t.Skipf("live PVE node not configured (set %s, %s, %s)", envEndpoint, envTokenID, envTokenSecret)
 	}
 
+	insecure := os.Getenv(envInsecureTLS) == "1"
+
 	var opts []proxmox.Option
-	if os.Getenv(envInsecureTLS) == "1" {
+	switch {
+	case os.Getenv(envRecord) == "1":
+		// Recording: the SDK must use the go-vcr client, which bypasses the
+		// SDK's own TLS options, so the insecure choice is applied to the
+		// recorder's real transport instead.
+		rt := http.DefaultTransport
+		if insecure {
+			rt = insecureTransport()
+		}
+		client := newRecorderClient(t, cassetteName(t), recorder.ModeRecordOnly, rt)
+		opts = append(opts, proxmox.WithHTTPClient(client))
+	case insecure:
 		opts = append(opts, proxmox.WithInsecureSkipVerify(true))
 	}
 
@@ -55,6 +75,24 @@ func newClient(t *testing.T) *proxmox.Client {
 		t.Fatalf("NewClient(%s): %v", endpoint, err)
 	}
 	return c
+}
+
+// cassetteDir is where recorded cassettes live, relative to this package.
+const cassetteDir = "testdata/cassettes"
+
+// cassetteName maps the running test to its cassette path (without .yaml), so
+// each test records to and replays from its own fixture.
+func cassetteName(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(cassetteDir, strings.ReplaceAll(t.Name(), "/", "_"))
+}
+
+// insecureTransport is the real transport used while recording against a live
+// self-signed node (PVE_INSECURE_TLS=1); it mirrors the SDK's own opt-in.
+func insecureTransport() http.RoundTripper {
+	return &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12}, //nolint:gosec // opt-in for self-signed PVE, matches the SDK
+	}
 }
 
 // testNode returns the node under test (PVE_NODE, default "pve").
