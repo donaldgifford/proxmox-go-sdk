@@ -9,6 +9,13 @@ Design docs, plans, and implementation docs can reference investigations by ID
 (e.g. `INV-0001`) to document how open questions were resolved.
 
 <!-- BEGIN DOCZ AUTO-GENERATED -->
+
+## All Investigations
+
+| ID       | Title                                               | Status | Date       | Author         | Link                                                                                                                       |
+| -------- | --------------------------------------------------- | ------ | ---------- | -------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| INV-0001 | Nested Proxmox nodes for automated live SDK testing | Open   | 2026-07-05 | Donald Gifford | [0001-nested-proxmox-nodes-for-automated-live-sdk-testing.md](0001-nested-proxmox-nodes-for-automated-live-sdk-testing.md) |
+
 <!-- END DOCZ AUTO-GENERATED -->
 <!-- BEGIN DOCZ AUTO-GENERATED -->
 <!-- END DOCZ AUTO-GENERATED -->
