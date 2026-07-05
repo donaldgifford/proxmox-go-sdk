@@ -9,6 +9,11 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 ### Documentation
 
 - Add SECURITY, CONTRIBUTING, USAGE, and DEVELOPMENT guides
+- Add TESTING.md live-node + recording walkthrough
+
+### Testing
+
+- *(integration)* Add go-vcr record/replay harness with secret redaction
 
 ## [0.1.0] - 2026-07-03
 
