@@ -3,14 +3,20 @@ package tasks
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/pverr"
 )
 
-// exitOK is the PVE exit status string for a task that succeeded.
+// exitOK is the PVE exit status string for a task that succeeded cleanly.
 const exitOK = "OK"
+
+// warnPrefix is the exit status prefix PVE uses when a task completes but logs
+// non-fatal warnings, e.g. "WARNINGS: 1". The operation still succeeded (an LXC
+// create routinely finishes this way), so it counts as success, not failure.
+const warnPrefix = "WARNINGS:"
 
 // Status is a task's status as reported by GET /nodes/{node}/tasks/{upid}/status.
 type Status struct {
@@ -34,8 +40,17 @@ func (s *Status) Running() bool { return s.State == "running" }
 // Done reports whether the task has exited (successfully or not).
 func (s *Status) Done() bool { return s.State == "stopped" }
 
-// OK reports whether the task exited successfully.
-func (s *Status) OK() bool { return s.ExitStatus == exitOK }
+// OK reports whether the task exited successfully. PVE reports a clean success
+// as "OK" and a success-with-non-fatal-warnings as "WARNINGS: N" (the operation
+// still completed) — both count as success. Any other exit status is a real
+// failure. Use [Status.Warnings] to distinguish the two successes.
+func (s *Status) OK() bool {
+	return s.ExitStatus == exitOK || strings.HasPrefix(s.ExitStatus, warnPrefix)
+}
+
+// Warnings reports whether the task completed but logged non-fatal warnings
+// (exit status "WARNINGS: N"). Such a task is still [Status.OK].
+func (s *Status) Warnings() bool { return strings.HasPrefix(s.ExitStatus, warnPrefix) }
 
 // LogLine is one line of a task log from GET /nodes/{node}/tasks/{upid}/log.
 type LogLine struct {

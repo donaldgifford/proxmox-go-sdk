@@ -560,9 +560,19 @@ environment.** This shapes how we test and what "done" means:
   SDK request (method+URL) — the fastest way to see a silent poll loop.
 - **First live verification (user-run, 9.2 node `r740a`):** `TestQEMULifecycle`
   passes end-to-end (create → start → snapshot → rollback → stop → delete) with
-  `PVE_RECORD=1` — the Phase 2 QEMU live Success Criterion is now **live-verified**
-  (rollback-while-running worked on real PVE). The LXC half and the other phases'
-  live criteria remain written-but-unverified until run against the node.
+  `PVE_RECORD=1` — the Phase 2 QEMU live Success Criterion is now
+  **live-verified** (rollback-while-running worked on real PVE). The LXC half
+  and the other phases' live criteria remain written-but-unverified until run
+  against the node.
+- **Task exit status `WARNINGS: N` is success, not failure.** PVE finishes some
+  tasks (routinely an LXC create on a modern-systemd template — e.g. debian-13's
+  "Systemd 257 detected. You may need to enable nesting.") with exit status
+  `WARNINGS: N`: the operation completed. `tasks.Status.OK()` treats `OK` and
+  `WARNINGS: N` as success; `tasks.Status.Warnings()` flags the latter so a
+  consumer can log/inspect it. `tasks.Wait` returns **nil** for a warnings task
+  (it is a warning, not an error — modelling it as a sentinel error would make a
+  naive `if err != nil` fail a benign result). Found live on debian-13 LXC
+  create; unit-guarded by `TestWaitWarningsIsSuccess`.
 - Integration tests live in `proxmox/integration/` behind
   `//go:build integration`, read the node from `PVE_ENDPOINT` / `PVE_TOKEN_ID` /
   `PVE_TOKEN_SECRET` (optional `PVE_NODE` / `PVE_INSECURE_TLS` / `PVE_RECORD`).

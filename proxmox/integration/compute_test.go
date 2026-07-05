@@ -158,7 +158,11 @@ func TestLXCLifecycle(t *testing.T) {
 	}
 	mustSucceed(t, ts, ref, "snapshot")
 
-	ref, err = ct.RollbackSnapshot(testCtx(t), vmid, "itest0")
+	// A container snapshot has no vmstate, so a plain rollback leaves the CT
+	// stopped — and pct stop then 500s ("not running"), unlike qm stop. Roll back
+	// with start-after so the container is running again for the Stop step below
+	// (and to exercise that option).
+	ref, err = ct.RollbackSnapshot(testCtx(t), vmid, "itest0", lxc.WithStartAfterRollback())
 	if err != nil {
 		t.Fatalf("RollbackSnapshot: %v", err)
 	}
@@ -172,7 +176,10 @@ func TestLXCLifecycle(t *testing.T) {
 	mustSucceed(t, ts, ref, "stop")
 }
 
-// mustSucceed waits for a task and fails the test unless it ends OK.
+// mustSucceed waits for a task and fails the test unless it ends OK. A task that
+// finishes "WARNINGS: N" (e.g. an LXC create on a modern-systemd template) still
+// counts as success — st.OK() is true — but the warning is logged so it is not
+// silently swallowed.
 func mustSucceed(t *testing.T, ts *tasks.Service, ref tasks.Ref, step string) {
 	t.Helper()
 	st, err := ts.Wait(testCtx(t), ref)
@@ -181,5 +188,8 @@ func mustSucceed(t *testing.T, ts *tasks.Service, ref tasks.Ref, step string) {
 	}
 	if !st.OK() {
 		t.Fatalf("%s task exited %q, want OK", step, st.ExitStatus)
+	}
+	if st.Warnings() {
+		t.Logf("%s completed with warnings (%s)", step, st.ExitStatus)
 	}
 }

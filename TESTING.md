@@ -58,7 +58,7 @@ Decide up front, and write them down:
 | Scratch storage | `local-lvm`                       | must allow `images` + `iso` |
 | Scratch QEMU ID | `9101`                            | must be unused              |
 | Scratch LXC ID  | `9102`                            | must be unused              |
-| LXC template    | `local:vztmpl/debian-12-…tar.zst` | `pveam list local`          |
+| LXC template    | `local:vztmpl/debian-13-…tar.zst` | `pveam list local`          |
 
 ## Step 1 — Create an API token
 
@@ -121,7 +121,7 @@ export PVE_INSECURE_TLS=1      # if the node uses a self-signed cert
 export PVE_TEST_STORAGE="local-lvm"
 export PVE_TEST_VMID=9101
 export PVE_TEST_LXC_VMID=9102
-export PVE_TEST_LXC_TEMPLATE="local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst"
+export PVE_TEST_LXC_TEMPLATE="local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
 export PVE_TEST_ISO_PATH="/path/to/tiny.iso"
 export PVE_TEST_VOLID="local-lvm:vm-9101-disk-0"
 export PVE_TEST_HA_SIDS="vm:9101,vm:9102"
