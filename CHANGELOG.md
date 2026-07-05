@@ -6,6 +6,10 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [unreleased]
 
+### Bug Fixes
+
+- *(integration)* Record every task-status poll, bound teardown
+
 ### Documentation
 
 - Add SECURITY, CONTRIBUTING, USAGE, and DEVELOPMENT guides
