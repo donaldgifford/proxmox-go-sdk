@@ -124,8 +124,12 @@ The SDK was developed without access to a live Proxmox cluster or recorded API
 cassettes. Everything is verified against `mockpve`, which is faithful to the
 REST envelope but does **not** run a real hypervisor, scheduler, or storage
 backend. A set of acceptance criteria can therefore only be confirmed by running
-against real hardware. **This section is for you to work through manually on a
-reachable 9.x node** (and a 9.2 node for `9.2+` gated operations).
+against real hardware.
+
+**→ [TESTING.md](TESTING.md) is the full step-by-step walkthrough** — creating
+an API token, configuring the environment, running each lifecycle test one at a
+time, and recording `go-vcr` cassettes. This section is only the summary and the
+"what's unverified" context.
 
 ### What is written-but-unverified
 
@@ -145,57 +149,22 @@ against real PVE:
 - The live **VNC (RFB) wire payload** from `console.Connect` (the WebSocket
   upgrade + duplex plumbing is mock-verified; the RFB bytes are not).
 
-### Prerequisites
+### Running it
 
-- A reachable Proxmox VE **9.0+** node (plus a **9.2** node to exercise `9.2+`
-  gated ops).
-- An API token (`user@realm!tokenid` + secret) with enough privilege for the
-  operations you intend to test.
-- For self-signed clusters, set `PVE_INSECURE_TLS=1`.
-
-> **Use a scratch cluster / disposable guest IDs.** The destructive tests below
-> create and delete VMs, containers, volumes, snapshots, and HA rules. They
-> clean up after themselves, but run them somewhere you can afford to break.
-
-### Environment variables
-
-The integration harness (`proxmox/integration/`) is configured entirely through
-the environment. Read-only tests need only the first three; each destructive
-test is gated behind its own variable and skips when unset.
-
-| Variable                | Required | Purpose                                          |
-| ----------------------- | -------- | ------------------------------------------------ |
-| `PVE_ENDPOINT`          | yes      | e.g. `https://pve.example:8006`                  |
-| `PVE_TOKEN_ID`          | yes      | e.g. `root@pam!sdk`                              |
-| `PVE_TOKEN_SECRET`      | yes      | the token's secret                               |
-| `PVE_NODE`              | no       | node under test (default `pve`)                  |
-| `PVE_INSECURE_TLS`      | no       | `1` to skip TLS verify (self-signed)             |
-| `PVE_TEST_STORAGE`      | gate     | target storage for scratch disks / uploads       |
-| `PVE_TEST_VMID`         | gate     | scratch QEMU VMID the suite may create/destroy   |
-| `PVE_TEST_LXC_VMID`     | gate     | scratch LXC VMID the suite may create/destroy    |
-| `PVE_TEST_LXC_TEMPLATE` | gate     | OS template volid for the LXC lifecycle          |
-| `PVE_TEST_ISO_PATH`     | gate     | local path to a small ISO to upload (Phase 3)    |
-| `PVE_TEST_VOLID`        | gate     | existing volume to snapshot + clean up (Phase 3) |
-| `PVE_TEST_HA_SIDS`      | gate     | CSV of ≥2 HA-managed SIDs (Phase 4)              |
-
-### Running the suite
-
-The tests are excluded from the default build; enable them with the
-`integration` tag:
+The full procedure — token creation, environment setup, the read-only smoke
+test, each destructive lifecycle test, the acceptance-criteria checklist, and
+recording cassettes — lives in **[TESTING.md](TESTING.md)**. The short version:
 
 ```sh
 export PVE_ENDPOINT="https://pve.example:8006"
-export PVE_TOKEN_ID="root@pam!sdk"
-export PVE_TOKEN_SECRET="..."
-export PVE_INSECURE_TLS=1          # if self-signed
+export PVE_TOKEN_ID="root@pam!sdk" PVE_TOKEN_SECRET="…"
+export PVE_INSECURE_TLS=1   # if self-signed
 
-# read-only tests only (safe on any cluster)
+# read-only smoke test (safe on any cluster)
 go test -tags=integration ./proxmox/integration/... -run 'Reads|Version' -v
 
-# enable a destructive lifecycle test by setting its gate(s)
-export PVE_TEST_STORAGE="local-lvm"
-export PVE_TEST_VMID=9101
-go test -tags=integration ./proxmox/integration/... -run QEMU -v
+# record cassettes while running (secrets are redacted before write)
+PVE_RECORD=1 go test -tags=integration ./proxmox/integration/... -run … -v
 ```
 
 Compile-check the harness without a node:
@@ -204,35 +173,16 @@ Compile-check the harness without a node:
 go vet -tags=integration ./proxmox/integration/...
 ```
 
-### Acceptance-criteria checklist
+### Recording (go-vcr)
 
-Work through these against a live node and tick each one off. They map to the
-per-phase Success Criteria in `docs/impl/0001-proxmox-ve-9x-sdk-coverage.md`.
+`PVE_RECORD=1` records each exchange into
+`proxmox/integration/testdata/cassettes/` with credentials redacted before
+write. The redaction is guarded by `TestRedactInteraction` /
+`TestRecorderRecordReplay`, which run in the normal suite (no node needed):
 
-- [ ] **Phase 1 — foundation:** auth + `GET /version` round-trips against a live
-      9.x node; the task waiters drive a real start/stop task to completion.
-- [ ] **Phase 2 — compute:** create → start → snapshot → rollback → stop →
-      delete runs end-to-end for **both QEMU and LXC** (`PVE_TEST_STORAGE` +
-      `PVE_TEST_VMID`, and `+ PVE_TEST_LXC_VMID` + `PVE_TEST_LXC_TEMPLATE`).
-- [ ] **Phase 3 — storage:** upload an ISO (`PVE_TEST_ISO_PATH`), create a
-      volume-chain snapshot where supported and clean it up (`PVE_TEST_VOLID`);
-      confirm the provisional volume-chain-snapshot endpoint path.
-- [ ] **Phase 4 — HA:** define a resource-affinity rule (`PVE_TEST_HA_SIDS`),
-      read it back, **and observe the scheduler honor the placement** (the mock
-      does not schedule — this half is live-only).
-- [ ] **Phase 5 — network/SDN:** enumerate zones / VNets / fabrics without
-      error; confirm whether a real **SDN live-status** endpoint exists (the SDK
-      currently returns `ErrUnsupported`).
-- [ ] **Phase 6 — cluster/access/console:** list users/tokens under the 9.x
-      privilege model; mint a VNC ticket and **drive a real RFB session**
-      through `console.Connect` (`PVE_TEST_VMID`).
-- [ ] **9.2-gated ops:** on a 9.2 node, confirm the real endpoints (or absence)
-      behind Dynamic Load Balancer, HA arm/disarm, SDN BGP fabrics, ZFS RAIDZ
-      expansion, and token-secret rotation.
+```sh
+go test ./proxmox/integration/... -run 'Redact|RecordReplay' -v
+```
 
-### Capturing cassettes for CI (deferred)
-
-Once a live node is reachable, the recorded-corpus → `go-vcr` cassette pipeline
-(so CI can replay real responses without a cluster) can be captured and used to
-seed `mockpve`. `mockpve` is built to accept that corpus later without redesign.
-Until then, `mockpve` remains the source of truth for automated tests.
+Cassettes are git-ignored until reviewed; wiring committed cassettes into CI
+replay is a planned follow-up. See [TESTING.md](TESTING.md#recording-cassettes).

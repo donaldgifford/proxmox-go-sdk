@@ -532,19 +532,38 @@ environment.** This shapes how we test and what "done" means:
   fuzzed-`mockpve` pipeline (OQ-4/5/10) is a capture step deferred until a live
   9.x node is reachable; `mockpve` is built so that corpus can seed it later
   without redesign.
+- **The go-vcr record/replay harness now EXISTS**
+  (`proxmox/integration/ recorder_test.go`, non-tagged so it runs in the default
+  suite): a `BeforeSaveHook` redacts secrets (Authorization/Cookie/CSRF headers,
+  password/secret/otp form fields, ticket/CSRF/token-value response bodies) to
+  `REDACTED` **before** the cassette hits disk; a method+URL matcher
+  (`matchMethodURL`) tolerates the redacted headers on replay. `newRecorder`/
+  `newRecorderClient` inject a go-vcr `*http.Client` via
+  `proxmox.WithHTTPClient` (which bypasses the SDK's TLS opts, so record mode
+  applies insecure-TLS to the recorder's real transport instead).
+  `TestRedactInteraction` + `TestRecorderRecordReplay` prove
+  record→redact→replay end-to-end against `mockpve` (server closed before
+  replay) and run in CI — real verification here, no node. **Capturing real
+  cassettes is still live-only** (I cannot reach a node); the harness records to
+  `proxmox/integration/testdata/cassettes/` under `PVE_RECORD=1`, git-ignored
+  until reviewed. Wiring committed cassettes into CI replay is a deliberate
+  follow-up. **`TESTING.md`** is the thorough manual walkthrough (token creation
+  → env → per-phase lifecycle runs → recording); `DEVELOPMENT.md`'s live-node
+  section now points at it.
 - Integration tests live in `proxmox/integration/` behind
   `//go:build integration`, read the node from `PVE_ENDPOINT` / `PVE_TOKEN_ID` /
-  `PVE_TOKEN_SECRET` (optional `PVE_NODE` / `PVE_INSECURE_TLS`). Read-only tests
-  cover every phase; destructive tests are env-gated: QEMU lifecycle
-  (`PVE_TEST_STORAGE` + `PVE_TEST_VMID`), LXC lifecycle (`+PVE_TEST_LXC_VMID` +
-  `PVE_TEST_LXC_TEMPLATE`), ISO upload (`PVE_TEST_ISO_PATH`), volume snapshot
-  (`PVE_TEST_VOLID`), HA resource-affinity rule (`PVE_TEST_HA_SIDS`). They are
-  **not runnable here** — they `t.Skip` without a node. The harness is
-  compile-verified (`go vet -tags=integration ./proxmox/integration/`) but its
-  execution + the go-vcr cassette capture are live-only. The package keeps an
-  untagged `doc.go` so the default `go build ./...` sees a non-empty package.
-  Never claim a phase's live-only Success Criteria pass when they cannot be
-  verified — mark them written-but-unverified instead.
+  `PVE_TOKEN_SECRET` (optional `PVE_NODE` / `PVE_INSECURE_TLS` / `PVE_RECORD`).
+  Read-only tests cover every phase; destructive tests are env-gated: QEMU
+  lifecycle (`PVE_TEST_STORAGE` + `PVE_TEST_VMID`), LXC lifecycle
+  (`+PVE_TEST_LXC_VMID` + `PVE_TEST_LXC_TEMPLATE`), ISO upload
+  (`PVE_TEST_ISO_PATH`), volume snapshot (`PVE_TEST_VOLID`), HA
+  resource-affinity rule (`PVE_TEST_HA_SIDS`). They are **not runnable here** —
+  they `t.Skip` without a node. The harness is compile-verified
+  (`go vet -tags=integration ./proxmox/integration/`) but its execution + the
+  go-vcr cassette capture are live-only. The package keeps an untagged `doc.go`
+  so the default `go build ./...` sees a non-empty package. Never claim a
+  phase's live-only Success Criteria pass when they cannot be verified — mark
+  them written-but-unverified instead.
 - Working definition of "done" for a task in this environment: typed op exists,
   `go build ./...` is clean, it is unit-tested against `mockpve`, and
   `just lint`
