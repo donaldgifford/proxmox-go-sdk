@@ -103,7 +103,13 @@ func newRecorder(t *testing.T, cassetteName string, mode recorder.Mode, realTran
 		recorder.WithHook(redactInteraction, recorder.BeforeSaveHook),
 		recorder.WithMatcher(matchMethodURL),
 		recorder.WithSkipRequestLatency(true),
-		recorder.WithReplayableInteractions(true),
+		// NOTE: WithReplayableInteractions is deliberately NOT set. A task-status
+		// poll loop makes many identical GETs to /tasks/{upid}/status; replayable
+		// interactions serve the first recording for all of them, so in record
+		// mode the network is only hit once and the task is frozen at its first
+		// state ("running") forever — Wait then never sees "stopped". Leaving it
+		// off records every poll as its own sequential interaction (running…,
+		// stopped) and replays them in order, one consumption each.
 	)
 	if err != nil {
 		t.Fatalf("new recorder for %q: %v", cassetteName, err)

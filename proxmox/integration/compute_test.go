@@ -3,7 +3,6 @@
 package integration
 
 import (
-	"context"
 	"os"
 	"strconv"
 	"testing"
@@ -51,12 +50,14 @@ func TestQEMULifecycle(t *testing.T) {
 	}
 	// Always attempt teardown, even on later failure.
 	t.Cleanup(func() {
-		dref, derr := q.Delete(context.Background(), vmid)
+		ctx, cancel := cleanupCtx()
+		defer cancel()
+		dref, derr := q.Delete(ctx, vmid)
 		if derr != nil {
 			t.Logf("cleanup Delete(%d): %v", vmid, derr)
 			return
 		}
-		if _, werr := ts.Wait(context.Background(), dref); werr != nil {
+		if _, werr := ts.Wait(ctx, dref); werr != nil {
 			t.Logf("cleanup Wait(delete): %v", werr)
 		}
 	})
@@ -130,12 +131,14 @@ func TestLXCLifecycle(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 	t.Cleanup(func() {
-		dref, derr := ct.Delete(context.Background(), vmid)
+		ctx, cancel := cleanupCtx()
+		defer cancel()
+		dref, derr := ct.Delete(ctx, vmid)
 		if derr != nil {
 			t.Logf("cleanup Delete(%d): %v", vmid, derr)
 			return
 		}
-		if _, werr := ts.Wait(context.Background(), dref); werr != nil {
+		if _, werr := ts.Wait(ctx, dref); werr != nil {
 			t.Logf("cleanup Wait(delete): %v", werr)
 		}
 	})

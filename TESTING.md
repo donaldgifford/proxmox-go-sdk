@@ -137,6 +137,7 @@ Every variable:
 | `PVE_NODE`              | no       | node under test (default `pve`)           |
 | `PVE_INSECURE_TLS`      | no       | `1` to skip TLS verify (self-signed)      |
 | `PVE_RECORD`            | no       | `1` to record cassettes while running     |
+| `PVE_DEBUG`             | no       | `1` to stream a line per SDK request      |
 | `PVE_TEST_STORAGE`      | gate     | storage for scratch disks / uploads       |
 | `PVE_TEST_VMID`         | gate     | scratch QEMU VMID (created + destroyed)   |
 | `PVE_TEST_LXC_VMID`     | gate     | scratch LXC VMID (created + destroyed)    |
@@ -347,15 +348,17 @@ follow-up, tracked separately.
 
 ## Troubleshooting
 
-| Symptom                                         | Likely cause / fix                                               |
-| ----------------------------------------------- | ---------------------------------------------------------------- |
-| `x509: certificate signed by unknown authority` | self-signed node — set `PVE_INSECURE_TLS=1`                      |
-| `401 authentication failure`                    | wrong `PVE_TOKEN_ID`/`PVE_TOKEN_SECRET`; id is `user@realm!name` |
-| `403` / `Permission check failed`               | token lacks a privilege — use a fuller role (see Step 1)         |
-| a test `SKIP`s                                  | a required `PVE_TEST_*` var is unset (expected)                  |
-| `ErrUnsupported`                                | op needs a newer 9.x minor, or has no confirmed REST endpoint    |
-| connection refused / timeout                    | wrong `PVE_ENDPOINT` host/port (`:8006`), or firewall            |
-| replay: `requested interaction not found`       | the cassette predates a code change — re-record it               |
+| Symptom                                         | Likely cause / fix                                                                                                            |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `x509: certificate signed by unknown authority` | self-signed node — set `PVE_INSECURE_TLS=1`                                                                                   |
+| `401 authentication failure`                    | wrong `PVE_TOKEN_ID`/`PVE_TOKEN_SECRET`; id is `user@realm!name`                                                              |
+| `403` / `Permission check failed`               | token lacks a privilege — use a fuller role (see Step 1)                                                                      |
+| a test `SKIP`s                                  | a required `PVE_TEST_*` var is unset (expected)                                                                               |
+| `ErrUnsupported`                                | op needs a newer 9.x minor, or has no confirmed REST endpoint                                                                 |
+| connection refused / timeout                    | wrong `PVE_ENDPOINT` host/port (`:8006`), or firewall                                                                         |
+| a step sits silent for a while                  | normal — the task waiter polls quietly; set `PVE_DEBUG=1` to see each request, and note each step is bounded by a 90s context |
+| `Wait(...): context deadline exceeded`          | the task never went terminal within 90s — run with `PVE_DEBUG=1` to watch the `/tasks/{upid}/status` poll loop                |
+| replay: `requested interaction not found`       | the cassette predates a code change — re-record it                                                                            |
 
 ## Safety and teardown
 

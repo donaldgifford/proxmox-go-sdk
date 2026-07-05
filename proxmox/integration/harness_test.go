@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -100,6 +101,7 @@ const (
 	envNode        = "PVE_NODE"         // node under test, default "pve"
 	envInsecureTLS = "PVE_INSECURE_TLS" // "1" to skip TLS verify (self-signed)
 	envRecord      = "PVE_RECORD"       // "1" to record go-vcr cassettes while running
+	envDebug       = "PVE_DEBUG"        // "1" to stream a debug line per SDK request to stderr
 
 	// Destructive-test gates. Absent -> the corresponding test skips.
 	envTestStorage     = "PVE_TEST_STORAGE"      // target storage for a scratch guest disk / uploads
@@ -138,6 +140,13 @@ func newClient(t *testing.T) *proxmox.Client {
 		opts = append(opts, proxmox.WithHTTPClient(client))
 	case insecure:
 		opts = append(opts, proxmox.WithInsecureSkipVerify(true))
+	}
+
+	// PVE_DEBUG=1 streams one debug line per SDK request to stderr (method+URL),
+	// so a silent task-poll loop is visible while diagnosing a slow/stuck step.
+	if os.Getenv(envDebug) == "1" {
+		opts = append(opts, proxmox.WithLogger(
+			slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))))
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -181,4 +190,13 @@ func testCtx(t *testing.T) context.Context {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	t.Cleanup(cancel)
 	return ctx
+}
+
+// cleanupCtx returns a bounded context for teardown. Cleanup runs after the test
+// body (often after a failure), so it cannot use testCtx's already-cancelled
+// context, but it must not use a bare context.Background() either: a wedged
+// delete/wait would then poll until the test binary's 10-minute timeout instead
+// of failing fast. The caller must cancel.
+func cleanupCtx() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), 90*time.Second)
 }

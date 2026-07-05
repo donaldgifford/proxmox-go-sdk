@@ -3,7 +3,6 @@
 package integration
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -66,12 +65,14 @@ func TestVolumeSnapshotLifecycle(t *testing.T) {
 	const snap = "itest0"
 
 	t.Cleanup(func() {
-		dref, derr := s.DeleteVolumeSnapshot(context.Background(), node, store, volid, snap)
+		ctx, cancel := cleanupCtx()
+		defer cancel()
+		dref, derr := s.DeleteVolumeSnapshot(ctx, node, store, volid, snap)
 		if derr != nil {
 			t.Logf("cleanup DeleteVolumeSnapshot: %v", derr)
 			return
 		}
-		if _, werr := ts.Wait(context.Background(), dref); werr != nil {
+		if _, werr := ts.Wait(ctx, dref); werr != nil {
 			t.Logf("cleanup Wait(delete snapshot): %v", werr)
 		}
 	})

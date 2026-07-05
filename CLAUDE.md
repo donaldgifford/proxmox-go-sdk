@@ -549,7 +549,20 @@ environment.** This shapes how we test and what "done" means:
   until reviewed. Wiring committed cassettes into CI replay is a deliberate
   follow-up. **`TESTING.md`** is the thorough manual walkthrough (token creation
   → env → per-phase lifecycle runs → recording); `DEVELOPMENT.md`'s live-node
-  section now points at it.
+  section now points at it. **The recorder must NOT set
+  `WithReplayableInteractions(true)`** — a task-status poll loop makes many
+  identical GETs to `/tasks/{upid}/status`, and that flag serves the first
+  recording ("running") for all of them, so in record mode the task never
+  reaches "stopped" and `tasks.Wait` spins to its deadline (found live; guarded
+  by `TestRecorderRecordsEachPoll`). Destructive-test teardown uses `cleanupCtx`
+  (90s), not `context.Background()`, so a wedged delete fails fast instead of
+  hanging to the 10-min binary panic. `PVE_DEBUG=1` streams one `slog` line per
+  SDK request (method+URL) — the fastest way to see a silent poll loop.
+- **First live verification (user-run, 9.2 node `r740a`):** `TestQEMULifecycle`
+  passes end-to-end (create → start → snapshot → rollback → stop → delete) with
+  `PVE_RECORD=1` — the Phase 2 QEMU live Success Criterion is now **live-verified**
+  (rollback-while-running worked on real PVE). The LXC half and the other phases'
+  live criteria remain written-but-unverified until run against the node.
 - Integration tests live in `proxmox/integration/` behind
   `//go:build integration`, read the node from `PVE_ENDPOINT` / `PVE_TOKEN_ID` /
   `PVE_TOKEN_SECRET` (optional `PVE_NODE` / `PVE_INSECURE_TLS` / `PVE_RECORD`).
