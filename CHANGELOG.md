@@ -10,6 +10,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 - *(integration)* Record every task-status poll, bound teardown
 - *(tasks)* Treat task exit status "WARNINGS: N" as success
+- *(api,storage)* Send Content-Length and correct multipart form on upload
 
 ### Documentation
 
