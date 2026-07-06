@@ -119,7 +119,9 @@ export PVE_INSECURE_TLS=1      # if the node uses a self-signed cert
 
 # --- destructive-test gates (set only the ones you want to run) ---
 export PVE_TEST_STORAGE="local-lvm"
+export PVE_TEST_ISO_STORAGE="local"   # ISO upload target (must allow "iso"); falls back to PVE_TEST_STORAGE
 export PVE_TEST_VMID=9101
+export PVE_TEST_CONSOLE_VMID=9103    # console-mint scratch VM; distinct so it runs alongside the lifecycle tests
 export PVE_TEST_LXC_VMID=9102
 export PVE_TEST_LXC_TEMPLATE="local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
 export PVE_TEST_ISO_PATH="/path/to/tiny.iso"
@@ -129,22 +131,24 @@ export PVE_TEST_HA_SIDS="vm:9101,vm:9102"
 
 Every variable:
 
-| Variable                | Required | Purpose                                   |
-| ----------------------- | -------- | ----------------------------------------- |
-| `PVE_ENDPOINT`          | yes      | base URL, e.g. `https://pve.example:8006` |
-| `PVE_TOKEN_ID`          | yes      | e.g. `root@pam!sdk`                       |
-| `PVE_TOKEN_SECRET`      | yes      | the token's secret                        |
-| `PVE_NODE`              | no       | node under test (default `pve`)           |
-| `PVE_INSECURE_TLS`      | no       | `1` to skip TLS verify (self-signed)      |
-| `PVE_RECORD`            | no       | `1` to record cassettes while running     |
-| `PVE_DEBUG`             | no       | `1` to stream a line per SDK request      |
-| `PVE_TEST_STORAGE`      | gate     | storage for scratch disks / uploads       |
-| `PVE_TEST_VMID`         | gate     | scratch QEMU VMID (created + destroyed)   |
-| `PVE_TEST_LXC_VMID`     | gate     | scratch LXC VMID (created + destroyed)    |
-| `PVE_TEST_LXC_TEMPLATE` | gate     | OS template volid for the LXC lifecycle   |
-| `PVE_TEST_ISO_PATH`     | gate     | local path to a small ISO to upload       |
-| `PVE_TEST_VOLID`        | gate     | existing volume to snapshot + clean up    |
-| `PVE_TEST_HA_SIDS`      | gate     | CSV of ≥2 HA-managed SIDs                 |
+| Variable                | Required | Purpose                                                    |
+| ----------------------- | -------- | ---------------------------------------------------------- |
+| `PVE_ENDPOINT`          | yes      | base URL, e.g. `https://pve.example:8006`                  |
+| `PVE_TOKEN_ID`          | yes      | e.g. `root@pam!sdk`                                        |
+| `PVE_TOKEN_SECRET`      | yes      | the token's secret                                         |
+| `PVE_NODE`              | no       | node under test (default `pve`)                            |
+| `PVE_INSECURE_TLS`      | no       | `1` to skip TLS verify (self-signed)                       |
+| `PVE_RECORD`            | no       | `1` to record cassettes while running                      |
+| `PVE_DEBUG`             | no       | `1` to stream a line per SDK request                       |
+| `PVE_TEST_STORAGE`      | gate     | storage for scratch disks / uploads                        |
+| `PVE_TEST_ISO_STORAGE`  | gate     | ISO-upload storage (allows `iso`); else `PVE_TEST_STORAGE` |
+| `PVE_TEST_VMID`         | gate     | scratch QEMU VMID (created + destroyed)                    |
+| `PVE_TEST_CONSOLE_VMID` | gate     | scratch QEMU VMID for the console-mint test (own VMID)     |
+| `PVE_TEST_LXC_VMID`     | gate     | scratch LXC VMID (created + destroyed)                     |
+| `PVE_TEST_LXC_TEMPLATE` | gate     | OS template volid for the LXC lifecycle                    |
+| `PVE_TEST_ISO_PATH`     | gate     | local path to a small ISO to upload                        |
+| `PVE_TEST_VOLID`        | gate     | existing volume to snapshot + clean up                     |
+| `PVE_TEST_HA_SIDS`      | gate     | CSV of ≥2 HA-managed SIDs                                  |
 
 ### How the harness finds these values
 
@@ -259,7 +263,8 @@ Lists users and tokens under the 9.x privilege model and mints a VNC ticket.
 Driving the raw RFB session is a manual step beyond the ticket mint.
 
 ```sh
-# needs: PVE_TEST_VMID
+# needs: PVE_TEST_STORAGE, PVE_TEST_CONSOLE_VMID
+# (spins up its own scratch VM, mints against it, then tears it down)
 go test -tags=integration ./proxmox/integration/... -run TestConsoleMint -v
 ```
 
@@ -387,7 +392,7 @@ Test → phase → gates:
 | `TestISOUpload`               | 3     | `PVE_TEST_STORAGE`, `PVE_TEST_ISO_PATH`               |
 | `TestVolumeSnapshotLifecycle` | 3     | `PVE_TEST_STORAGE`, `PVE_TEST_VOLID`                  |
 | `TestResourceAffinityRule`    | 4     | `PVE_TEST_HA_SIDS`                                    |
-| `TestConsoleMint`             | 6     | `PVE_TEST_VMID`                                       |
+| `TestConsoleMint`             | 6     | `PVE_TEST_STORAGE`, `PVE_TEST_CONSOLE_VMID`           |
 
 Command cheat-sheet:
 

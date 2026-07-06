@@ -10,16 +10,21 @@ import (
 )
 
 // TestISOUpload covers the upload half of the Phase 3 criterion: streaming an
-// ISO to a storage. It is gated on PVE_TEST_STORAGE + PVE_TEST_ISO_PATH (a local
-// ISO file) and skips otherwise.
+// ISO to a storage. It is gated on PVE_TEST_ISO_PATH (a local ISO file) plus a
+// target storage that allows "iso" content — PVE_TEST_ISO_STORAGE, falling back
+// to PVE_TEST_STORAGE (the guest-disk storage is often ZFS/LVM, which does not
+// take ISOs, so the two are separable). Skips otherwise.
 func TestISOUpload(t *testing.T) {
 	c := newClient(t)
 	node := testNode()
 
-	store := os.Getenv(envTestStorage)
+	store := os.Getenv(envTestISOStorage)
+	if store == "" {
+		store = os.Getenv(envTestStorage)
+	}
 	isoPath := os.Getenv(envTestISOPath)
 	if store == "" || isoPath == "" {
-		t.Skipf("ISO upload disabled (set %s and %s)", envTestStorage, envTestISOPath)
+		t.Skipf("ISO upload disabled (set %s or %s, and %s)", envTestISOStorage, envTestStorage, envTestISOPath)
 	}
 
 	f, err := os.Open(isoPath) //nolint:gosec // path is an operator-supplied test fixture.

@@ -127,10 +127,17 @@ func TestFormEncodeStringRoundTrip(t *testing.T) {
 
 func TestDoUpload(t *testing.T) {
 	var gotAuth, gotPath, gotContent, gotFile string
-	var multipartCT bool
+	var multipartCT, gotChunked bool
+	var gotContentLength int64
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
 		gotPath = r.URL.Path
+		gotContentLength = r.ContentLength
+		for _, te := range r.TransferEncoding {
+			if te == "chunked" {
+				gotChunked = true
+			}
+		}
 		mediaType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		multipartCT = mediaType == "multipart/form-data"
 		if err := r.ParseMultipartForm(1 << 20); err != nil {
@@ -163,9 +170,20 @@ func TestDoUpload(t *testing.T) {
 		t.Fatalf("multipart Close: %v", err)
 	}
 
+	// Wrap the buffer so net/http cannot auto-detect its length: this forces the
+	// no-Content-Length path that broke uploads (io.Pipe body -> chunked -> PVE
+	// 501). DoUpload must spool it and send a Content-Length regardless.
+	body := io.MultiReader(&buf)
+
 	var upid string
-	if err := c.DoUpload(context.Background(), "nodes/pve/storage/local/upload", &buf, mw.FormDataContentType(), &upid); err != nil {
+	if err := c.DoUpload(context.Background(), "nodes/pve/storage/local/upload", body, mw.FormDataContentType(), &upid); err != nil {
 		t.Fatalf("DoUpload: %v", err)
+	}
+	if gotChunked {
+		t.Error("upload used chunked Transfer-Encoding; pveproxy rejects it with HTTP 501 — DoUpload must send a Content-Length")
+	}
+	if gotContentLength <= 0 {
+		t.Errorf("server saw Content-Length = %d, want > 0 (the spooled body size)", gotContentLength)
 	}
 	if upid == "" {
 		t.Error("DoUpload returned empty UPID")
