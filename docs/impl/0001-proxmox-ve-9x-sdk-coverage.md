@@ -39,6 +39,7 @@ created: 2026-06-22
       - [Success Criteria](#success-criteria-5)
   - [File Changes](#file-changes)
   - [Testing Plan](#testing-plan)
+    - [Outstanding live verification](#outstanding-live-verification)
   - [Dependencies](#dependencies)
   - [Open Questions](#open-questions)
   - [References](#references)
@@ -251,11 +252,12 @@ The 9.x-reworked area — model rules, never the deprecated groups.
 
 #### Success Criteria
 
-- [x] Define a resource-affinity rule via the SDK and observe placement honor it
-      — the rule definition + read-back is covered by the runnable `ha`
-      `Example` and `TestCreateResourceAffinityRule` (mock-verified). The
-      **placement-honored observation is live-only** (the mock does not
-      schedule) and remains written-but-unverified without a real cluster.
+- [~] Define a resource-affinity rule via the SDK and observe placement honor it
+  — the rule definition + read-back is covered by the runnable `ha` `Example`
+  and `TestCreateResourceAffinityRule` (mock-verified). The **placement-honored
+  observation is live-only** (the mock does not schedule) and remains
+  written-but-unverified without a real ≥2-node 9.2 cluster — tracked in
+  [Outstanding live verification](#outstanding-live-verification).
 
 ---
 
@@ -429,9 +431,10 @@ The 9.x-reworked area — model rules, never the deprecated groups.
 > `Console().Connect` dials the ticket over `api.DoWebSocket` and is exercised
 > against a `mockpve` hijack+echo `/vncwebsocket` upgrade, so the SDK plumbing
 > is verified; the **live VNC (RFB) wire payload** is the one **live-only**
-> piece, written-but-unverified here (no live 9.x node / recorded cassettes —
-> see CLAUDE.md). Several Phase-6 surfaces are REST-with-caveat (DEB822, SMART,
-> ACME task-vs-sync, Ceph/PBS paths, RRD pressure-stall/ZFS-ARC) or documented
+> piece, written-but-unverified here (no live VNC session captured — tracked in
+> [Outstanding live verification](#outstanding-live-verification)). Several
+> Phase-6 surfaces are REST-with-caveat (DEB822, SMART, ACME task-vs-sync,
+> Ceph/PBS paths, RRD pressure-stall/ZFS-ARC) or documented
 > `pverr.ErrUnsupported` stubs (Ceph RBD mirroring, PBS verify, metrics OTel,
 > console VerifyVNCTicket) where no PVE 9.x REST endpoint is confirmed.
 
@@ -515,6 +518,29 @@ file. This table maps the real code to phases. Column widths are re-aligned by
 - [x] `Example` functions compile + run under `go test`; `go doc ./...` renders
       every package's overview (godoc coverage gate) — every service + `mockpve`
       package ships a runnable `Example`; no `Skeleton` doc stubs remain.
+
+### Outstanding live verification
+
+Every implementation task is done and the suite has run end-to-end against a
+live 9.2-1 node (`r740a`), with the resulting cassettes committed and replaying
+in CI (`just test-replay`). **Two Success Criteria remain genuinely live-only**
+and cannot be verified in the current environment — track them here until a
+suitable cluster is reachable:
+
+- [ ] **P4 — resource-affinity placement honored.** The rule is defined and read
+      back (mock-verified + the `ha` `Example`), but observing the scheduler
+      _act_ on it needs a **real ≥2-node 9.2 HA cluster**. Only one 9.2 node
+      (`r740a`) is available, so `TestResourceAffinityRule` has no cassette and
+      is excluded from `just test-replay`.
+- [ ] **P6 — VNC (RFB) wire payload.** Ticket mint is live-verified
+      (`TestConsoleMint`) and `Connect` is exercised against a `mockpve`
+      hijack+echo upgrade, but the **live RFB byte stream** a real node returns
+      over `console.Connect` is unverified (no live VNC session captured).
+
+Neither blocks the MVP surface (both ops exist, are typed, and are mock-tested);
+they are verification gaps, not missing functionality. Do **not** mark either
+`[x]` — or emit the loop's completion promise — until each is confirmed against
+live hardware.
 
 ## Dependencies
 
