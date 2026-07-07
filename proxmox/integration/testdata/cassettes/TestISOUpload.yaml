@@ -1,0 +1,160 @@
+---
+version: 2
+interactions:
+    - id: 0
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/version
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 72
+        body: '{"data":{"repoid":"5e5ae681198514d4","version":"9.2.4","release":"9.2"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "72"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Tue, 07 Jul 2026 01:29:40 GMT
+            Expires:
+                - Tue, 07 Jul 2026 01:29:40 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 24.341375ms
+    - id: 1
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 48
+        host: pve.example:8006
+        body: '[multipart upload body truncated: 4194667 bytes]'
+        headers:
+            Authorization:
+                - REDACTED
+            Content-Type:
+                - multipart/form-data; boundary=46d15e29793f72005bdf933d1386cc860f4ad62d3192bbd7ec25cae380d2
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/storage/local/upload
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 71
+        body: '{"data":"UPID:pve:00086DA5:00B7AA7A:6A4C5684:imgcopy::root@pam!sdk:"}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "71"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Tue, 07 Jul 2026 01:29:40 GMT
+            Expires:
+                - Tue, 07 Jul 2026 01:29:40 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 166.820042ms
+    - id: 2
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:00086DA5:00B7AA7A:6A4C5684:imgcopy::root@pam!sdk:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 227
+        body: '{"data":{"pid":552357,"type":"imgcopy","user":"root@pam","node":"pve","upid":"UPID:pve:00086DA5:00B7AA7A:6A4C5684:imgcopy::root@pam!sdk:","status":"running","pstart":12036730,"starttime":1783387780,"tokenid":"sdk","id":""}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "227"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Tue, 07 Jul 2026 01:29:40 GMT
+            Expires:
+                - Tue, 07 Jul 2026 01:29:40 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 30.311209ms
+    - id: 3
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:00086DA5:00B7AA7A:6A4C5684:imgcopy::root@pam!sdk:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 245
+        body: '{"data":{"id":"","pid":552357,"user":"root@pam","status":"stopped","pstart":12036730,"node":"pve","upid":"UPID:pve:00086DA5:00B7AA7A:6A4C5684:imgcopy::root@pam!sdk:","exitstatus":"OK","tokenid":"sdk","starttime":1783387780,"type":"imgcopy"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "245"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Tue, 07 Jul 2026 01:29:41 GMT
+            Expires:
+                - Tue, 07 Jul 2026 01:29:41 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 29.358625ms

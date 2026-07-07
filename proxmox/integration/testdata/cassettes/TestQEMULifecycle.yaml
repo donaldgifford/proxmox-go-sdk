@@ -1,0 +1,797 @@
+---
+version: 2
+interactions:
+    - id: 0
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/version
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 72
+        body: '{"data":{"repoid":"5e5ae681198514d4","version":"9.2.4","release":"9.2"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "72"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:49 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:49 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 22.68375ms
+    - id: 1
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 110
+        host: pve.example:8006
+        body: cores=1&memory=512&name=sdk-itest&net0=virtio%2Cbridge%3Dvmbr0&scsi0=local-zfs%3A8&storage=local-zfs&vmid=9101
+        form:
+            cores:
+                - "1"
+            memory:
+                - "512"
+            name:
+                - sdk-itest
+            net0:
+                - virtio,bridge=vmbr0
+            scsi0:
+                - local-zfs:8
+            storage:
+                - local-zfs
+            vmid:
+                - "9101"
+        headers:
+            Authorization:
+                - REDACTED
+            Content-Type:
+                - application/x-www-form-urlencoded
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/qemu
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 76
+        body: '{"data":"UPID:pve:00004675:0005B36F:6A4A8EED:qmcreate:9101:root@pam!sdk:"}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "76"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:49 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:49 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 44.818583ms
+    - id: 2
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:00004675:0005B36F:6A4A8EED:qmcreate:9101:root@pam!sdk:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 234
+        body: '{"data":{"pstart":373615,"status":"running","upid":"UPID:pve:00004675:0005B36F:6A4A8EED:qmcreate:9101:root@pam!sdk:","node":"pve","tokenid":"sdk","id":"9101","starttime":1783271149,"type":"qmcreate","pid":18037,"user":"root@pam"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "234"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:49 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:49 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 26.774208ms
+    - id: 3
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:00004675:0005B36F:6A4A8EED:qmcreate:9101:root@pam!sdk:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 234
+        body: '{"data":{"node":"pve","upid":"UPID:pve:00004675:0005B36F:6A4A8EED:qmcreate:9101:root@pam!sdk:","status":"running","pstart":373615,"starttime":1783271149,"tokenid":"sdk","id":"9101","pid":18037,"type":"qmcreate","user":"root@pam"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "234"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:50 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:50 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 29.595042ms
+    - id: 4
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:00004675:0005B36F:6A4A8EED:qmcreate:9101:root@pam!sdk:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 252
+        body: '{"data":{"user":"root@pam","pid":18037,"id":"9101","type":"qmcreate","tokenid":"sdk","starttime":1783271149,"status":"stopped","pstart":373615,"node":"pve","upid":"UPID:pve:00004675:0005B36F:6A4A8EED:qmcreate:9101:root@pam!sdk:","exitstatus":"OK"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "252"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:51 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:51 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 30.186459ms
+    - id: 5
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            Content-Type:
+                - application/x-www-form-urlencoded
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/qemu/9101/status/start
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 75
+        body: '{"data":"UPID:pve:00004686:0005B477:6A4A8EEF:qmstart:9101:root@pam!sdk:"}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "75"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:51 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:51 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 52.779167ms
+    - id: 6
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:00004686:0005B477:6A4A8EEF:qmstart:9101:root@pam!sdk:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 232
+        body: '{"data":{"upid":"UPID:pve:00004686:0005B477:6A4A8EEF:qmstart:9101:root@pam!sdk:","node":"pve","pstart":373879,"status":"running","starttime":1783271151,"id":"9101","tokenid":"sdk","type":"qmstart","pid":18054,"user":"root@pam"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "232"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:51 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:51 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 27.341167ms
+    - id: 7
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:00004686:0005B477:6A4A8EEF:qmstart:9101:root@pam!sdk:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 232
+        body: '{"data":{"user":"root@pam","type":"qmstart","pid":18054,"starttime":1783271151,"tokenid":"sdk","id":"9101","upid":"UPID:pve:00004686:0005B477:6A4A8EEF:qmstart:9101:root@pam!sdk:","node":"pve","pstart":373879,"status":"running"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "232"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:52 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:52 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 29.225541ms
+    - id: 8
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:00004686:0005B477:6A4A8EEF:qmstart:9101:root@pam!sdk:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 250
+        body: '{"data":{"id":"9101","pid":18054,"user":"root@pam","pstart":373879,"status":"stopped","upid":"UPID:pve:00004686:0005B477:6A4A8EEF:qmstart:9101:root@pam!sdk:","exitstatus":"OK","node":"pve","tokenid":"sdk","starttime":1783271151,"type":"qmstart"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "250"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:54 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:54 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 38.575834ms
+    - id: 9
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 15
+        host: pve.example:8006
+        body: snapname=itest0
+        form:
+            snapname:
+                - itest0
+        headers:
+            Authorization:
+                - REDACTED
+            Content-Type:
+                - application/x-www-form-urlencoded
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/qemu/9101/snapshot
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 78
+        body: '{"data":"UPID:pve:000046B2:0005B580:6A4A8EF2:qmsnapshot:9101:root@pam!sdk:"}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "78"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:54 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:54 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 55.039833ms
+    - id: 10
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:000046B2:0005B580:6A4A8EF2:qmsnapshot:9101:root@pam!sdk:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 238
+        body: '{"data":{"type":"qmsnapshot","pid":18098,"user":"root@pam","pstart":374144,"status":"running","upid":"UPID:pve:000046B2:0005B580:6A4A8EF2:qmsnapshot:9101:root@pam!sdk:","node":"pve","tokenid":"sdk","id":"9101","starttime":1783271154}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "238"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:54 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:54 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 26.618958ms
+    - id: 11
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:000046B2:0005B580:6A4A8EF2:qmsnapshot:9101:root@pam!sdk:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 256
+        body: '{"data":{"type":"qmsnapshot","status":"stopped","pstart":374144,"node":"pve","exitstatus":"OK","upid":"UPID:pve:000046B2:0005B580:6A4A8EF2:qmsnapshot:9101:root@pam!sdk:","tokenid":"sdk","starttime":1783271154,"pid":18098,"user":"root@pam","id":"9101"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "256"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:55 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:55 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 37.008583ms
+    - id: 12
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            Content-Type:
+                - application/x-www-form-urlencoded
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/qemu/9101/snapshot/itest0/rollback
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 78
+        body: '{"data":"UPID:pve:000046E2:0005B5F1:6A4A8EF3:qmrollback:9101:root@pam!sdk:"}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "78"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:55 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:55 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 55.356792ms
+    - id: 13
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:000046E2:0005B5F1:6A4A8EF3:qmrollback:9101:root@pam!sdk:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 238
+        body: '{"data":{"tokenid":"sdk","id":"9101","starttime":1783271155,"pstart":374257,"status":"running","upid":"UPID:pve:000046E2:0005B5F1:6A4A8EF3:qmrollback:9101:root@pam!sdk:","node":"pve","user":"root@pam","type":"qmrollback","pid":18146}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "238"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:55 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:55 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 30.361042ms
+    - id: 14
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:000046E2:0005B5F1:6A4A8EF3:qmrollback:9101:root@pam!sdk:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 256
+        body: '{"data":{"type":"qmrollback","pstart":374257,"status":"stopped","upid":"UPID:pve:000046E2:0005B5F1:6A4A8EF3:qmrollback:9101:root@pam!sdk:","exitstatus":"OK","node":"pve","tokenid":"sdk","starttime":1783271155,"pid":18146,"user":"root@pam","id":"9101"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "256"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:56 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:56 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 111.812625ms
+    - id: 15
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            Content-Type:
+                - application/x-www-form-urlencoded
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/qemu/9101/status/stop
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 74
+        body: '{"data":"UPID:pve:000046F9:0005B668:6A4A8EF4:qmstop:9101:root@pam!sdk:"}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "74"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:56 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:56 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 52.921959ms
+    - id: 16
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:000046F9:0005B668:6A4A8EF4:qmstop:9101:root@pam!sdk:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 248
+        body: '{"data":{"type":"qmstop","tokenid":"sdk","starttime":1783271156,"status":"stopped","pstart":374376,"node":"pve","upid":"UPID:pve:000046F9:0005B668:6A4A8EF4:qmstop:9101:root@pam!sdk:","exitstatus":"OK","user":"root@pam","pid":18169,"id":"9101"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "248"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:56 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:56 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 29.746959ms
+    - id: 17
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            Content-Type:
+                - application/x-www-form-urlencoded
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/qemu/9101
+        method: DELETE
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 77
+        body: '{"data":"UPID:pve:000046FA:0005B671:6A4A8EF4:qmdestroy:9101:root@pam!sdk:"}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "77"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:56 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:56 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 57.379917ms
+    - id: 18
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:000046FA:0005B671:6A4A8EF4:qmdestroy:9101:root@pam!sdk:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 236
+        body: '{"data":{"pid":18170,"type":"qmdestroy","user":"root@pam","status":"running","pstart":374385,"node":"pve","upid":"UPID:pve:000046FA:0005B671:6A4A8EF4:qmdestroy:9101:root@pam!sdk:","tokenid":"sdk","id":"9101","starttime":1783271156}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "236"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:56 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:56 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 29.297833ms
+    - id: 19
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:000046FA:0005B671:6A4A8EF4:qmdestroy:9101:root@pam!sdk:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 254
+        body: '{"data":{"id":"9101","user":"root@pam","pid":18170,"starttime":1783271156,"tokenid":"sdk","node":"pve","exitstatus":"OK","upid":"UPID:pve:000046FA:0005B671:6A4A8EF4:qmdestroy:9101:root@pam!sdk:","status":"stopped","pstart":374385,"type":"qmdestroy"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "254"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 17:05:57 GMT
+            Expires:
+                - Sun, 05 Jul 2026 17:05:57 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 29.56875ms
