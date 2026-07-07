@@ -25,6 +25,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(integration)* Add go-vcr record/replay harness with secret redaction
 - Autoload .env for the integration suite (1Password/op run friendly)
 - *(integration)* Truncate multipart upload bodies in recorded cassettes
+- *(integration)* Scrub endpoint host + node name from recorded cassettes
 
 ## [0.1.0] - 2026-07-03
 
