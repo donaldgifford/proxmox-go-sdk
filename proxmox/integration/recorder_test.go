@@ -9,6 +9,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -37,13 +38,20 @@ var (
 	jsonSecretRe = regexp.MustCompile(`(?i)"(ticket|csrfpreventiontoken|value)"\s*:\s*"[^"]*"`)
 )
 
+// uploadBodyTruncatedMarker labels a multipart upload body that was dropped
+// before the cassette hit disk (see truncateUploadBody).
+const uploadBodyTruncatedMarker = "multipart upload body truncated"
+
 // redactInteraction is the go-vcr BeforeSaveHook. It rewrites credential-bearing
 // headers and bodies to the redacted placeholder so a cassette never carries a
-// live secret. It runs before the cassette is written, not on the wire, so the
-// real request still authenticates normally.
+// live secret, and truncates streamed multipart upload bodies so an ISO/disk
+// image does not bloat the fixture. It runs before the cassette is written, not
+// on the wire, so the real request still authenticates and uploads normally.
 func redactInteraction(i *cassette.Interaction) error {
 	redactHeaders(i.Request.Headers, "Authorization", "Cookie", "Csrfpreventiontoken")
 	redactHeaders(i.Response.Headers, "Set-Cookie")
+
+	truncateUploadBody(&i.Request)
 
 	if i.Request.Body != "" {
 		i.Request.Body = formSecretRe.ReplaceAllString(i.Request.Body, "${1}="+redacted)
@@ -68,6 +76,21 @@ func redactHeaders(h http.Header, keys ...string) {
 			h.Set(k, redacted)
 		}
 	}
+}
+
+// truncateUploadBody drops the body of a streamed multipart upload (ISO / disk
+// image) before it is written to a cassette. Left intact, a single ISO upload
+// bloats the fixture by megabytes of base64 (an 8.4 MB cassette for a 4 MB ISO)
+// for no replay value: matchMethodURL keys on method+URL, not body, and the mock
+// corpus is built from the *response* (the import task), not the uploaded bytes.
+// The multipart Content-Type (with its boundary) and the response are preserved,
+// so the recording still faithfully shows the request shape.
+func truncateUploadBody(r *cassette.Request) {
+	if !strings.HasPrefix(r.Headers.Get("Content-Type"), "multipart/form-data") || r.Body == "" {
+		return
+	}
+	r.Body = fmt.Sprintf("[%s: %d bytes]", uploadBodyTruncatedMarker, len(r.Body))
+	r.ContentLength = int64(len(r.Body))
 }
 
 func isCredentialURL(u string) bool {
@@ -168,6 +191,53 @@ func TestRedactInteraction(t *testing.T) {
 	// A non-secret field must be preserved so replay still matches.
 	if !strings.Contains(i.Response.Body, "root@pam") {
 		t.Error("non-secret response field was clobbered")
+	}
+}
+
+// TestTruncateUploadBody proves the BeforeSaveHook drops a multipart upload body
+// (so an ISO does not bloat the cassette) while leaving a non-multipart body
+// alone and preserving the multipart Content-Type for replay fidelity.
+func TestTruncateUploadBody(t *testing.T) {
+	bigISO := strings.Repeat("A", 4<<20) // 4 MiB stand-in for an uploaded ISO.
+	i := &cassette.Interaction{
+		Request: cassette.Request{
+			URL:     "https://pve:8006/api2/json/nodes/pve/storage/local/upload",
+			Method:  http.MethodPost,
+			Body:    "--b\r\nContent-Disposition: form-data; name=\"content\"\r\n\r\niso\r\n--b\r\n" + bigISO + "\r\n--b--",
+			Headers: http.Header{"Content-Type": {"multipart/form-data; boundary=b"}},
+		},
+	}
+	if err := redactInteraction(i); err != nil {
+		t.Fatalf("redactInteraction: %v", err)
+	}
+	if strings.Contains(i.Request.Body, bigISO) {
+		t.Error("multipart upload body survived; the ISO bytes reached the cassette")
+	}
+	if !strings.Contains(i.Request.Body, uploadBodyTruncatedMarker) {
+		t.Errorf("truncated body = %q, want the truncation marker", i.Request.Body)
+	}
+	if i.Request.ContentLength != int64(len(i.Request.Body)) {
+		t.Errorf("ContentLength = %d, want %d (the truncated length)", i.Request.ContentLength, len(i.Request.Body))
+	}
+	// The multipart Content-Type must survive so the recording still shows the
+	// request was an upload.
+	if got := i.Request.Headers.Get("Content-Type"); !strings.HasPrefix(got, "multipart/form-data") {
+		t.Errorf("Content-Type = %q, want multipart/form-data preserved", got)
+	}
+
+	// A non-multipart body (a normal form POST) must be left untouched.
+	plain := &cassette.Interaction{
+		Request: cassette.Request{
+			Method:  http.MethodPost,
+			Body:    "vmid=100&name=web",
+			Headers: http.Header{"Content-Type": {"application/x-www-form-urlencoded"}},
+		},
+	}
+	if err := redactInteraction(plain); err != nil {
+		t.Fatalf("redactInteraction(plain): %v", err)
+	}
+	if plain.Request.Body != "vmid=100&name=web" {
+		t.Errorf("non-multipart body was altered: %q", plain.Request.Body)
 	}
 }
 
