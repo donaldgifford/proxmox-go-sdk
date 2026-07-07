@@ -64,7 +64,7 @@ jobs:
         with:
           files: coverage.txt
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: donaldgifford/commons
+          slug: donaldgifford/proxmox-go-sdk
         continue-on-error: true
 
   test-replay:
