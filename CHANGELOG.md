@@ -20,6 +20,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - Add TESTING.md live-node + recording walkthrough
 - *(inv)* Add INV-0001 — nested Proxmox nodes for live SDK testing
 - Record live verification against r740a (9.2-1)
+- *(impl)* Track the two unverified live-only criteria (P4, P6)
 
 ### Testing
 
