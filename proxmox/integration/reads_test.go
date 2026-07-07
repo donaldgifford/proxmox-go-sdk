@@ -5,13 +5,13 @@ package integration
 import "testing"
 
 // TestVersionRoundTrip is the Phase 1 live criterion: auth + GET /version
-// round-trips against a real 9.x node and reports a >= 9.0 release.
+// round-trips against a real 9.x node and reports a >= 9.0 release. NewClient
+// performs that round-trip (and rejects < 9.0) to seed the capability snapshot,
+// so this asserts on the cached snapshot rather than issuing a second, identical
+// /version fetch — which go-vcr collapses into one interaction, breaking replay.
 func TestVersionRoundTrip(t *testing.T) {
 	c := newClient(t)
-	caps, err := c.Version().Capabilities(testCtx(t))
-	if err != nil {
-		t.Fatalf("Version().Capabilities: %v", err)
-	}
+	caps := c.Capabilities()
 	if !caps.AtLeast(9, 0) {
 		t.Fatalf("reported version %s is below the 9.0 floor", caps.String())
 	}

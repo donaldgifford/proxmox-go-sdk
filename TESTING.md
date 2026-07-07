@@ -138,6 +138,7 @@ Every variable:
 | `PVE_NODE`              | no       | node under test (default `pve`)                            |
 | `PVE_INSECURE_TLS`      | no       | `1` to skip TLS verify (self-signed)                       |
 | `PVE_RECORD`            | no       | `1` to record cassettes while running                      |
+| `PVE_REPLAY`            | no       | `1` to replay committed cassettes (no node; see below)     |
 | `PVE_DEBUG`             | no       | `1` to stream a line per SDK request                       |
 | `PVE_TEST_STORAGE`      | gate     | storage for scratch disks / uploads                        |
 | `PVE_TEST_ISO_STORAGE`  | gate     | ISO-upload storage (allows `iso`); else `PVE_TEST_STORAGE` |
@@ -350,9 +351,37 @@ cassette, open the `.yaml` and confirm:
   node names, IP addresses, MAC addresses, storage names, VM configs.
 
 When a cassette is reviewed and you intend to commit it, force-add it
-(`git add -f testdata/cassettes/<name>.yaml`) or narrow the `.gitignore`. Wiring
-the committed cassettes into CI replay (so CI needs no node) is a deliberate
-follow-up, tracked separately.
+(`git add -f testdata/cassettes/<name>.yaml`) or narrow the `.gitignore`. Before
+committing, the recorder scrubs each cassette twice: `redactInteraction` blanks
+secrets (auth/cookie/CSRF headers, `password`/`secret`/`otp` form fields, and
+`ticket`/`csrfpreventiontoken`/`value`/`password` JSON response fields) and
+`topologyScrub` rewrites the live host, IP, and node name to the placeholders
+`pve.example:8006` / `pve` so a committed fixture never exposes lab topology. A
+multipart upload body is truncated to a marker so a large ISO is not committed
+verbatim.
+
+### Replaying cassettes (no node)
+
+Once cassettes are committed they can drive the integration suite with **no live
+node** — this is what CI runs. Set `PVE_REPLAY=1` and the harness backs each
+test with its committed cassette (`ModeReplayOnly`, never touches the network)
+instead of a live client. A host-agnostic matcher (`matchReplayRequest`) matches
+on method + path + query, so the placeholder endpoint the cassettes were
+scrubbed to is irrelevant.
+
+```bash
+just test-replay
+```
+
+The recipe supplies the `PVE_TEST_*` gate values each cassette was recorded with
+(node `pve`; QEMU `9101`, LXC/console `9102`; ISO storage `local`) and `-run`s
+only the tests that have a cassette. `TestResourceAffinityRule` has none (it
+needs a two-node HA cluster) and is excluded. The `.github/workflows/ci.yml`
+`Test Replay (cassettes)` job runs exactly this recipe.
+
+A cassette that predates a code change replays as
+`requested interaction not found` — re-record it against a live node
+(`PVE_RECORD=1`).
 
 ## Troubleshooting
 

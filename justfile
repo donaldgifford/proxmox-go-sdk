@@ -11,6 +11,28 @@ build:
 test:
     go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
+# Replay the committed go-vcr cassettes with NO live node (CI + local). Runs the
+# integration suite against the recorded fixtures in
+# proxmox/integration/testdata/cassettes, exercising every phase's SDK request
+# paths without a cluster. The gate values below match what each cassette was
+# recorded with (node pve; QEMU 9101, LXC/console 9102; ISO storage local); the
+# host-agnostic replay matcher makes the endpoint a placeholder. Only the tests
+# that have a cassette are run — TestResourceAffinityRule has none (needs a
+# 2-node HA cluster) and is excluded.
+test-replay:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    iso="${TMPDIR:-/tmp}/pve-replay.iso"
+    touch "$iso"
+    PVE_REPLAY=1 PVE_NODE=pve \
+      PVE_TEST_STORAGE=local-zfs PVE_TEST_VMID=9101 \
+      PVE_TEST_LXC_VMID=9102 \
+      PVE_TEST_LXC_TEMPLATE=local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst \
+      PVE_TEST_CONSOLE_VMID=9102 \
+      PVE_TEST_ISO_STORAGE=local PVE_TEST_ISO_PATH="$iso" \
+      go test -tags=integration ./proxmox/integration/ \
+      -run 'TestVersionRoundTrip|TestComputeReads|TestStorageReads|TestClusterAndHAReads|TestNetworkReads|TestAccessReads|TestQEMULifecycle|TestLXCLifecycle|TestISOUpload|TestConsoleMint'
+
 # Run the mockpve test-helper server locally
 run *args:
     go run ./cmd/mockpve {{args}}

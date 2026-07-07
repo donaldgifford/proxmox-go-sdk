@@ -563,12 +563,25 @@ environment.** This shapes how we test and what "done" means:
   record→redact→replay end-to-end against `mockpve` (server closed before
   replay) and run in CI — real verification here, no node. **Capturing real
   cassettes is still live-only** (I cannot reach a node); the harness records to
-  `proxmox/integration/testdata/cassettes/` under `PVE_RECORD=1`, git-ignored
-  until reviewed. Wiring committed cassettes into CI replay is a deliberate
-  follow-up. **`TESTING.md`** is the thorough manual walkthrough (token creation
-  → env → per-phase lifecycle runs → recording); `DEVELOPMENT.md`'s live-node
-  section now points at it. **The recorder must NOT set
-  `WithReplayableInteractions(true)`** — a task-status poll loop makes many
+  `proxmox/integration/testdata/cassettes/` under `PVE_RECORD=1`. **Ten reviewed
+  cassettes are now committed** (force-added past the dir's `*.yaml` gitignore):
+  version + per-phase reads, QEMU/LXC lifecycles, ISO upload, console mint —
+  each scrubbed of secrets (Authorization/token, console VNC ticket+password,
+  LXC password) **and** lab topology (endpoint host/IP + node name rewritten to
+  `pve.example`/`pve`; the ISO body truncated). **CI replay is now wired in**: a
+  `PVE_REPLAY=1` mode in the harness (`newReplayClient`) backs each test with
+  its committed cassette in `ModeReplayOnly` against the placeholder endpoint,
+  the matcher is host-agnostic (method + path+query, renamed
+  `matchMethodURL`→`matchReplayRequest`), and `just test-replay` (the new
+  `Test Replay (cassettes)` CI job) runs the 10 cassette-backed tests with no
+  live node. Recording collapses two identical `/version` fetches into one
+  interaction, so `TestVersionRoundTrip` asserts on `NewClient`'s cached caps
+  rather than re-fetching (else replay 404s on the second).
+  `TestResourceAffinityRule` has **no** cassette (needs a 2-node HA cluster) and
+  is excluded from the replay run. **`TESTING.md`** is the thorough manual
+  walkthrough (token creation → env → per-phase lifecycle runs → recording);
+  `DEVELOPMENT.md`'s live-node section now points at it. **The recorder must NOT
+  set `WithReplayableInteractions(true)`** — a task-status poll loop makes many
   identical GETs to `/tasks/{upid}/status`, and that flag serves the first
   recording ("running") for all of them, so in record mode the task never
   reaches "stopped" and `tasks.Wait` spins to its deadline (found live; guarded
@@ -613,9 +626,12 @@ environment.** This shapes how we test and what "done" means:
 
 ## CI matrix
 
-- `.forgejo/workflows/ci.yml` runs on every push/PR — `just test` + `just lint`.
-- `.github/workflows/ci.yml` is the mirror; identical jobs, runs on the GitHub
-  mirror if/when one exists.
+- `.github/workflows/ci.yml` runs on every push/PR — `just test`
+  (race+coverage), `just test-replay` (the `Test Replay (cassettes)` job:
+  replays the committed go-vcr cassettes through the integration suite with
+  `PVE_REPLAY=1`, no live node), `just lint`, schema-drift, security, and a
+  goreleaser snapshot. (A `.forgejo/workflows/` mirror is planned but not yet in
+  the repo.)
 - Release workflows fire only on `v*` tag push; `goreleaser` consumes
   `.goreleaser.yml` and the appropriate token (`GITEA_TOKEN` for Forgejo,
   `GITHUB_TOKEN` for GitHub).

@@ -44,6 +44,9 @@ func TestMain(m *testing.M) {
 // soon as the creds are satisfied so a second candidate (possibly a single-use
 // pipe) is not opened needlessly.
 func loadDotEnv() {
+	if os.Getenv(envReplay) == "1" {
+		return // replay is self-contained (committed cassettes); never read a dotenv
+	}
 	if credsSet() {
 		return // env already has them (explicit export / op run / CI): leave files alone
 	}
@@ -101,6 +104,7 @@ const (
 	envNode        = "PVE_NODE"         // node under test, default "pve"
 	envInsecureTLS = "PVE_INSECURE_TLS" // "1" to skip TLS verify (self-signed)
 	envRecord      = "PVE_RECORD"       // "1" to record go-vcr cassettes while running
+	envReplay      = "PVE_REPLAY"       // "1" to replay committed cassettes (no live node; CI)
 	envDebug       = "PVE_DEBUG"        // "1" to stream a debug line per SDK request to stderr
 
 	// Destructive-test gates. Absent -> the corresponding test skips.
@@ -114,10 +118,15 @@ const (
 	envTestHASIDs      = "PVE_TEST_HA_SIDS"      // CSV of >=2 HA-managed SIDs for a resource-affinity rule (Phase 4)
 )
 
-// newClient builds a live client from the environment, skipping the test when
-// the node/token are not configured. Safe to call from every test.
+// newClient builds a client for a test. In replay mode (PVE_REPLAY=1) it is
+// backed by the committed cassette for the running test — no live node, this is
+// what CI runs. Otherwise it builds a live client from the environment, skipping
+// the test when the node/token are not configured. Safe to call from every test.
 func newClient(t *testing.T) *proxmox.Client {
 	t.Helper()
+	if os.Getenv(envReplay) == "1" {
+		return newReplayClient(t)
+	}
 	endpoint := os.Getenv(envEndpoint)
 	tokenID := os.Getenv(envTokenID)
 	secret := os.Getenv(envTokenSecret)
@@ -158,6 +167,25 @@ func newClient(t *testing.T) *proxmox.Client {
 	c, err := proxmox.NewClient(ctx, endpoint, api.TokenCredentials(tokenID, secret), opts...)
 	if err != nil {
 		t.Fatalf("NewClient(%s): %v", endpoint, err)
+	}
+	return c
+}
+
+// newReplayClient builds a client backed by the committed go-vcr cassette for the
+// running test (ModeReplayOnly), so the integration suite runs in CI with no live
+// node. It dials the placeholder endpoint the cassettes were scrubbed to; the
+// host-agnostic matcher (matchReplayRequest) makes the real host irrelevant, and
+// ReplayOnly never touches the network. A test whose cassette is missing fails
+// (rather than skips) — the CI job -run's only the tests that have one.
+func newReplayClient(t *testing.T) *proxmox.Client {
+	t.Helper()
+	client := newRecorderClient(t, cassetteName(t), recorder.ModeReplayOnly, nil, topologyScrub{})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Cleanup(cancel)
+	c, err := proxmox.NewClient(ctx, "https://"+placeholderHost,
+		api.TokenCredentials("root@pam!sdk", "replay-token"), proxmox.WithHTTPClient(client))
+	if err != nil {
+		t.Fatalf("replay NewClient (cassette %s.yaml): %v", cassetteName(t), err)
 	}
 	return c
 }

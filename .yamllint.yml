@@ -50,6 +50,8 @@ rules:
 # - mkdocs.yml: MkDocs conventions (4-space nav indentation, no `---` marker)
 # - {.forgejo,.github}/workflows/: Actions workflows — linted by actionlint,
 #   which understands the `on:`-trigger empty-value keys yamllint rejects
+# - testdata/cassettes/: go-vcr cassettes — the YAML shape (4-space indent, long
+#   base64 bodies) is owned by the recorder, not hand-authored
 ignore: |-
   node_modules/
   vendor/
@@ -57,3 +59,4 @@ ignore: |-
   mkdocs.yml
   .forgejo/workflows/
   .github/workflows/
+  proxmox/integration/testdata/cassettes/
