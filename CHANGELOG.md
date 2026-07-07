@@ -27,6 +27,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(integration)* Truncate multipart upload bodies in recorded cassettes
 - *(integration)* Scrub endpoint host + node name from recorded cassettes
 - *(integration)* Commit reviewed go-vcr cassettes for CI replay
+- *(integration)* Wire committed cassettes into CI replay
 
 ## [0.1.0] - 2026-07-03
 
