@@ -33,7 +33,7 @@ func TestRecorderRecordsEachPoll(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	rec := newRecorder(t, filepath.Join(t.TempDir(), "poll"), recorder.ModeRecordOnly, http.DefaultTransport)
+	rec := newRecorder(t, filepath.Join(t.TempDir(), "poll"), recorder.ModeRecordOnly, http.DefaultTransport, topologyScrub{})
 	defer func() { _ = rec.Stop() }()
 	client := rec.GetDefaultClient()
 

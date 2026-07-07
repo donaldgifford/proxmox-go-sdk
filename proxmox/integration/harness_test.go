@@ -137,7 +137,10 @@ func newClient(t *testing.T) *proxmox.Client {
 		if insecure {
 			rt = insecureTransport()
 		}
-		client := newRecorderClient(t, cassetteName(t), recorder.ModeRecordOnly, rt)
+		// Scrub the live endpoint host and node name from the cassette so a
+		// committed fixture does not expose lab topology.
+		scrub := newTopologyScrub(endpoint, testNode())
+		client := newRecorderClient(t, cassetteName(t), recorder.ModeRecordOnly, rt, scrub)
 		opts = append(opts, proxmox.WithHTTPClient(client))
 	case insecure:
 		opts = append(opts, proxmox.WithInsecureSkipVerify(true))

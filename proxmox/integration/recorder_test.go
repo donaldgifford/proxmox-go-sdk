@@ -10,7 +10,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -65,8 +67,8 @@ func redactInteraction(i *cassette.Interaction) error {
 	// Secret fields ride response bodies from more than just /access/ticket: a
 	// console mint (POST .../vncproxy or .../spiceproxy) returns a one-time VNC
 	// ticket + password, and token creation returns a value. Scrub these field
-	// names wherever they appear. This is safe for replay — matchMethodURL keys on
-	// method+URL, not body — and PVE config/listing responses never legitimately
+	// names wherever they appear. This is safe for replay — matchReplayRequest keys
+	// on method+path, not body — and PVE config/listing responses never legitimately
 	// carry these keys (they are write-only), so nothing needed is clobbered.
 	if i.Response.Body != "" {
 		i.Response.Body = jsonSecretRe.ReplaceAllString(i.Response.Body, `"${1}":"`+redacted+`"`)
@@ -85,7 +87,7 @@ func redactHeaders(h http.Header, keys ...string) {
 // truncateUploadBody drops the body of a streamed multipart upload (ISO / disk
 // image) before it is written to a cassette. Left intact, a single ISO upload
 // bloats the fixture by megabytes of base64 (an 8.4 MB cassette for a 4 MB ISO)
-// for no replay value: matchMethodURL keys on method+URL, not body, and the mock
+// for no replay value: matchReplayRequest keys on method+path, not body, and the mock
 // corpus is built from the *response* (the import task), not the uploaded bytes.
 // The multipart Content-Type (with its boundary) and the response are preserved,
 // so the recording still faithfully shows the request shape.
@@ -97,20 +99,84 @@ func truncateUploadBody(r *cassette.Request) {
 	r.ContentLength = int64(len(r.Body))
 }
 
-// matchMethodURL matches a replay request to a recorded interaction on method +
-// URL only. The default matcher also compares headers and body, but redaction
-// rewrites the Authorization header (and credential-request bodies), so those
-// no longer equal the live request — method + URL is the redaction-safe key.
-// (A write-heavy replay that POSTs different bodies to one URL would need a
-// body-aware matcher; deferred until cassettes are wired into CI.)
-func matchMethodURL(r *http.Request, i cassette.Request) bool { //nolint:gocritic // signature fixed by cassette.MatcherFunc
-	return r.Method == i.Method && r.URL.String() == i.URL
+// Topology placeholders. A committed cassette must not expose lab topology (the
+// live endpoint host/IP and node name), so a recording rewrites them to these
+// stable, RFC-friendly stand-ins. The host placeholder keeps PVE's default port.
+const (
+	placeholderHost     = "pve.example:8006"
+	placeholderBareHost = "pve.example"
+	placeholderNode     = "pve"
+)
+
+// topologyScrub rewrites the live endpoint host:port and node name to fixed
+// placeholders across a recorded interaction's URL and bodies. The node also
+// rides response-body UPIDs (UPID:<node>:…) and the task-poll URLs the SDK
+// derives from them, so it must be replaced everywhere for a replay to stay
+// internally consistent. The zero value (empty fields) is a no-op, so unit tests
+// and the mockpve self-test record verbatim.
+type topologyScrub struct {
+	host string // live "host:port", e.g. "10.10.11.20:8006"
+	node string // live node name, e.g. "r740a"
+}
+
+// newTopologyScrub derives the scrub from a live endpoint URL and node name.
+func newTopologyScrub(endpoint, node string) topologyScrub {
+	s := topologyScrub{node: node}
+	if u, err := url.Parse(endpoint); err == nil {
+		s.host = u.Host
+	}
+	return s
+}
+
+func (s topologyScrub) apply(i *cassette.Interaction) {
+	if s.host == "" && s.node == "" {
+		return
+	}
+	bareHost := s.host
+	if h, _, err := net.SplitHostPort(s.host); err == nil {
+		bareHost = h
+	}
+	rep := func(v string) string {
+		if v == "" {
+			return v
+		}
+		if s.host != "" {
+			// host:port before bare host, so the ":port" form is not left dangling.
+			v = strings.ReplaceAll(v, s.host, placeholderHost)
+			v = strings.ReplaceAll(v, bareHost, placeholderBareHost)
+		}
+		if s.node != "" {
+			v = strings.ReplaceAll(v, s.node, placeholderNode)
+		}
+		return v
+	}
+	i.Request.URL = rep(i.Request.URL)
+	i.Request.Body = rep(i.Request.Body)
+	i.Response.Body = rep(i.Response.Body)
+}
+
+// matchReplayRequest matches a replay request to a recorded interaction on method
+// plus URL path+query, deliberately ignoring scheme and host. Recording rewrites
+// the host to a placeholder (topologyScrub), so a committed cassette's host no
+// longer equals any live/CI endpoint; matching on the path (which the SDK builds
+// from the node + resource, both already topology-scrubbed) lets a replay run
+// against any endpoint. Headers/body are ignored too, since redaction rewrites
+// the Authorization header and credential bodies.
+func matchReplayRequest(r *http.Request, i cassette.Request) bool { //nolint:gocritic // signature fixed by cassette.MatcherFunc
+	if r.Method != i.Method {
+		return false
+	}
+	iu, err := url.Parse(i.URL)
+	if err != nil {
+		return false
+	}
+	return r.URL.Path == iu.Path && r.URL.RawQuery == iu.RawQuery
 }
 
 // newRecorder builds a go-vcr recorder for cassetteName (without the .yaml
-// suffix) with secret redaction wired in. Callers own Stop(); newRecorderClient
-// wraps this with a t.Cleanup for the common case.
-func newRecorder(t *testing.T, cassetteName string, mode recorder.Mode, realTransport http.RoundTripper) *recorder.Recorder {
+// suffix) with secret redaction and topology scrubbing wired in. Callers own
+// Stop(); newRecorderClient wraps this with a t.Cleanup for the common case.
+func newRecorder(t *testing.T, cassetteName string, mode recorder.Mode, realTransport http.RoundTripper, scrub topologyScrub) *recorder.Recorder {
 	t.Helper()
 	if mode == recorder.ModeRecordOnly {
 		if err := os.MkdirAll(filepath.Dir(cassetteName), 0o750); err != nil {
@@ -120,11 +186,20 @@ func newRecorder(t *testing.T, cassetteName string, mode recorder.Mode, realTran
 	if realTransport == nil {
 		realTransport = http.DefaultTransport
 	}
+	// Redact secrets first, then scrub topology, so the placeholder host/node are
+	// written over an already-secret-free interaction.
+	beforeSave := func(i *cassette.Interaction) error {
+		if err := redactInteraction(i); err != nil {
+			return err
+		}
+		scrub.apply(i)
+		return nil
+	}
 	rec, err := recorder.New(cassetteName,
 		recorder.WithMode(mode),
 		recorder.WithRealTransport(realTransport),
-		recorder.WithHook(redactInteraction, recorder.BeforeSaveHook),
-		recorder.WithMatcher(matchMethodURL),
+		recorder.WithHook(beforeSave, recorder.BeforeSaveHook),
+		recorder.WithMatcher(matchReplayRequest),
 		recorder.WithSkipRequestLatency(true),
 		// NOTE: WithReplayableInteractions is deliberately NOT set. A task-status
 		// poll loop makes many identical GETs to /tasks/{upid}/status; replayable
@@ -144,9 +219,9 @@ func newRecorder(t *testing.T, cassetteName string, mode recorder.Mode, realTran
 // flushing (and redacting) the cassette on test cleanup. In record mode it
 // proxies to realTransport; in replay mode it serves recorded interactions and
 // needs no network.
-func newRecorderClient(t *testing.T, cassetteName string, mode recorder.Mode, realTransport http.RoundTripper) *http.Client {
+func newRecorderClient(t *testing.T, cassetteName string, mode recorder.Mode, realTransport http.RoundTripper, scrub topologyScrub) *http.Client {
 	t.Helper()
-	rec := newRecorder(t, cassetteName, mode, realTransport)
+	rec := newRecorder(t, cassetteName, mode, realTransport, scrub)
 	t.Cleanup(func() {
 		if serr := rec.Stop(); serr != nil {
 			t.Errorf("stop recorder for %q: %v", cassetteName, serr)
@@ -226,6 +301,48 @@ func TestRedactConsoleTicket(t *testing.T) {
 	}
 }
 
+// TestScrubTopology proves the recording rewrites the live endpoint host:port,
+// its bare host, and the node name to stable placeholders across the request URL
+// and both bodies — including the node inside a response-body UPID, so the
+// task-poll URL the SDK later derives stays consistent — while leaving unrelated
+// text alone.
+func TestScrubTopology(t *testing.T) {
+	scrub := newTopologyScrub("https://10.10.11.20:8006", "r740a")
+	i := &cassette.Interaction{
+		Request: cassette.Request{
+			Method: http.MethodPost,
+			URL:    "https://10.10.11.20:8006/api2/json/nodes/r740a/qemu/100/status/start",
+		},
+		Response: cassette.Response{
+			Body: `{"data":"UPID:r740a:0005:...:qmstart:100:root@pam!sdk:"}`,
+		},
+	}
+	scrub.apply(i)
+
+	for _, leak := range []string{"10.10.11.20", "r740a"} {
+		if strings.Contains(i.Request.URL, leak) || strings.Contains(i.Response.Body, leak) {
+			t.Errorf("topology %q survived scrub: url=%q body=%q", leak, i.Request.URL, i.Response.Body)
+		}
+	}
+	if !strings.Contains(i.Request.URL, "https://"+placeholderHost+"/api2/json/nodes/"+placeholderNode+"/") {
+		t.Errorf("scrubbed URL = %q, want placeholder host+node", i.Request.URL)
+	}
+	if !strings.Contains(i.Response.Body, "UPID:"+placeholderNode+":") {
+		t.Errorf("scrubbed UPID body = %q, want placeholder node", i.Response.Body)
+	}
+	// The token id is not topology and must survive (it is not a secret).
+	if !strings.Contains(i.Response.Body, "root@pam!sdk") {
+		t.Errorf("scrubbed body dropped the token id: %q", i.Response.Body)
+	}
+
+	// The zero scrub is a no-op (mockpve self-tests record verbatim).
+	blank := &cassette.Interaction{Request: cassette.Request{URL: "https://127.0.0.1:9/x"}}
+	topologyScrub{}.apply(blank)
+	if blank.Request.URL != "https://127.0.0.1:9/x" {
+		t.Errorf("zero scrub altered URL: %q", blank.Request.URL)
+	}
+}
+
 // TestTruncateUploadBody proves the BeforeSaveHook drops a multipart upload body
 // (so an ISO does not bloat the cassette) while leaving a non-multipart body
 // alone and preserving the multipart Content-Type for replay fidelity.
@@ -289,7 +406,7 @@ func TestRecorderRecordReplay(t *testing.T) {
 	cassettePath := filepath.Join(t.TempDir(), "selftest")
 
 	// --- Record against the live mockpve server, flushing explicitly. ---
-	rec := newRecorder(t, cassettePath, recorder.ModeRecordOnly, http.DefaultTransport)
+	rec := newRecorder(t, cassettePath, recorder.ModeRecordOnly, http.DefaultTransport, topologyScrub{})
 	c, err := proxmox.NewClient(ctx, ts.URL, creds, proxmox.WithHTTPClient(rec.GetDefaultClient()))
 	if err != nil {
 		t.Fatalf("record NewClient: %v", err)
@@ -319,7 +436,7 @@ func TestRecorderRecordReplay(t *testing.T) {
 	}
 
 	// --- Replay with the server gone; the recorded data must come back. ---
-	repClient := newRecorderClient(t, cassettePath, recorder.ModeReplayOnly, nil)
+	repClient := newRecorderClient(t, cassettePath, recorder.ModeReplayOnly, nil, topologyScrub{})
 	c2, err := proxmox.NewClient(ctx, ts.URL, creds, proxmox.WithHTTPClient(repClient))
 	if err != nil {
 		t.Fatalf("replay NewClient: %v", err)
