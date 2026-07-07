@@ -1,0 +1,121 @@
+---
+version: 2
+interactions:
+    - id: 0
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/version
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 72
+        body: '{"data":{"repoid":"5e5ae681198514d4","version":"9.2.4","release":"9.2"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "72"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 16:19:38 GMT
+            Expires:
+                - Sun, 05 Jul 2026 16:19:38 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 26.261625ms
+    - id: 1
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/access/users
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 101
+        body: '{"data":[{"realm-type":"pam","enable":1,"userid":"root@pam","email":"admin@fartlab.dev","expire":0}]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "101"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 16:19:38 GMT
+            Expires:
+                - Sun, 05 Jul 2026 16:19:38 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 13.143208ms
+    - id: 2
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/access/users/root@pam/token
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 51
+        body: '{"data":[{"expire":0,"privsep":0,"tokenid":"sdk"}]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "51"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 16:19:38 GMT
+            Expires:
+                - Sun, 05 Jul 2026 16:19:38 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 22.173084ms

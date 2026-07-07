@@ -11,10 +11,12 @@ import (
 )
 
 // UploadSpec carries a streaming upload. Filename is the name PVE stores the
-// object as; Reader supplies the bytes and is streamed (never buffered whole).
-// Pass it by pointer.
+// object as; Reader supplies the bytes. The bytes are streamed through a
+// multipart pipe and spooled to a temp file by the transport (pveproxy needs a
+// Content-Length), so the payload is never held whole in memory. Pass it by
+// pointer.
 type UploadSpec struct {
-	Filename string    // required, e.g. "debian-12.iso".
+	Filename string    // required, e.g. "debian-13.iso".
 	Reader   io.Reader // required; streamed to PVE.
 }
 
@@ -67,13 +69,15 @@ func (s *Service) upload(ctx context.Context, node, storage, content string, spe
 	return svcutil.TaskRef("storage.Upload", upid)
 }
 
-// writeUploadParts writes the content/filename fields and streams the file part.
+// writeUploadParts writes the content field and streams the file part. PVE's
+// upload endpoint wants exactly two parts: a "content" text field and a
+// "filename" file part (the canonical `-F content=iso -F filename=@file`). A
+// separate "filename" *text* field must NOT be sent — it shadows the file
+// part's field name, so pveproxy registers a plain-string param instead of the
+// upload and rejects the request with HTTP 400.
 func writeUploadParts(mw *multipart.Writer, content string, spec *UploadSpec) error {
 	if err := mw.WriteField("content", content); err != nil {
 		return fmt.Errorf("write content field: %w", err)
-	}
-	if err := mw.WriteField("filename", spec.Filename); err != nil {
-		return fmt.Errorf("write filename field: %w", err)
 	}
 	part, err := mw.CreateFormFile("filename", spec.Filename)
 	if err != nil {

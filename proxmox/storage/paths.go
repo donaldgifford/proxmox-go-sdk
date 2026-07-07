@@ -27,16 +27,10 @@ func nodeVolumePath(node, storage, volid string) string {
 	return nodeContentPath(node, storage) + "/" + url.PathEscape(volid)
 }
 
-// Volume-chain snapshots (9.1+). The exact PVE path is unconfirmed without a
-// live node; "<volume>/snapshot" mirrors the guest snapshot convention.
-
-func volumeSnapshotsPath(node, storage, volid string) string {
-	return nodeVolumePath(node, storage, volid) + "/snapshot"
-}
-
-func volumeSnapshotPath(node, storage, volid, snapname string) string {
-	return volumeSnapshotsPath(node, storage, volid) + "/" + snapname
-}
+// Note: PVE has no storage-level volume-snapshot endpoint (verified against a
+// live 9.2 node — the content API stops at .../content/{volume}). The
+// storage.VolumeSnapshots family therefore returns ErrUnsupported and needs no
+// path helper here; snapshots are driven through the guest (qemu/lxc).
 
 // Node-scoped ZFS pool management: GET/POST /nodes/{node}/disks/zfs and
 // GET /nodes/{node}/disks/zfs/{name}. RAIDZ expansion has no confirmed PVE REST

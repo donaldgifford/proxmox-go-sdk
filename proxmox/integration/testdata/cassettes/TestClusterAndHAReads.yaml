@@ -1,0 +1,123 @@
+---
+version: 2
+interactions:
+    - id: 0
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/version
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 72
+        body: '{"data":{"release":"9.2","version":"9.2.4","repoid":"5e5ae681198514d4"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "72"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 16:19:38 GMT
+            Expires:
+                - Sun, 05 Jul 2026 16:19:38 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 19.664958ms
+    - id: 1
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/resources
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 779
+        body: '{"data":[{"node":"pve","level":"","maxmem":134754836480,"uptime":962,"maxcpu":56,"maxdisk":231006797824,"cpu":0.000549392124198065,"mem":3648548864,"status":"online","disk":2717253632,"cgroup-mode":2,"id":"node/pve","type":"node"},{"status":"available","content":"images,rootdir","shared":0,"plugintype":"zfspool","node":"pve","type":"storage","id":"storage/pve/local-zfs","storage":"local-zfs","maxdisk":228289642496,"disk":98304},{"status":"available","content":"vztmpl,import,backup,iso","shared":0,"plugintype":"dir","node":"pve","type":"storage","id":"storage/pve/local","storage":"local","maxdisk":228289675264,"disk":131072},{"network":"localnetwork","node":"pve","network-type":"zone","status":"ok","type":"network","id":"network/pve/zone/localnetwork"}]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "779"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 16:19:38 GMT
+            Expires:
+                - Sun, 05 Jul 2026 16:19:38 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 7.270792ms
+    - id: 2
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Authorization:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/ha/resources
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 11
+        body: '{"data":[]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "11"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Sun, 05 Jul 2026 16:19:38 GMT
+            Expires:
+                - Sun, 05 Jul 2026 16:19:38 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 6.733542ms

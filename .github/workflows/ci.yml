@@ -67,6 +67,27 @@ jobs:
           slug: donaldgifford/commons
         continue-on-error: true
 
+  test-replay:
+    name: Test Replay (cassettes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Set up mise (for just)
+        uses: jdx/mise-action@v4
+        with:
+          experimental: true
+
+      # Replays the committed go-vcr cassettes through the integration suite with
+      # no live node, so every phase's SDK request paths are exercised in CI.
+      - name: Replay recorded cassettes (no live node)
+        run: just test-replay
+
   security:
     name: Security Scan
     runs-on: ubuntu-latest

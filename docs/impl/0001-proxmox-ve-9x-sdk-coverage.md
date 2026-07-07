@@ -39,6 +39,7 @@ created: 2026-06-22
       - [Success Criteria](#success-criteria-5)
   - [File Changes](#file-changes)
   - [Testing Plan](#testing-plan)
+    - [Outstanding live verification](#outstanding-live-verification)
   - [Dependencies](#dependencies)
   - [Open Questions](#open-questions)
   - [References](#references)
@@ -251,11 +252,12 @@ The 9.x-reworked area — model rules, never the deprecated groups.
 
 #### Success Criteria
 
-- [x] Define a resource-affinity rule via the SDK and observe placement honor it
-      — the rule definition + read-back is covered by the runnable `ha`
-      `Example` and `TestCreateResourceAffinityRule` (mock-verified). The
-      **placement-honored observation is live-only** (the mock does not
-      schedule) and remains written-but-unverified without a real cluster.
+- [~] Define a resource-affinity rule via the SDK and observe placement honor it
+  — the rule definition + read-back is covered by the runnable `ha` `Example`
+  and `TestCreateResourceAffinityRule` (mock-verified). The **placement-honored
+  observation is live-only** (the mock does not schedule) and remains
+  written-but-unverified without a real ≥2-node 9.2 cluster — tracked in
+  [Outstanding live verification](#outstanding-live-verification).
 
 ---
 
@@ -429,9 +431,10 @@ The 9.x-reworked area — model rules, never the deprecated groups.
 > `Console().Connect` dials the ticket over `api.DoWebSocket` and is exercised
 > against a `mockpve` hijack+echo `/vncwebsocket` upgrade, so the SDK plumbing
 > is verified; the **live VNC (RFB) wire payload** is the one **live-only**
-> piece, written-but-unverified here (no live 9.x node / recorded cassettes —
-> see CLAUDE.md). Several Phase-6 surfaces are REST-with-caveat (DEB822, SMART,
-> ACME task-vs-sync, Ceph/PBS paths, RRD pressure-stall/ZFS-ARC) or documented
+> piece, written-but-unverified here (no live VNC session captured — tracked in
+> [Outstanding live verification](#outstanding-live-verification)). Several
+> Phase-6 surfaces are REST-with-caveat (DEB822, SMART, ACME task-vs-sync,
+> Ceph/PBS paths, RRD pressure-stall/ZFS-ARC) or documented
 > `pverr.ErrUnsupported` stubs (Ceph RBD mirroring, PBS verify, metrics OTel,
 > console VerifyVNCTicket) where no PVE 9.x REST endpoint is confirmed.
 
@@ -469,9 +472,10 @@ file. This table maps the real code to phases. Column widths are re-aligned by
       in-process `mockpve` responder; `just test` (race + coverage) is green
       module-wide.
 - [~] Integration tests against a live 9.x node (and a 9.2 node for `(9.2+)`
-  rows); harness per **OQ-5** — **harness written & compile-verified, execution
-  live-only.** `proxmox/integration/` holds the build-tagged
-  (`//go:build integration`) suite, an env-configured client
+  rows); harness per **OQ-5** — **harness written, and now run end-to-end
+  against a live 9.2-1 node (`r740a`); two live-only criteria remain.**
+  `proxmox/integration/` holds the build-tagged (`//go:build integration`)
+  suite, an env-configured client
   (`PVE_ENDPOINT`/`PVE_TOKEN_ID`/`PVE_TOKEN_SECRET`, optional
   `PVE_NODE`/`PVE_INSECURE_TLS`) that skips when unset, with a test mapped to
   **every phase's Success Criterion**:
@@ -479,17 +483,26 @@ file. This table maps the real code to phases. Column widths are re-aligned by
   - **P2** destructive create→start→snapshot→rollback→stop→delete for **both
     QEMU** (`PVE_TEST_STORAGE`+`PVE_TEST_VMID`) **and LXC**
     (`PVE_TEST_STORAGE`+`PVE_TEST_LXC_VMID`+`PVE_TEST_LXC_TEMPLATE`);
-  - **P3** ISO upload (`PVE_TEST_ISO_PATH`) + volume-chain snapshot lifecycle
-    (`PVE_TEST_VOLID`);
+  - **P3** ISO upload (`PVE_TEST_ISO_STORAGE`+`PVE_TEST_ISO_PATH`); the
+    volume-chain snapshot criterion is retired — PVE has no storage-level
+    snapshot endpoint (confirmed on `r740a`), so those ops are
+    `pverr.ErrUnsupported`;
   - **P4** define a resource-affinity HA rule + read-back (`PVE_TEST_HA_SIDS`);
   - **P5** enumerate zones/VNets/fabrics;
-  - **P6** access user/token reads + VNC ticket mint (`PVE_TEST_VMID`).
+  - **P6** access user/token reads + VNC ticket mint (`PVE_TEST_CONSOLE_VMID`;
+    the console test spins up its own scratch VM).
 
   Read-only tests are safe against any cluster; destructive tests are env-gated
   and clean up after themselves. It compiles under `go vet -tags=integration`
-  and skips cleanly with no node here; **running it against a live 9.x node (and
-  capturing the go-vcr cassettes for CI replay) is the deferred,
-  environment-blocked remainder.**
+  and skips cleanly with no node. **Live-verified against `r740a` (9.2-1) with
+  `PVE_RECORD=1`, cassettes committed and replaying in CI:** P1 version
+  round-trip; the P2–P6 reads; P2 QEMU **and** LXC lifecycles; P3 ISO upload; P6
+  VNC ticket mint. **Two criteria remain genuinely live-only** (no node here can
+  cover them): P4's resource-affinity rule needs a second 9.2 node for a real HA
+  cluster, and P6's VNC (RFB) wire payload is the live byte stream
+  `console.Connect` carries. The P3 volume-chain-snapshot line was resolved by
+  inspecting `r740a`'s `apidoc.js` — PVE exposes no storage-level snapshot
+  endpoint, so it is `pverr.ErrUnsupported`, not a pending live check.
 
 - [x] Table-driven tests for the `0/1`→bool + config-struct (un)marshalling —
       `proxmox/types/types_test.go` covers `PVEBool` both directions; the
@@ -505,6 +518,29 @@ file. This table maps the real code to phases. Column widths are re-aligned by
 - [x] `Example` functions compile + run under `go test`; `go doc ./...` renders
       every package's overview (godoc coverage gate) — every service + `mockpve`
       package ships a runnable `Example`; no `Skeleton` doc stubs remain.
+
+### Outstanding live verification
+
+Every implementation task is done and the suite has run end-to-end against a
+live 9.2-1 node (`r740a`), with the resulting cassettes committed and replaying
+in CI (`just test-replay`). **Two Success Criteria remain genuinely live-only**
+and cannot be verified in the current environment — track them here until a
+suitable cluster is reachable:
+
+- [ ] **P4 — resource-affinity placement honored.** The rule is defined and read
+      back (mock-verified + the `ha` `Example`), but observing the scheduler
+      _act_ on it needs a **real ≥2-node 9.2 HA cluster**. Only one 9.2 node
+      (`r740a`) is available, so `TestResourceAffinityRule` has no cassette and
+      is excluded from `just test-replay`.
+- [ ] **P6 — VNC (RFB) wire payload.** Ticket mint is live-verified
+      (`TestConsoleMint`) and `Connect` is exercised against a `mockpve`
+      hijack+echo upgrade, but the **live RFB byte stream** a real node returns
+      over `console.Connect` is unverified (no live VNC session captured).
+
+Neither blocks the MVP surface (both ops exist, are typed, and are mock-tested);
+they are verification gaps, not missing functionality. Do **not** mark either
+`[x]` — or emit the loop's completion promise — until each is confirmed against
+live hardware.
 
 ## Dependencies
 

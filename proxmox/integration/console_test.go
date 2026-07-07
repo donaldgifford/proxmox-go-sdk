@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/console"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/qemu"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/types"
 )
 
@@ -30,22 +31,73 @@ func TestAccessReads(t *testing.T) {
 }
 
 // TestConsoleMint covers the other half of the Phase 6 criterion: minting a VNC
-// console ticket for a VM. It needs a real VMID (PVE_TEST_VMID) and skips
-// otherwise. Minting is non-destructive — it does not dial or alter the guest.
+// console ticket for a VM. It is self-contained — it spins up its own scratch VM
+// (create + start), mints against it, then tears it down (stop + delete) in
+// cleanup — so it does not depend on a pre-existing guest and never touches one.
+// It is gated on PVE_TEST_STORAGE and PVE_TEST_CONSOLE_VMID and skips otherwise.
+// The VMID is deliberately its own gate (not the shared PVE_TEST_VMID) so this
+// test can run in the same invocation as TestQEMULifecycle without both trying to
+// create the same VMID. Minting itself is non-destructive — it does not dial or
+// alter the running guest.
 func TestConsoleMint(t *testing.T) {
 	c := newClient(t)
-	ctx := testCtx(t)
+	node := testNode()
 
-	raw := os.Getenv(envTestVMID)
-	if raw == "" {
-		t.Skipf("no scratch VM configured (set %s to an existing VMID)", envTestVMID)
+	storage := os.Getenv(envTestStorage)
+	raw := os.Getenv(envTestConsoleVMID)
+	if storage == "" || raw == "" {
+		t.Skipf("console mint disabled (set %s and %s)", envTestStorage, envTestConsoleVMID)
 	}
 	vmid, err := strconv.Atoi(raw)
 	if err != nil {
-		t.Fatalf("%s=%q is not an integer: %v", envTestVMID, raw, err)
+		t.Fatalf("%s=%q is not an integer: %v", envTestConsoleVMID, raw, err)
 	}
 
-	ticket, err := c.Console().MintVNCTicket(ctx, testNode(), console.KindQEMU, types.VMID(vmid))
+	q := c.QEMU(node)
+	ts := c.Tasks()
+
+	// Spin up a scratch VM so the VMID exists for the mint.
+	ref, err := q.Create(testCtx(t), &qemu.CreateSpec{
+		VMID:    types.VMID(vmid),
+		Name:    "sdk-itest-console",
+		Memory:  512,
+		Cores:   1,
+		Net0:    "virtio,bridge=vmbr0",
+		SCSI0:   storage + ":8",
+		Storage: storage,
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	// Tear down even if a later step fails: a running VM cannot be destroyed, so
+	// stop first (best-effort — it may already be stopped), then delete.
+	t.Cleanup(func() {
+		ctx, cancel := cleanupCtx()
+		defer cancel()
+		if sref, serr := q.Stop(ctx, vmid); serr != nil {
+			t.Logf("cleanup Stop(%d): %v", vmid, serr)
+		} else if _, werr := ts.Wait(ctx, sref); werr != nil {
+			t.Logf("cleanup Wait(stop): %v", werr)
+		}
+		dref, derr := q.Delete(ctx, vmid)
+		if derr != nil {
+			t.Logf("cleanup Delete(%d): %v", vmid, derr)
+			return
+		}
+		if _, werr := ts.Wait(ctx, dref); werr != nil {
+			t.Logf("cleanup Wait(delete): %v", werr)
+		}
+	})
+	mustSucceed(t, ts, ref, "create")
+
+	// Start it so the mint is against a running guest.
+	ref, err = q.Start(testCtx(t), vmid)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	mustSucceed(t, ts, ref, "start")
+
+	ticket, err := c.Console().MintVNCTicket(testCtx(t), node, console.KindQEMU, types.VMID(vmid))
 	if err != nil {
 		t.Fatalf("Console().MintVNCTicket(vmid=%d): %v", vmid, err)
 	}

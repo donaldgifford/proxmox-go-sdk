@@ -28,7 +28,7 @@ func newServiceAndTasks(t *testing.T, mock *mockpve.Server) (*storage.Service, *
 	return storage.NewService(c, version.Capabilities{}), tasks.NewService(c)
 }
 
-func newCappedServiceAndTasks(t *testing.T, mock *mockpve.Server, ver string) (*storage.Service, *tasks.Service) {
+func newCappedService(t *testing.T, mock *mockpve.Server, ver string) *storage.Service {
 	t.Helper()
 	c, cleanup := mock.NewClient()
 	t.Cleanup(cleanup)
@@ -36,7 +36,7 @@ func newCappedServiceAndTasks(t *testing.T, mock *mockpve.Server, ver string) (*
 	if err != nil {
 		t.Fatalf("version.Parse(%q): %v", ver, err)
 	}
-	return storage.NewService(c, caps), tasks.NewService(c)
+	return storage.NewService(c, caps)
 }
 
 func awaitOK(t *testing.T, ts *tasks.Service, ref tasks.Ref) {
@@ -252,62 +252,34 @@ func TestDeleteVolumeNotFound(t *testing.T) {
 	}
 }
 
-func TestVolumeSnapshotGatedPre91(t *testing.T) {
+// TestVolumeSnapshotsUnsupported pins the reclassification: PVE exposes no
+// storage-level volume-snapshot REST endpoint (verified against a live 9.2 node,
+// where the content API stops at .../content/{volume}), so all three ops return
+// pverr.ErrUnsupported on every version — including 9.2, and regardless of the
+// spec — directing callers at the guest snapshot API. See storage.VolumeSnapshots.
+func TestVolumeSnapshotsUnsupported(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()
 	mock.AddVolume(testNode, "dir", "dir:vm-100-disk-0.qcow2", "images", "qcow2", 8<<30)
-	svc, _ := newCappedServiceAndTasks(t, mock, "9.0.3") // below the 9.1 gate.
+	svc := newCappedService(t, mock, "9.2") // newest supported minor.
 	ctx := context.Background()
 	const volid = "dir:vm-100-disk-0.qcow2"
 
 	_, listErr := svc.VolumeSnapshots(ctx, testNode, "dir", volid)
 	if !errors.Is(listErr, pverr.ErrUnsupported) {
-		t.Errorf("VolumeSnapshots on 9.0 = %v, want ErrUnsupported", listErr)
+		t.Errorf("VolumeSnapshots = %v, want ErrUnsupported", listErr)
 	}
 	_, createErr := svc.CreateVolumeSnapshot(ctx, testNode, "dir", volid, &storage.VolumeSnapshotSpec{Name: "s1"})
 	if !errors.Is(createErr, pverr.ErrUnsupported) {
-		t.Errorf("CreateVolumeSnapshot on 9.0 = %v, want ErrUnsupported", createErr)
+		t.Errorf("CreateVolumeSnapshot = %v, want ErrUnsupported", createErr)
+	}
+	// Even a nil spec resolves to ErrUnsupported (no endpoint to validate against).
+	if _, err := svc.CreateVolumeSnapshot(ctx, testNode, "dir", volid, nil); !errors.Is(err, pverr.ErrUnsupported) {
+		t.Errorf("CreateVolumeSnapshot(nil) = %v, want ErrUnsupported", err)
 	}
 	_, delErr := svc.DeleteVolumeSnapshot(ctx, testNode, "dir", volid, "s1")
 	if !errors.Is(delErr, pverr.ErrUnsupported) {
-		t.Errorf("DeleteVolumeSnapshot on 9.0 = %v, want ErrUnsupported", delErr)
-	}
-}
-
-func TestVolumeSnapshotLifecycle(t *testing.T) {
-	t.Parallel()
-	mock := mockpve.New()
-	mock.AddVolume(testNode, "dir", "dir:vm-100-disk-0.qcow2", "images", "qcow2", 8<<30)
-	svc, ts := newCappedServiceAndTasks(t, mock, "9.1")
-	ctx := context.Background()
-	const volid = "dir:vm-100-disk-0.qcow2"
-
-	ref, err := svc.CreateVolumeSnapshot(ctx, testNode, "dir", volid, &storage.VolumeSnapshotSpec{Name: "pre-change"})
-	if err != nil {
-		t.Fatalf("CreateVolumeSnapshot: %v", err)
-	}
-	awaitOK(t, ts, ref)
-
-	snaps, err := svc.VolumeSnapshots(ctx, testNode, "dir", volid)
-	if err != nil {
-		t.Fatalf("VolumeSnapshots: %v", err)
-	}
-	if len(snaps) != 1 || snaps[0].Name != "pre-change" {
-		t.Fatalf("VolumeSnapshots = %+v, want one named pre-change", snaps)
-	}
-
-	ref, err = svc.DeleteVolumeSnapshot(ctx, testNode, "dir", volid, "pre-change")
-	if err != nil {
-		t.Fatalf("DeleteVolumeSnapshot: %v", err)
-	}
-	awaitOK(t, ts, ref)
-
-	snaps, err = svc.VolumeSnapshots(ctx, testNode, "dir", volid)
-	if err != nil {
-		t.Fatalf("VolumeSnapshots after delete: %v", err)
-	}
-	if len(snaps) != 0 {
-		t.Fatalf("VolumeSnapshots after delete = %+v, want none", snaps)
+		t.Errorf("DeleteVolumeSnapshot = %v, want ErrUnsupported", delErr)
 	}
 }
 
@@ -469,7 +441,7 @@ func TestCreateZFSPoolValidation(t *testing.T) {
 func TestExpandRAIDZGatedPre92(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()
-	svc, _ := newCappedServiceAndTasks(t, mock, "9.1") // below the 9.2 gate.
+	svc := newCappedService(t, mock, "9.1") // below the 9.2 gate.
 	spec := &storage.RAIDZExpandSpec{Pool: "tank", Device: "/dev/sde"}
 
 	_, err := svc.ExpandRAIDZ(context.Background(), testNode, spec)
@@ -481,7 +453,7 @@ func TestExpandRAIDZGatedPre92(t *testing.T) {
 func TestExpandRAIDZNoRESTEndpoint(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()
-	svc, _ := newCappedServiceAndTasks(t, mock, "9.2") // gate satisfied.
+	svc := newCappedService(t, mock, "9.2") // gate satisfied.
 	spec := &storage.RAIDZExpandSpec{Pool: "tank", Device: "/dev/sde"}
 
 	// Even on 9.2 there is no PVE REST endpoint for RAIDZ expansion: the op
@@ -492,24 +464,5 @@ func TestExpandRAIDZNoRESTEndpoint(t *testing.T) {
 	}
 	if _, err := svc.ExpandRAIDZ(context.Background(), testNode, nil); err == nil {
 		t.Error("ExpandRAIDZ(nil) error = nil, want non-nil")
-	}
-}
-
-func TestVolumeSnapshotValidation(t *testing.T) {
-	t.Parallel()
-	mock := mockpve.New()
-	mock.AddVolume(testNode, "dir", "dir:vm-100-disk-0.qcow2", "images", "qcow2", 8<<30)
-	svc, _ := newCappedServiceAndTasks(t, mock, "9.1")
-	ctx := context.Background()
-	const volid = "dir:vm-100-disk-0.qcow2"
-
-	if _, err := svc.CreateVolumeSnapshot(ctx, testNode, "dir", volid, nil); err == nil {
-		t.Error("CreateVolumeSnapshot(nil) error = nil, want non-nil")
-	}
-	if _, err := svc.CreateVolumeSnapshot(ctx, testNode, "dir", volid, &storage.VolumeSnapshotSpec{}); err == nil {
-		t.Error("CreateVolumeSnapshot(no name) error = nil, want non-nil")
-	}
-	if _, err := svc.DeleteVolumeSnapshot(ctx, testNode, "dir", volid, ""); err == nil {
-		t.Error("DeleteVolumeSnapshot(no name) error = nil, want non-nil")
 	}
 }

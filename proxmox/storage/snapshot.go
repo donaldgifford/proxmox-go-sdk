@@ -3,14 +3,15 @@ package storage
 import (
 	"context"
 	"fmt"
-	"net/http"
 
-	"github.com/donaldgifford/proxmox-go-sdk/proxmox/internal/svcutil"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/pverr"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/tasks"
 )
 
-// VolumeSnapshot is one entry from the volume's snapshot listing. A volume-chain
-// snapshot is a point-in-time layer in the volume's qcow2 chain.
+// VolumeSnapshot is one entry from a volume's snapshot listing. A volume-chain
+// snapshot is a point-in-time layer in the volume's qcow2 chain. The type is
+// retained for a future PVE release that may expose a storage-level snapshot
+// endpoint; see VolumeSnapshots for why the ops are currently unsupported.
 type VolumeSnapshot struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
@@ -19,7 +20,7 @@ type VolumeSnapshot struct {
 }
 
 // VolumeSnapshotSpec is the body of a volume-snapshot create. Name is required.
-// Pass it by pointer.
+// Pass it by pointer. Retained alongside VolumeSnapshot; see VolumeSnapshots.
 type VolumeSnapshotSpec struct {
 	Name        string `json:"snapname"`
 	Description string `json:"description,omitempty"`
@@ -27,62 +28,48 @@ type VolumeSnapshotSpec struct {
 	Extra map[string]string `json:"-"`
 }
 
-// VolumeSnapshots lists a volume's chain snapshots.
+// VolumeSnapshots would list a volume's chain snapshots, but PVE exposes no
+// storage-level snapshot REST endpoint, so it always returns pverr.ErrUnsupported.
 //
-// Snapshots-as-volume-chains are a PVE 9.1 capability (see
+// Snapshots-as-volume-chains are a real PVE 9.1 storage capability (see
 // version.Capabilities.VolumeChainSnapshots) that brings snapshots to storage
 // without native support — thick LVM, Directory, NFS, CIFS — by layering qcow2.
-// Storage with native snapshots (ZFS, btrfs, LVM-thin) does not need it.
-//
-// API-shape caveat: the standalone storage-level volume-snapshot endpoint is not
-// confirmed against a live 9.x node (no apidoc ships in this repo). The version
-// gate is firm; the request path may need adjustment once a node is reachable.
-func (s *Service) VolumeSnapshots(ctx context.Context, node, storage, volid string) ([]VolumeSnapshot, error) {
-	if err := s.caps.Require("volume-chain snapshots", "9.1"); err != nil {
-		return nil, fmt.Errorf("storage.VolumeSnapshots: %w", err)
-	}
-	var snaps []VolumeSnapshot
-	if err := s.c.DoRequest(ctx, http.MethodGet, volumeSnapshotsPath(node, storage, volid), nil, &snaps); err != nil {
-		return nil, fmt.Errorf("storage.VolumeSnapshots: %w", err)
-	}
-	return snaps, nil
+// But the mechanism has no standalone storage endpoint: verified against a live
+// 9.2 node, the storage content API stops at /nodes/{node}/storage/{storage}/
+// content/{volume} with no .../snapshot child. Snapshots are taken through the
+// owning guest — qemu.CreateSnapshot / lxc.CreateSnapshot — and PVE builds the
+// volume chain underneath on supported storage. For raw storage-plugin snapshot
+// operations on an unattached volume there is no API at all; use the ssh
+// side-channel. This mirrors storage.ExpandRAIDZ / ha.ArmHA, which are likewise
+// stubbed because no REST endpoint exists.
+func (*Service) VolumeSnapshots(_ context.Context, _, _, _ string) ([]VolumeSnapshot, error) {
+	return nil, volumeSnapshotUnsupported("VolumeSnapshots")
 }
 
-// CreateVolumeSnapshot snapshots a volume and returns the snapshot task. Gated
-// on the 9.1 VolumeChainSnapshots capability (see VolumeSnapshots).
-func (s *Service) CreateVolumeSnapshot(ctx context.Context, node, storage, volid string, spec *VolumeSnapshotSpec) (tasks.Ref, error) {
-	if spec == nil {
-		return tasks.Ref{}, fmt.Errorf("storage.CreateVolumeSnapshot: %w", svcutil.ErrNilSpec)
-	}
-	if err := s.caps.Require("volume-chain snapshots", "9.1"); err != nil {
-		return tasks.Ref{}, fmt.Errorf("storage.CreateVolumeSnapshot: %w", err)
-	}
-	if spec.Name == "" {
-		return tasks.Ref{}, fmt.Errorf("storage.CreateVolumeSnapshot: snapshot name: %w", svcutil.ErrMissingField)
-	}
-	body, err := svcutil.EncodeWithExtra(spec, spec.Extra)
-	if err != nil {
-		return tasks.Ref{}, fmt.Errorf("storage.CreateVolumeSnapshot: %w", err)
-	}
-	var upid string
-	if derr := s.c.DoRequest(ctx, http.MethodPost, volumeSnapshotsPath(node, storage, volid), body, &upid); derr != nil {
-		return tasks.Ref{}, fmt.Errorf("storage.CreateVolumeSnapshot: %w", derr)
-	}
-	return svcutil.TaskRef("storage.CreateVolumeSnapshot", upid)
+// CreateVolumeSnapshot always returns pverr.ErrUnsupported: PVE has no
+// storage-level volume-snapshot REST endpoint. Snapshot the owning guest with
+// qemu.CreateSnapshot / lxc.CreateSnapshot instead (see VolumeSnapshots).
+func (*Service) CreateVolumeSnapshot(_ context.Context, _, _, _ string, _ *VolumeSnapshotSpec) (tasks.Ref, error) {
+	return tasks.Ref{}, volumeSnapshotUnsupported("CreateVolumeSnapshot")
 }
 
-// DeleteVolumeSnapshot removes a volume-chain snapshot and returns the deletion
-// task. Gated on the 9.1 VolumeChainSnapshots capability (see VolumeSnapshots).
-func (s *Service) DeleteVolumeSnapshot(ctx context.Context, node, storage, volid, snapname string) (tasks.Ref, error) {
-	if err := s.caps.Require("volume-chain snapshots", "9.1"); err != nil {
-		return tasks.Ref{}, fmt.Errorf("storage.DeleteVolumeSnapshot: %w", err)
-	}
-	if snapname == "" {
-		return tasks.Ref{}, fmt.Errorf("storage.DeleteVolumeSnapshot: snapshot name: %w", svcutil.ErrMissingField)
-	}
-	var upid string
-	if err := s.c.DoRequest(ctx, http.MethodDelete, volumeSnapshotPath(node, storage, volid, snapname), nil, &upid); err != nil {
-		return tasks.Ref{}, fmt.Errorf("storage.DeleteVolumeSnapshot: %w", err)
-	}
-	return svcutil.TaskRef("storage.DeleteVolumeSnapshot", upid)
+// DeleteVolumeSnapshot always returns pverr.ErrUnsupported: PVE has no
+// storage-level volume-snapshot REST endpoint. Drop the snapshot through the
+// owning guest with qemu.DeleteSnapshot / lxc.DeleteSnapshot instead (see
+// VolumeSnapshots).
+func (*Service) DeleteVolumeSnapshot(_ context.Context, _, _, _, _ string) (tasks.Ref, error) {
+	return tasks.Ref{}, volumeSnapshotUnsupported("DeleteVolumeSnapshot")
+}
+
+// volumeSnapshotUnsupported builds the shared ErrUnsupported error, naming the op
+// and pointing callers at the guest snapshot API (the path that actually drives
+// the 9.1 volume-chain mechanism) and the ssh side-channel.
+func volumeSnapshotUnsupported(op string) error {
+	return fmt.Errorf(
+		"storage.%s: PVE exposes no storage-level volume-snapshot REST endpoint; "+
+			"snapshot the owning guest with qemu/lxc.CreateSnapshot (the 9.1 "+
+			"volume-chain mechanism runs underneath on supported storage), or use "+
+			"the ssh side-channel for raw storage-plugin operations: %w",
+		op, pverr.ErrUnsupported,
+	)
 }

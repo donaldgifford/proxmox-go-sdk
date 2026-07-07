@@ -266,15 +266,19 @@ awaiting every task); a live 9.x node is not reachable here, so the end-to-end
 behaviour against real PVE is written-but-unverified.
 
 **Phase 3 (storage) is implementation-complete** — all 7 tasks checked in
-IMPL-0001 and the Success Criterion (upload ISO → volume-chain snapshot where
-supported → clean up) is covered by a runnable `storage` `Example` plus
-`TestVolumeSnapshotLifecycle` (mock-verified; live-node behaviour
-written-but-unverified). The `storage` service was **go-architect designed** and
-differs from compute in one structural way: `c.Storage()` is **not node-scoped**
-(DESIGN-0001) — `storage.Service{c, caps}` holds no node; cluster-scoped
-datastore config reads (`/storage`, `/storage/{id}`) take no node, while
-per-node status/content/volume/upload/zfs ops take `node` as a per-call arg.
-`Datastore` reads are lossless (custom `UnmarshalJSON` → `Extra`;
+IMPL-0001. The Success Criterion narrowed after live verification: **PVE exposes
+no storage-level volume-snapshot REST endpoint** (confirmed on live 9.2 node
+`r740a` — `/nodes/{node}/storage/{storage}/content` stops at `/{volume}`, no
+`/snapshot` child), so the "volume-chain snapshot" half was reclassified to
+documented `ErrUnsupported` (see the `storage.VolumeSnapshots` reclassification
+note below). What's live-verified is the **ISO upload** half (`TestISOUpload`
+passes end-to-end on `r740a`); the runnable `storage` `Example` now shows upload
+→ volume create → delete. The `storage` service was **go-architect designed**
+and differs from compute in one structural way: `c.Storage()` is **not
+node-scoped** (DESIGN-0001) — `storage.Service{c, caps}` holds no node;
+cluster-scoped datastore config reads (`/storage`, `/storage/{id}`) take no
+node, while per-node status/content/volume/upload/zfs ops take `node` as a
+per-call arg. `Datastore` reads are lossless (custom `UnmarshalJSON` → `Extra`;
 `datastoreKnownFields` kept in sync). `ListContent` filters via functional
 options (`WithContentType`/`WithVMID`) that build a `?content=…&vmid=…` query
 appended to the GET path (GET bodies aren't form-encoded, so query goes in the
@@ -300,14 +304,28 @@ no storage-level resize or move endpoint** — only volume _allocate_
 (`POST /qemu/{vmid}/move_disk`, `MoveDiskSpec`). Don't add fake storage
 resize/move endpoints.
 
-Task 3 (volume-chain snapshots) is the SDK's first **storage** version-gated op:
-`VolumeSnapshots`/`CreateVolumeSnapshot`/`DeleteVolumeSnapshot` gate on
-`caps.Require("volume-chain snapshots", "9.1")` (new
-`version.Capabilities.VolumeChainSnapshots()`), bringing snapshots to storage
-without native support (thick-LVM, dir/NFS/CIFS via qcow2 chains). **The gate is
-the firm, mock-verified part; the storage-level snapshot endpoint shape is
-unconfirmed** (no apidoc) — the path `…/content/{volid}/snapshot` mirrors the
-guest convention and is documented as needing live-node verification.
+Task 3 (volume-chain snapshots) was **reclassified to `ErrUnsupported` after
+live verification**. It originally shipped
+`VolumeSnapshots`/`CreateVolumeSnapshot`/ `DeleteVolumeSnapshot` gated on
+`caps.Require("volume-chain snapshots", "9.1")` against a **guessed** path
+`…/content/{volid}/snapshot`. That path does not exist: on live 9.2 node
+`r740a`, `grep …/content` in the node's own `apidoc.js` shows the storage
+content API stops at `/nodes/{node}/storage/{storage}/content/{volume}` — no
+`/snapshot` child. Per the honesty rule (the `ExpandRAIDZ`/`ArmHA`/RBD-mirroring
+precedent), the three ops now **always return `pverr.ErrUnsupported`** (no
+version gate, no request), with docs redirecting callers to
+`qemu.CreateSnapshot`/`lxc.CreateSnapshot` — the guest snapshot API is what
+actually drives the 9.1 volume-chain mechanism underneath on supported storage;
+raw storage-plugin ops go via the ssh side-channel. The
+`VolumeSnapshot`/`VolumeSnapshotSpec` types are retained (for a future PVE
+release that may add the endpoint).
+`version.Capabilities. VolumeChainSnapshots()` **stays** but is now documented
+as an _informational_ capability (does the storage support guest snapshots at
+all), not a gate for a storage endpoint. The mock's `…/content/{volid}/snapshot`
+routes/handlers + `volSnapRecord`/`volSnapshotPayload` types were removed
+(mockpve mirrors real PVE); the `volumeSnapshotsPath` helper is gone. Unit
+guard: `TestVolumeSnapshotsUnsupported`. No live volume-snapshot integration
+test (nothing hits the node); `PVE_TEST_VOLID` retired.
 
 Task 4 (ISO/disk-image streaming upload) extended the **transport**: the
 `api.Client` interface gained
@@ -532,19 +550,85 @@ environment.** This shapes how we test and what "done" means:
   fuzzed-`mockpve` pipeline (OQ-4/5/10) is a capture step deferred until a live
   9.x node is reachable; `mockpve` is built so that corpus can seed it later
   without redesign.
+- **The go-vcr record/replay harness now EXISTS**
+  (`proxmox/integration/ recorder_test.go`, non-tagged so it runs in the default
+  suite): a `BeforeSaveHook` redacts secrets (Authorization/Cookie/CSRF headers,
+  password/secret/otp form fields, ticket/CSRF/token-value response bodies) to
+  `REDACTED` **before** the cassette hits disk; a method+URL matcher
+  (`matchMethodURL`) tolerates the redacted headers on replay. `newRecorder`/
+  `newRecorderClient` inject a go-vcr `*http.Client` via
+  `proxmox.WithHTTPClient` (which bypasses the SDK's TLS opts, so record mode
+  applies insecure-TLS to the recorder's real transport instead).
+  `TestRedactInteraction` + `TestRecorderRecordReplay` prove
+  record→redact→replay end-to-end against `mockpve` (server closed before
+  replay) and run in CI — real verification here, no node. **Capturing real
+  cassettes is still live-only** (I cannot reach a node); the harness records to
+  `proxmox/integration/testdata/cassettes/` under `PVE_RECORD=1`. **Ten reviewed
+  cassettes are now committed** (force-added past the dir's `*.yaml` gitignore):
+  version + per-phase reads, QEMU/LXC lifecycles, ISO upload, console mint —
+  each scrubbed of secrets (Authorization/token, console VNC ticket+password,
+  LXC password) **and** lab topology (endpoint host/IP + node name rewritten to
+  `pve.example`/`pve`; the ISO body truncated). **CI replay is now wired in**: a
+  `PVE_REPLAY=1` mode in the harness (`newReplayClient`) backs each test with
+  its committed cassette in `ModeReplayOnly` against the placeholder endpoint,
+  the matcher is host-agnostic (method + path+query, renamed
+  `matchMethodURL`→`matchReplayRequest`), and `just test-replay` (the new
+  `Test Replay (cassettes)` CI job) runs the 10 cassette-backed tests with no
+  live node. Recording collapses two identical `/version` fetches into one
+  interaction, so `TestVersionRoundTrip` asserts on `NewClient`'s cached caps
+  rather than re-fetching (else replay 404s on the second).
+  `TestResourceAffinityRule` has **no** cassette (needs a 2-node HA cluster) and
+  is excluded from the replay run. **`TESTING.md`** is the thorough manual
+  walkthrough (token creation → env → per-phase lifecycle runs → recording);
+  `DEVELOPMENT.md`'s live-node section now points at it. **The recorder must NOT
+  set `WithReplayableInteractions(true)`** — a task-status poll loop makes many
+  identical GETs to `/tasks/{upid}/status`, and that flag serves the first
+  recording ("running") for all of them, so in record mode the task never
+  reaches "stopped" and `tasks.Wait` spins to its deadline (found live; guarded
+  by `TestRecorderRecordsEachPoll`). Destructive-test teardown uses `cleanupCtx`
+  (90s), not `context.Background()`, so a wedged delete fails fast instead of
+  hanging to the 10-min binary panic. `PVE_DEBUG=1` streams one `slog` line per
+  SDK request (method+URL) — the fastest way to see a silent poll loop.
+- **Live verification (user-run, 9.2-1 node `r740a`):** the suite has now run
+  end-to-end against real PVE with `PVE_RECORD=1`, and the resulting cassettes
+  are committed + replay green in CI (`just test-replay` / the
+  `Test Replay (cassettes)` job). **Live-verified:** P1 version round-trip; the
+  P2–P6 read criteria (compute/storage/cluster+HA/network/access reads); P2
+  **QEMU** lifecycle (create → start → snapshot → rollback-while-running → stop
+  → delete) **and P2 LXC** lifecycle; P3 **ISO upload** (drove out the
+  chunked-body 501 + redundant-multipart-field 400 bugs); and P6 **VNC ticket
+  mint** (`TestConsoleMint`, spins up its own scratch VM). **Still
+  written-but-unverified (genuinely live-only here):** P4 resource-affinity HA
+  rule (`TestResourceAffinityRule` — needs a second 9.2 node for a real HA
+  cluster; no cassette) and the P6 **VNC (RFB) wire payload** carried by
+  `console.Connect` (the ticket mint is verified; the live RFB byte stream is
+  not). Volume-chain snapshots are **not** a gap — confirmed via `r740a`'s own
+  `apidoc.js` that PVE has no storage-level snapshot endpoint, so they were
+  honestly reclassified to `pverr.ErrUnsupported`.
+- **Task exit status `WARNINGS: N` is success, not failure.** PVE finishes some
+  tasks (routinely an LXC create on a modern-systemd template — e.g. debian-13's
+  "Systemd 257 detected. You may need to enable nesting.") with exit status
+  `WARNINGS: N`: the operation completed. `tasks.Status.OK()` treats `OK` and
+  `WARNINGS: N` as success; `tasks.Status.Warnings()` flags the latter so a
+  consumer can log/inspect it. `tasks.Wait` returns **nil** for a warnings task
+  (it is a warning, not an error — modelling it as a sentinel error would make a
+  naive `if err != nil` fail a benign result). Found live on debian-13 LXC
+  create; unit-guarded by `TestWaitWarningsIsSuccess`.
 - Integration tests live in `proxmox/integration/` behind
   `//go:build integration`, read the node from `PVE_ENDPOINT` / `PVE_TOKEN_ID` /
-  `PVE_TOKEN_SECRET` (optional `PVE_NODE` / `PVE_INSECURE_TLS`). Read-only tests
-  cover every phase; destructive tests are env-gated: QEMU lifecycle
-  (`PVE_TEST_STORAGE` + `PVE_TEST_VMID`), LXC lifecycle (`+PVE_TEST_LXC_VMID` +
-  `PVE_TEST_LXC_TEMPLATE`), ISO upload (`PVE_TEST_ISO_PATH`), volume snapshot
-  (`PVE_TEST_VOLID`), HA resource-affinity rule (`PVE_TEST_HA_SIDS`). They are
-  **not runnable here** — they `t.Skip` without a node. The harness is
-  compile-verified (`go vet -tags=integration ./proxmox/integration/`) but its
-  execution + the go-vcr cassette capture are live-only. The package keeps an
-  untagged `doc.go` so the default `go build ./...` sees a non-empty package.
-  Never claim a phase's live-only Success Criteria pass when they cannot be
-  verified — mark them written-but-unverified instead.
+  `PVE_TOKEN_SECRET` (optional `PVE_NODE` / `PVE_INSECURE_TLS` / `PVE_RECORD`).
+  Read-only tests cover every phase; destructive tests are env-gated: QEMU
+  lifecycle (`PVE_TEST_STORAGE` + `PVE_TEST_VMID`), LXC lifecycle
+  (`+PVE_TEST_LXC_VMID` + `PVE_TEST_LXC_TEMPLATE`), ISO upload
+  (`PVE_TEST_ISO_STORAGE` + `PVE_TEST_ISO_PATH`), console mint
+  (`PVE_TEST_STORAGE` + `PVE_TEST_CONSOLE_VMID`, spins up its own scratch VM),
+  HA resource-affinity rule (`PVE_TEST_HA_SIDS`). They are **not runnable here**
+  — they `t.Skip` without a node. The harness is compile-verified
+  (`go vet -tags=integration ./proxmox/integration/`) but its execution + the
+  go-vcr cassette capture are live-only. The package keeps an untagged `doc.go`
+  so the default `go build ./...` sees a non-empty package. Never claim a
+  phase's live-only Success Criteria pass when they cannot be verified — mark
+  them written-but-unverified instead.
 - Working definition of "done" for a task in this environment: typed op exists,
   `go build ./...` is clean, it is unit-tested against `mockpve`, and
   `just lint`
@@ -552,9 +636,12 @@ environment.** This shapes how we test and what "done" means:
 
 ## CI matrix
 
-- `.forgejo/workflows/ci.yml` runs on every push/PR — `just test` + `just lint`.
-- `.github/workflows/ci.yml` is the mirror; identical jobs, runs on the GitHub
-  mirror if/when one exists.
+- `.github/workflows/ci.yml` runs on every push/PR — `just test`
+  (race+coverage), `just test-replay` (the `Test Replay (cassettes)` job:
+  replays the committed go-vcr cassettes through the integration suite with
+  `PVE_REPLAY=1`, no live node), `just lint`, schema-drift, security, and a
+  goreleaser snapshot. (A `.forgejo/workflows/` mirror is planned but not yet in
+  the repo.)
 - Release workflows fire only on `v*` tag push; `goreleaser` consumes
   `.goreleaser.yml` and the appropriate token (`GITEA_TOKEN` for Forgejo,
   `GITHUB_TOKEN` for GitHub).

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -188,11 +189,16 @@ func (t *transport) DoRequest(ctx context.Context, method, path string, body, ou
 	return err
 }
 
-// DoUpload streams a multipart POST to path and unwraps the envelope into out.
-// It refreshes credentials and applies auth + CSRF like a write, but does not
-// retry or fail over: an upload body is a single-use stream, so a failed upload
-// must be restarted by the caller with a fresh reader. It targets the primary
-// endpoint only.
+// DoUpload posts a multipart body to path and unwraps the envelope into out. It
+// refreshes credentials and applies auth + CSRF like a write, but does not retry
+// or fail over: an upload body is a single-use stream, so a failed upload must be
+// restarted by the caller with a fresh reader. It targets the primary endpoint
+// only.
+//
+// PVE's pveproxy does not accept a chunked request body (it answers HTTP 501), so
+// the request must carry a Content-Length. The body is a streaming multipart
+// whose length is not known in advance, so it is spooled to a temp file to
+// measure it — the payload is never held whole in memory, only on temp disk.
 func (t *transport) DoUpload(ctx context.Context, path string, body io.Reader, contentType string, out any) error {
 	if t.creds.needsRefresh() {
 		if err := t.creds.refresh(ctx, t.doRaw, false); err != nil {
@@ -200,13 +206,29 @@ func (t *transport) DoUpload(ctx context.Context, path string, body io.Reader, c
 		}
 	}
 
+	spool, size, err := spoolToTemp(body)
+	if err != nil {
+		return fmt.Errorf("api: upload spool: %w", err)
+	}
+	defer func() {
+		if cerr := spool.Close(); cerr != nil {
+			t.logger.Debug("api: close upload spool", "err", cerr)
+		}
+		if rerr := os.Remove(spool.Name()); rerr != nil {
+			t.logger.Debug("api: remove upload spool", "err", rerr)
+		}
+	}()
+
 	expandedPath := t.ExpandPath(path)
 	fullURL := t.conn.baseURL().String() + expandedPath
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, body)
+	// NopCloser so the http transport does not close the spool file out from
+	// under the deferred cleanup above.
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, io.NopCloser(spool))
 	if err != nil {
 		return fmt.Errorf("api: build upload request: %w", err)
 	}
+	req.ContentLength = size
 	req.Header.Set("Content-Type", contentType)
 	if t.userAgent != "" {
 		req.Header.Set("User-Agent", t.userAgent)
@@ -221,6 +243,36 @@ func (t *transport) DoUpload(ctx context.Context, path string, body io.Reader, c
 		return pverr.ClassifyNetError(expandedPath, err)
 	}
 	return readResponse(resp, expandedPath, out)
+}
+
+// spoolToTemp drains r into a temp file and rewinds it, returning the file and
+// its byte count. The caller owns closing and removing the file. It exists so an
+// upload can send a Content-Length (see DoUpload) without buffering the payload
+// in memory.
+func spoolToTemp(r io.Reader) (f *os.File, size int64, err error) {
+	f, err = os.CreateTemp("", "pve-upload-*")
+	if err != nil {
+		return nil, 0, fmt.Errorf("create temp: %w", err)
+	}
+	// On any failure below, clean up the temp file and surface the cause.
+	defer func() {
+		if err != nil {
+			if cerr := f.Close(); cerr != nil {
+				err = errors.Join(err, cerr)
+			}
+			if rerr := os.Remove(f.Name()); rerr != nil {
+				err = errors.Join(err, rerr)
+			}
+			f = nil
+		}
+	}()
+	if size, err = io.Copy(f, r); err != nil {
+		return f, 0, fmt.Errorf("spool body: %w", err)
+	}
+	if _, err = f.Seek(0, io.SeekStart); err != nil {
+		return f, 0, fmt.Errorf("rewind spool: %w", err)
+	}
+	return f, size, nil
 }
 
 // execute runs the request with per-endpoint retry and sticky failover.

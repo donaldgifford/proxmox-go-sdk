@@ -68,6 +68,26 @@ func TestWaitSuccess(t *testing.T) {
 	}
 }
 
+func TestWaitWarningsIsSuccess(t *testing.T) {
+	// PVE finishes some tasks (routinely an LXC create) as "WARNINGS: N": the
+	// operation completed, so Wait must treat it as success, not ErrTaskFailed.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		io.WriteString(w, `{"data":{"upid":"`+testUPID+`","status":"stopped","exitstatus":"WARNINGS: 1"}}`)
+	}))
+	defer srv.Close()
+
+	st, err := fastService(t, srv).Wait(context.Background(), Ref{Node: "pve", UPID: testUPID})
+	if err != nil {
+		t.Fatalf("Wait on a WARNINGS task = %v, want success", err)
+	}
+	if !st.OK() {
+		t.Errorf("OK() = false on %q, want true", st.ExitStatus)
+	}
+	if !st.Warnings() {
+		t.Errorf("Warnings() = false on %q, want true", st.ExitStatus)
+	}
+}
+
 func TestWaitFailureCarriesLog(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		switch {
