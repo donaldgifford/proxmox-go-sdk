@@ -11,14 +11,18 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/storage"
 )
 
-// Example uploads an ISO, allocates a disk volume, takes a volume-chain snapshot
-// of it (a 9.1+ capability), then cleans both up — awaiting each PVE task. It is
-// the Phase 3 storage flow end to end.
+// Example uploads an ISO, allocates a disk volume, then frees it — awaiting each
+// PVE task. It is the Phase 3 storage flow end to end.
+//
+// Note there is no volume-snapshot step: PVE exposes no storage-level snapshot
+// REST endpoint (storage.VolumeSnapshots returns ErrUnsupported). A volume is
+// snapshotted through its owning guest — qemu.CreateSnapshot / lxc.CreateSnapshot
+// — which builds the 9.1 volume chain underneath on supported storage.
 func Example() {
 	// mockpve stands in for a live cluster so the example is self-contained;
 	// against a real node, pass its URL and a real token to proxmox.NewClient.
 	mock := mockpve.New()
-	mock.SeedVersion("9.1.0", "9.1", "mockpve") // 9.1 enables volume-chain snapshots.
+	mock.SeedVersion("9.2.0", "9.2", "mockpve")
 	ts := mock.Serve()
 	defer ts.Close()
 
@@ -32,7 +36,7 @@ func Example() {
 
 	// Upload an ISO to the node's "local" storage and await the import task.
 	ref, err := s.UploadISO(ctx, "pve", "local", &storage.UploadSpec{
-		Filename: "debian-12.iso",
+		Filename: "debian-13.iso",
 		Reader:   strings.NewReader("FAKE-ISO-BYTES"),
 	})
 	if err != nil {
@@ -44,7 +48,7 @@ func Example() {
 		return
 	}
 
-	// Allocate a disk volume to snapshot (allocation is synchronous → volid).
+	// Allocate a disk volume (allocation is synchronous → volid).
 	volid, err := s.CreateVolume(ctx, "pve", "local", &storage.VolumeCreateSpec{
 		Filename: "vm-100-disk-0.qcow2",
 		Size:     "8G",
@@ -55,36 +59,9 @@ func Example() {
 		fmt.Println("create volume:", err)
 		return
 	}
+	fmt.Println(volid)
 
-	// Snapshot the volume and await the snapshot task.
-	ref, err = s.CreateVolumeSnapshot(ctx, "pve", "local", volid,
-		&storage.VolumeSnapshotSpec{Name: "pre-change"})
-	if err != nil {
-		fmt.Println("snapshot:", err)
-		return
-	}
-	if _, err := c.Tasks().Wait(ctx, ref); err != nil {
-		fmt.Println("await snapshot:", err)
-		return
-	}
-
-	snaps, err := s.VolumeSnapshots(ctx, "pve", "local", volid)
-	if err != nil {
-		fmt.Println("list snapshots:", err)
-		return
-	}
-	fmt.Println(snaps[0].Name)
-
-	// Clean up: drop the snapshot, then free the volume, awaiting each task.
-	ref, err = s.DeleteVolumeSnapshot(ctx, "pve", "local", volid, "pre-change")
-	if err != nil {
-		fmt.Println("delete snapshot:", err)
-		return
-	}
-	if _, err := c.Tasks().Wait(ctx, ref); err != nil {
-		fmt.Println("await delete snapshot:", err)
-		return
-	}
+	// Clean up: free the volume and await the deletion task.
 	ref, err = s.DeleteVolume(ctx, "pve", "local", volid)
 	if err != nil {
 		fmt.Println("delete volume:", err)
@@ -95,5 +72,5 @@ func Example() {
 		return
 	}
 	// Output:
-	// pre-change
+	// local:vm-100-disk-0.qcow2
 }

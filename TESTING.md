@@ -125,7 +125,6 @@ export PVE_TEST_CONSOLE_VMID=9103    # console-mint scratch VM; distinct so it r
 export PVE_TEST_LXC_VMID=9102
 export PVE_TEST_LXC_TEMPLATE="local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
 export PVE_TEST_ISO_PATH="/path/to/tiny.iso"
-export PVE_TEST_VOLID="local-lvm:vm-9101-disk-0"
 export PVE_TEST_HA_SIDS="vm:9101,vm:9102"
 ```
 
@@ -147,7 +146,6 @@ Every variable:
 | `PVE_TEST_LXC_VMID`     | gate     | scratch LXC VMID (created + destroyed)                     |
 | `PVE_TEST_LXC_TEMPLATE` | gate     | OS template volid for the LXC lifecycle                    |
 | `PVE_TEST_ISO_PATH`     | gate     | local path to a small ISO to upload                        |
-| `PVE_TEST_VOLID`        | gate     | existing volume to snapshot + clean up                     |
 | `PVE_TEST_HA_SIDS`      | gate     | CSV of ≥2 HA-managed SIDs                                  |
 
 ### How the harness finds these values
@@ -230,15 +228,19 @@ go test -tags=integration ./proxmox/integration/... -run TestLXCLifecycle -v
 
 ### Storage (Phase 3)
 
-ISO upload, and a volume-chain snapshot lifecycle where the backend supports it.
+Streams an ISO upload to a live node.
 
 ```sh
-# ISO upload — needs: PVE_TEST_STORAGE, PVE_TEST_ISO_PATH
+# ISO upload — needs: PVE_TEST_STORAGE (allows "iso") or PVE_TEST_ISO_STORAGE, PVE_TEST_ISO_PATH
 go test -tags=integration ./proxmox/integration/... -run TestISOUpload -v
-
-# volume snapshot — needs: PVE_TEST_STORAGE, PVE_TEST_VOLID
-go test -tags=integration ./proxmox/integration/... -run TestVolumeSnapshotLifecycle -v
 ```
+
+> **No volume-snapshot test.** PVE exposes no storage-level volume-snapshot REST
+> endpoint (verified on a live 9.2 node — the content API stops at
+> `.../content/{volume}`). `storage.VolumeSnapshots` and friends return
+> `pverr.ErrUnsupported`; a volume is snapshotted through its owning guest,
+> which the QEMU/LXC lifecycle tests already cover. See the unit test
+> `TestVolumeSnapshotsUnsupported`.
 
 ### HA (Phase 4)
 
@@ -287,9 +289,10 @@ Tick these off against your node. They map to the per-phase Success Criteria in
 - [ ] **Phase 2 — compute:** create → start → snapshot → rollback → stop →
       delete for **both** QEMU and LXC (`TestQEMULifecycle`,
       `TestLXCLifecycle`).
-- [ ] **Phase 3 — storage:** ISO upload + a volume-chain snapshot cleaned up
-      (`TestISOUpload`, `TestVolumeSnapshotLifecycle`); confirm the provisional
-      volume-chain-snapshot path.
+- [ ] **Phase 3 — storage:** ISO upload streamed to a live node
+      (`TestISOUpload`). Storage-level volume snapshots are unsupported (no PVE
+      REST endpoint); volume chains are exercised via guest snapshots in the
+      Phase 2 lifecycles.
 - [ ] **Phase 4 — HA:** define a resource-affinity rule and read it back
       (`TestResourceAffinityRule`); observe the scheduler honor placement
       (manual).
@@ -379,20 +382,19 @@ follow-up, tracked separately.
 
 Test → phase → gates:
 
-| Test                          | Phase | Required gates                                        |
-| ----------------------------- | ----- | ----------------------------------------------------- |
-| `TestVersionRoundTrip`        | 1     | (none beyond endpoint/token)                          |
-| `TestComputeReads`            | 2     | (none)                                                |
-| `TestStorageReads`            | 3     | (none)                                                |
-| `TestClusterAndHAReads`       | 4     | (none)                                                |
-| `TestNetworkReads`            | 5     | (none)                                                |
-| `TestAccessReads`             | 6     | (none)                                                |
-| `TestQEMULifecycle`           | 2     | `PVE_TEST_STORAGE`, `PVE_TEST_VMID`                   |
-| `TestLXCLifecycle`            | 2     | `PVE_TEST_STORAGE`, `PVE_TEST_LXC_VMID`, `…_TEMPLATE` |
-| `TestISOUpload`               | 3     | `PVE_TEST_STORAGE`, `PVE_TEST_ISO_PATH`               |
-| `TestVolumeSnapshotLifecycle` | 3     | `PVE_TEST_STORAGE`, `PVE_TEST_VOLID`                  |
-| `TestResourceAffinityRule`    | 4     | `PVE_TEST_HA_SIDS`                                    |
-| `TestConsoleMint`             | 6     | `PVE_TEST_STORAGE`, `PVE_TEST_CONSOLE_VMID`           |
+| Test                       | Phase | Required gates                                        |
+| -------------------------- | ----- | ----------------------------------------------------- |
+| `TestVersionRoundTrip`     | 1     | (none beyond endpoint/token)                          |
+| `TestComputeReads`         | 2     | (none)                                                |
+| `TestStorageReads`         | 3     | (none)                                                |
+| `TestClusterAndHAReads`    | 4     | (none)                                                |
+| `TestNetworkReads`         | 5     | (none)                                                |
+| `TestAccessReads`          | 6     | (none)                                                |
+| `TestQEMULifecycle`        | 2     | `PVE_TEST_STORAGE`, `PVE_TEST_VMID`                   |
+| `TestLXCLifecycle`         | 2     | `PVE_TEST_STORAGE`, `PVE_TEST_LXC_VMID`, `…_TEMPLATE` |
+| `TestISOUpload`            | 3     | `PVE_TEST_ISO_STORAGE`, `PVE_TEST_ISO_PATH`           |
+| `TestResourceAffinityRule` | 4     | `PVE_TEST_HA_SIDS`                                    |
+| `TestConsoleMint`          | 6     | `PVE_TEST_STORAGE`, `PVE_TEST_CONSOLE_VMID`           |
 
 Command cheat-sheet:
 

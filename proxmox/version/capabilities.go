@@ -78,10 +78,16 @@ func (c Capabilities) DynamicLoadBalancer() bool { return c.AtLeast(9, 2) }
 // OCITemplates gates pulling OCI images as LXC templates (9.1+).
 func (c Capabilities) OCITemplates() bool { return c.AtLeast(9, 1) }
 
-// VolumeChainSnapshots gates snapshots-as-volume-chains on storage that lacks
-// native snapshots — thick LVM and Directory/NFS/CIFS via qcow2 chains (9.1+;
-// tech-preview maturing). ZFS/btrfs/LVM-thin have native snapshots and do not
-// need this gate.
+// VolumeChainSnapshots reports whether the cluster supports
+// snapshots-as-volume-chains on storage that lacks native snapshots — thick LVM
+// and Directory/NFS/CIFS via qcow2 chains (9.1+). ZFS/btrfs/LVM-thin have native
+// snapshots and do not need it.
+//
+// This is an informational capability, not a gate for a storage API: PVE exposes
+// no storage-level volume-snapshot REST endpoint (verified against a live 9.2
+// node). The chain is built through the guest snapshot ops (qemu/lxc.CreateSnapshot);
+// storage.VolumeSnapshots returns ErrUnsupported. A consumer can query this to
+// decide whether a storage will support guest snapshots at all.
 func (c Capabilities) VolumeChainSnapshots() bool { return c.AtLeast(9, 1) }
 
 // TPMStateSnapshots gates snapshotting a VM's TPM state on file-based storage

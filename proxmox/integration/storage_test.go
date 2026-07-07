@@ -51,40 +51,9 @@ func TestISOUpload(t *testing.T) {
 	mustSucceed(t, c.Tasks(), ref, "upload iso")
 }
 
-// TestVolumeSnapshotLifecycle covers the volume-chain snapshot half of the
-// Phase 3 criterion: snapshot an existing volume where supported, then clean up.
-// Gated on PVE_TEST_STORAGE + PVE_TEST_VOLID and skips otherwise. The snapshot
-// is deleted in cleanup even if the create step's wait fails.
-func TestVolumeSnapshotLifecycle(t *testing.T) {
-	c := newClient(t)
-	node := testNode()
-
-	store := os.Getenv(envTestStorage)
-	volid := os.Getenv(envTestVolID)
-	if store == "" || volid == "" {
-		t.Skipf("volume snapshot disabled (set %s and %s)", envTestStorage, envTestVolID)
-	}
-
-	s := c.Storage()
-	ts := c.Tasks()
-	const snap = "itest0"
-
-	t.Cleanup(func() {
-		ctx, cancel := cleanupCtx()
-		defer cancel()
-		dref, derr := s.DeleteVolumeSnapshot(ctx, node, store, volid, snap)
-		if derr != nil {
-			t.Logf("cleanup DeleteVolumeSnapshot: %v", derr)
-			return
-		}
-		if _, werr := ts.Wait(ctx, dref); werr != nil {
-			t.Logf("cleanup Wait(delete snapshot): %v", werr)
-		}
-	})
-
-	ref, err := s.CreateVolumeSnapshot(testCtx(t), node, store, volid, &storage.VolumeSnapshotSpec{Name: snap})
-	if err != nil {
-		t.Fatalf("CreateVolumeSnapshot: %v", err)
-	}
-	mustSucceed(t, ts, ref, "create volume snapshot")
-}
+// There is no live volume-snapshot test: PVE exposes no storage-level
+// volume-snapshot REST endpoint (verified against a live 9.2 node — the content
+// API stops at .../content/{volume}). storage.VolumeSnapshots and friends return
+// pverr.ErrUnsupported without touching the node; that behaviour is guarded by
+// the unit test TestVolumeSnapshotsUnsupported. A volume is snapshotted through
+// its owning guest, which the QEMU/LXC lifecycle tests already exercise.

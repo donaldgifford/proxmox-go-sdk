@@ -41,28 +41,15 @@ type storeRecord struct {
 	Used    int64
 }
 
-// volRecord is one stored object on a node's storage.
+// volRecord is one stored object on a node's storage. PVE has no storage-level
+// snapshot endpoint (see storage.VolumeSnapshots), so a volume carries no
+// snapshot state in the mock.
 type volRecord struct {
-	Volid     string
-	Content   string
-	Format    string
-	Size      int64
-	VMID      int
-	Snapshots map[string]*volSnapRecord // keyed by snapshot name.
-}
-
-// volSnapRecord models one volume-chain snapshot in the mock.
-type volSnapRecord struct {
-	Name        string
-	Description string
-	SnapTime    int64
-}
-
-// volSnapshotPayload is one element of a volume's snapshot listing.
-type volSnapshotPayload struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	SnapTime    int64  `json:"snaptime,omitempty"`
+	Volid   string
+	Content string
+	Format  string
+	Size    int64
+	VMID    int
 }
 
 // datastorePayload mirrors GET /storage entries.
@@ -136,10 +123,7 @@ func (s *Server) AddVolume(node, storage, volid, content, format string, size in
 		s.st.storage.content[node] = make(map[string][]*volRecord)
 	}
 	s.st.storage.content[node][storage] = append(s.st.storage.content[node][storage],
-		&volRecord{
-			Volid: volid, Content: content, Format: format, Size: size,
-			Snapshots: make(map[string]*volSnapRecord),
-		})
+		&volRecord{Volid: volid, Content: content, Format: format, Size: size})
 }
 
 // AddZFSPool seeds a ZFS pool on node. Call before serving.
@@ -157,17 +141,6 @@ func (s *Server) AddZFSPool(node, name string, size, free int64) {
 	}
 }
 
-// lookupVolume returns the record for node/storage/volid, or nil. The caller
-// must hold st.mu.
-func (s *Server) lookupVolume(node, storage, volid string) *volRecord {
-	for _, v := range s.st.storage.content[node][storage] {
-		if v.Volid == volid {
-			return v
-		}
-	}
-	return nil
-}
-
 func (s *Server) registerStorageRoutes() {
 	s.mux.HandleFunc("GET /api2/json/storage", s.handleDatastoreList)
 	s.mux.HandleFunc("GET /api2/json/storage/{storage}", s.handleDatastoreGet)
@@ -177,9 +150,8 @@ func (s *Server) registerStorageRoutes() {
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/storage/{storage}/content", s.handleVolumeCreate)
 	s.mux.HandleFunc("GET /api2/json/nodes/{node}/storage/{storage}/content/{volid}", s.handleVolumeGet)
 	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/storage/{storage}/content/{volid}", s.handleVolumeDelete)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/storage/{storage}/content/{volid}/snapshot", s.handleVolSnapshotList)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/storage/{storage}/content/{volid}/snapshot", s.handleVolSnapshotCreate)
-	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/storage/{storage}/content/{volid}/snapshot/{snap}", s.handleVolSnapshotDelete)
+	// No .../content/{volid}/snapshot routes: PVE exposes no storage-level
+	// volume-snapshot endpoint (see storage.VolumeSnapshots).
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/storage/{storage}/upload", s.handleStorageUpload)
 	s.mux.HandleFunc("GET /api2/json/nodes/{node}/disks/zfs", s.handleZFSList)
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/disks/zfs", s.handleZFSCreate)
@@ -401,80 +373,6 @@ func (s *Server) handleVolumeDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeData(w, s.finishedTask(node, "imgdel", storage))
-}
-
-func (s *Server) handleVolSnapshotList(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
-		return
-	}
-	node, storage, volid := r.PathValue("node"), r.PathValue("storage"), r.PathValue("volid")
-	s.st.mu.Lock()
-	rec := s.lookupVolume(node, storage, volid)
-	var out []volSnapshotPayload
-	if rec != nil {
-		out = make([]volSnapshotPayload, 0, len(rec.Snapshots))
-		for _, snap := range rec.Snapshots {
-			out = append(out, volSnapshotPayload{
-				Name: snap.Name, Description: snap.Description, SnapTime: snap.SnapTime,
-			})
-		}
-	}
-	s.st.mu.Unlock()
-	if rec == nil {
-		s.writeError(w, http.StatusNotFound, msgNoSuchVolume)
-		return
-	}
-	s.writeData(w, out)
-}
-
-func (s *Server) handleVolSnapshotCreate(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
-		return
-	}
-	node, storage, volid := r.PathValue("node"), r.PathValue("storage"), r.PathValue("volid")
-	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
-	if err := r.ParseForm(); err != nil {
-		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
-		return
-	}
-	name := r.PostForm.Get("snapname")
-	if name == "" {
-		s.writeError(w, http.StatusBadRequest, "missing snapname")
-		return
-	}
-	s.st.mu.Lock()
-	rec := s.lookupVolume(node, storage, volid)
-	if rec != nil {
-		rec.Snapshots[name] = &volSnapRecord{Name: name, Description: r.PostForm.Get("description")}
-	}
-	s.st.mu.Unlock()
-	if rec == nil {
-		s.writeError(w, http.StatusNotFound, msgNoSuchVolume)
-		return
-	}
-	s.writeData(w, s.finishedTask(node, "volsnapshot", storage))
-}
-
-func (s *Server) handleVolSnapshotDelete(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
-		return
-	}
-	node, storage, volid := r.PathValue("node"), r.PathValue("storage"), r.PathValue("volid")
-	snap := r.PathValue("snap")
-	s.st.mu.Lock()
-	rec := s.lookupVolume(node, storage, volid)
-	hasSnap := false
-	if rec != nil {
-		if _, hasSnap = rec.Snapshots[snap]; hasSnap {
-			delete(rec.Snapshots, snap)
-		}
-	}
-	s.st.mu.Unlock()
-	if rec == nil || !hasSnap {
-		s.writeError(w, http.StatusNotFound, "no such snapshot")
-		return
-	}
-	s.writeData(w, s.finishedTask(node, "voldelsnapshot", storage))
 }
 
 func (s *Server) handleZFSList(w http.ResponseWriter, r *http.Request) {

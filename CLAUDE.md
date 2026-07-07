@@ -266,15 +266,19 @@ awaiting every task); a live 9.x node is not reachable here, so the end-to-end
 behaviour against real PVE is written-but-unverified.
 
 **Phase 3 (storage) is implementation-complete** — all 7 tasks checked in
-IMPL-0001 and the Success Criterion (upload ISO → volume-chain snapshot where
-supported → clean up) is covered by a runnable `storage` `Example` plus
-`TestVolumeSnapshotLifecycle` (mock-verified; live-node behaviour
-written-but-unverified). The `storage` service was **go-architect designed** and
-differs from compute in one structural way: `c.Storage()` is **not node-scoped**
-(DESIGN-0001) — `storage.Service{c, caps}` holds no node; cluster-scoped
-datastore config reads (`/storage`, `/storage/{id}`) take no node, while
-per-node status/content/volume/upload/zfs ops take `node` as a per-call arg.
-`Datastore` reads are lossless (custom `UnmarshalJSON` → `Extra`;
+IMPL-0001. The Success Criterion narrowed after live verification: **PVE exposes
+no storage-level volume-snapshot REST endpoint** (confirmed on live 9.2 node
+`r740a` — `/nodes/{node}/storage/{storage}/content` stops at `/{volume}`, no
+`/snapshot` child), so the "volume-chain snapshot" half was reclassified to
+documented `ErrUnsupported` (see the `storage.VolumeSnapshots` reclassification
+note below). What's live-verified is the **ISO upload** half (`TestISOUpload`
+passes end-to-end on `r740a`); the runnable `storage` `Example` now shows upload
+→ volume create → delete. The `storage` service was **go-architect designed**
+and differs from compute in one structural way: `c.Storage()` is **not
+node-scoped** (DESIGN-0001) — `storage.Service{c, caps}` holds no node;
+cluster-scoped datastore config reads (`/storage`, `/storage/{id}`) take no
+node, while per-node status/content/volume/upload/zfs ops take `node` as a
+per-call arg. `Datastore` reads are lossless (custom `UnmarshalJSON` → `Extra`;
 `datastoreKnownFields` kept in sync). `ListContent` filters via functional
 options (`WithContentType`/`WithVMID`) that build a `?content=…&vmid=…` query
 appended to the GET path (GET bodies aren't form-encoded, so query goes in the
@@ -300,14 +304,28 @@ no storage-level resize or move endpoint** — only volume _allocate_
 (`POST /qemu/{vmid}/move_disk`, `MoveDiskSpec`). Don't add fake storage
 resize/move endpoints.
 
-Task 3 (volume-chain snapshots) is the SDK's first **storage** version-gated op:
-`VolumeSnapshots`/`CreateVolumeSnapshot`/`DeleteVolumeSnapshot` gate on
-`caps.Require("volume-chain snapshots", "9.1")` (new
-`version.Capabilities.VolumeChainSnapshots()`), bringing snapshots to storage
-without native support (thick-LVM, dir/NFS/CIFS via qcow2 chains). **The gate is
-the firm, mock-verified part; the storage-level snapshot endpoint shape is
-unconfirmed** (no apidoc) — the path `…/content/{volid}/snapshot` mirrors the
-guest convention and is documented as needing live-node verification.
+Task 3 (volume-chain snapshots) was **reclassified to `ErrUnsupported` after
+live verification**. It originally shipped
+`VolumeSnapshots`/`CreateVolumeSnapshot`/ `DeleteVolumeSnapshot` gated on
+`caps.Require("volume-chain snapshots", "9.1")` against a **guessed** path
+`…/content/{volid}/snapshot`. That path does not exist: on live 9.2 node
+`r740a`, `grep …/content` in the node's own `apidoc.js` shows the storage
+content API stops at `/nodes/{node}/storage/{storage}/content/{volume}` — no
+`/snapshot` child. Per the honesty rule (the `ExpandRAIDZ`/`ArmHA`/RBD-mirroring
+precedent), the three ops now **always return `pverr.ErrUnsupported`** (no
+version gate, no request), with docs redirecting callers to
+`qemu.CreateSnapshot`/`lxc.CreateSnapshot` — the guest snapshot API is what
+actually drives the 9.1 volume-chain mechanism underneath on supported storage;
+raw storage-plugin ops go via the ssh side-channel. The
+`VolumeSnapshot`/`VolumeSnapshotSpec` types are retained (for a future PVE
+release that may add the endpoint).
+`version.Capabilities. VolumeChainSnapshots()` **stays** but is now documented
+as an _informational_ capability (does the storage support guest snapshots at
+all), not a gate for a storage endpoint. The mock's `…/content/{volid}/snapshot`
+routes/handlers + `volSnapRecord`/`volSnapshotPayload` types were removed
+(mockpve mirrors real PVE); the `volumeSnapshotsPath` helper is gone. Unit
+guard: `TestVolumeSnapshotsUnsupported`. No live volume-snapshot integration
+test (nothing hits the node); `PVE_TEST_VOLID` retired.
 
 Task 4 (ISO/disk-image streaming upload) extended the **transport**: the
 `api.Client` interface gained
@@ -579,9 +597,10 @@ environment.** This shapes how we test and what "done" means:
   Read-only tests cover every phase; destructive tests are env-gated: QEMU
   lifecycle (`PVE_TEST_STORAGE` + `PVE_TEST_VMID`), LXC lifecycle
   (`+PVE_TEST_LXC_VMID` + `PVE_TEST_LXC_TEMPLATE`), ISO upload
-  (`PVE_TEST_ISO_PATH`), volume snapshot (`PVE_TEST_VOLID`), HA
-  resource-affinity rule (`PVE_TEST_HA_SIDS`). They are **not runnable here** —
-  they `t.Skip` without a node. The harness is compile-verified
+  (`PVE_TEST_ISO_STORAGE` + `PVE_TEST_ISO_PATH`), console mint
+  (`PVE_TEST_STORAGE` + `PVE_TEST_CONSOLE_VMID`, spins up its own scratch VM),
+  HA resource-affinity rule (`PVE_TEST_HA_SIDS`). They are **not runnable here**
+  — they `t.Skip` without a node. The harness is compile-verified
   (`go vet -tags=integration ./proxmox/integration/`) but its execution + the
   go-vcr cassette capture are live-only. The package keeps an untagged `doc.go`
   so the default `go build ./...` sees a non-empty package. Never claim a
