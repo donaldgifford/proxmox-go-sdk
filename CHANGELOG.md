@@ -4,32 +4,15 @@ All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [unreleased]
-
-### Bug Fixes
-
-- *(integration)* Record every task-status poll, bound teardown
-- *(tasks)* Treat task exit status "WARNINGS: N" as success
-- *(api,storage)* Send Content-Length and correct multipart form on upload
-- *(storage)* Reclassify volume snapshots to ErrUnsupported (no PVE endpoint)
-- *(integration)* Redact console VNC ticket/password in all response bodies
+## [0.1.1] - 2026-07-07
 
 ### Documentation
 
 - Add SECURITY, CONTRIBUTING, USAGE, and DEVELOPMENT guides
-- Add TESTING.md live-node + recording walkthrough
-- *(inv)* Add INV-0001 — nested Proxmox nodes for live SDK testing
-- Record live verification against r740a (9.2-1)
-- *(impl)* Track the two unverified live-only criteria (P4, P6)
 
 ### Testing
 
-- *(integration)* Add go-vcr record/replay harness with secret redaction
-- Autoload .env for the integration suite (1Password/op run friendly)
-- *(integration)* Truncate multipart upload bodies in recorded cassettes
-- *(integration)* Scrub endpoint host + node name from recorded cassettes
-- *(integration)* Commit reviewed go-vcr cassettes for CI replay
-- *(integration)* Wire committed cassettes into CI replay
+- Live-node recording harness (go-vcr) + TESTING.md walkthrough ([#4](https://github.com/donaldgifford/proxmox-go-sdk/issues/4))
 
 ## [0.1.0] - 2026-07-03
 
