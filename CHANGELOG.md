@@ -26,6 +26,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - Autoload .env for the integration suite (1Password/op run friendly)
 - *(integration)* Truncate multipart upload bodies in recorded cassettes
 - *(integration)* Scrub endpoint host + node name from recorded cassettes
+- *(integration)* Commit reviewed go-vcr cassettes for CI replay
 
 ## [0.1.0] - 2026-07-03
 
