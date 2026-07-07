@@ -35,7 +35,7 @@ const redacted = "REDACTED"
 // the minted ticket / CSRF token / new token value ride the response body.
 var (
 	formSecretRe = regexp.MustCompile(`(?i)(password|secret|otp)=[^&]*`)
-	jsonSecretRe = regexp.MustCompile(`(?i)"(ticket|csrfpreventiontoken|value)"\s*:\s*"[^"]*"`)
+	jsonSecretRe = regexp.MustCompile(`(?i)"(ticket|csrfpreventiontoken|value|password)"\s*:\s*"[^"]*"`)
 )
 
 // uploadBodyTruncatedMarker labels a multipart upload body that was dropped
@@ -62,9 +62,13 @@ func redactInteraction(i *cassette.Interaction) error {
 		}
 	}
 
-	// Only credential-minting endpoints put secrets in the response body; other
-	// bodies (VM configs, listings) must survive verbatim for replay to match.
-	if isCredentialURL(i.Request.URL) && i.Response.Body != "" {
+	// Secret fields ride response bodies from more than just /access/ticket: a
+	// console mint (POST .../vncproxy or .../spiceproxy) returns a one-time VNC
+	// ticket + password, and token creation returns a value. Scrub these field
+	// names wherever they appear. This is safe for replay — matchMethodURL keys on
+	// method+URL, not body — and PVE config/listing responses never legitimately
+	// carry these keys (they are write-only), so nothing needed is clobbered.
+	if i.Response.Body != "" {
 		i.Response.Body = jsonSecretRe.ReplaceAllString(i.Response.Body, `"${1}":"`+redacted+`"`)
 	}
 	return nil
@@ -91,10 +95,6 @@ func truncateUploadBody(r *cassette.Request) {
 	}
 	r.Body = fmt.Sprintf("[%s: %d bytes]", uploadBodyTruncatedMarker, len(r.Body))
 	r.ContentLength = int64(len(r.Body))
-}
-
-func isCredentialURL(u string) bool {
-	return strings.Contains(u, "/access/ticket") || strings.Contains(u, "/token/")
 }
 
 // matchMethodURL matches a replay request to a recorded interaction on method +
@@ -191,6 +191,38 @@ func TestRedactInteraction(t *testing.T) {
 	// A non-secret field must be preserved so replay still matches.
 	if !strings.Contains(i.Response.Body, "root@pam") {
 		t.Error("non-secret response field was clobbered")
+	}
+}
+
+// TestRedactConsoleTicket guards the gap that leaked a live VNC ticket: a console
+// mint (POST .../vncproxy) returns a one-time ticket + password in its response
+// body under a NON-credential URL, so redaction keyed on /access/ticket missed
+// them. The ticket and password must be scrubbed regardless of the URL, while a
+// non-secret field (port) survives.
+func TestRedactConsoleTicket(t *testing.T) {
+	const (
+		vncTicket = `8T:,O)X\:PVEVNC:6A4BB5CD::VDV71nhRWkraSECRETdata+/==`
+		vncPass   = `8T:,O)X\`
+	)
+	i := &cassette.Interaction{
+		Request: cassette.Request{
+			URL:    "https://pve:8006/api2/json/nodes/pve/qemu/9102/vncproxy",
+			Method: http.MethodPost,
+		},
+		Response: cassette.Response{
+			Body: `{"data":{"port":"5900","ticket":"` + vncTicket + `","upid":"UPID:x","password":"` + vncPass + `"}}`,
+		},
+	}
+	if err := redactInteraction(i); err != nil {
+		t.Fatalf("redactInteraction: %v", err)
+	}
+	for _, leak := range []string{vncTicket, vncPass} {
+		if strings.Contains(i.Response.Body, leak) {
+			t.Errorf("console secret survived redaction: %q in %q", leak, i.Response.Body)
+		}
+	}
+	if !strings.Contains(i.Response.Body, `"port":"5900"`) {
+		t.Errorf("non-secret port field was clobbered: %q", i.Response.Body)
 	}
 }
 
