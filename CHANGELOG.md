@@ -12,6 +12,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(tasks)* Treat task exit status "WARNINGS: N" as success
 - *(api,storage)* Send Content-Length and correct multipart form on upload
 - *(storage)* Reclassify volume snapshots to ErrUnsupported (no PVE endpoint)
+- *(integration)* Redact console VNC ticket/password in all response bodies
 
 ### Documentation
 
