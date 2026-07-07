@@ -469,9 +469,10 @@ file. This table maps the real code to phases. Column widths are re-aligned by
       in-process `mockpve` responder; `just test` (race + coverage) is green
       module-wide.
 - [~] Integration tests against a live 9.x node (and a 9.2 node for `(9.2+)`
-  rows); harness per **OQ-5** — **harness written & compile-verified, execution
-  live-only.** `proxmox/integration/` holds the build-tagged
-  (`//go:build integration`) suite, an env-configured client
+  rows); harness per **OQ-5** — **harness written, and now run end-to-end
+  against a live 9.2-1 node (`r740a`); two live-only criteria remain.**
+  `proxmox/integration/` holds the build-tagged (`//go:build integration`)
+  suite, an env-configured client
   (`PVE_ENDPOINT`/`PVE_TOKEN_ID`/`PVE_TOKEN_SECRET`, optional
   `PVE_NODE`/`PVE_INSECURE_TLS`) that skips when unset, with a test mapped to
   **every phase's Success Criterion**:
@@ -479,17 +480,26 @@ file. This table maps the real code to phases. Column widths are re-aligned by
   - **P2** destructive create→start→snapshot→rollback→stop→delete for **both
     QEMU** (`PVE_TEST_STORAGE`+`PVE_TEST_VMID`) **and LXC**
     (`PVE_TEST_STORAGE`+`PVE_TEST_LXC_VMID`+`PVE_TEST_LXC_TEMPLATE`);
-  - **P3** ISO upload (`PVE_TEST_ISO_PATH`) + volume-chain snapshot lifecycle
-    (`PVE_TEST_VOLID`);
+  - **P3** ISO upload (`PVE_TEST_ISO_STORAGE`+`PVE_TEST_ISO_PATH`); the
+    volume-chain snapshot criterion is retired — PVE has no storage-level
+    snapshot endpoint (confirmed on `r740a`), so those ops are
+    `pverr.ErrUnsupported`;
   - **P4** define a resource-affinity HA rule + read-back (`PVE_TEST_HA_SIDS`);
   - **P5** enumerate zones/VNets/fabrics;
-  - **P6** access user/token reads + VNC ticket mint (`PVE_TEST_VMID`).
+  - **P6** access user/token reads + VNC ticket mint (`PVE_TEST_CONSOLE_VMID`;
+    the console test spins up its own scratch VM).
 
   Read-only tests are safe against any cluster; destructive tests are env-gated
   and clean up after themselves. It compiles under `go vet -tags=integration`
-  and skips cleanly with no node here; **running it against a live 9.x node (and
-  capturing the go-vcr cassettes for CI replay) is the deferred,
-  environment-blocked remainder.**
+  and skips cleanly with no node. **Live-verified against `r740a` (9.2-1) with
+  `PVE_RECORD=1`, cassettes committed and replaying in CI:** P1 version
+  round-trip; the P2–P6 reads; P2 QEMU **and** LXC lifecycles; P3 ISO upload; P6
+  VNC ticket mint. **Two criteria remain genuinely live-only** (no node here can
+  cover them): P4's resource-affinity rule needs a second 9.2 node for a real HA
+  cluster, and P6's VNC (RFB) wire payload is the live byte stream
+  `console.Connect` carries. The P3 volume-chain-snapshot line was resolved by
+  inspecting `r740a`'s `apidoc.js` — PVE exposes no storage-level snapshot
+  endpoint, so it is `pverr.ErrUnsupported`, not a pending live check.
 
 - [x] Table-driven tests for the `0/1`→bool + config-struct (un)marshalling —
       `proxmox/types/types_test.go` covers `PVEBool` both directions; the

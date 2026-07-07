@@ -589,12 +589,22 @@ environment.** This shapes how we test and what "done" means:
   (90s), not `context.Background()`, so a wedged delete fails fast instead of
   hanging to the 10-min binary panic. `PVE_DEBUG=1` streams one `slog` line per
   SDK request (method+URL) — the fastest way to see a silent poll loop.
-- **First live verification (user-run, 9.2 node `r740a`):** `TestQEMULifecycle`
-  passes end-to-end (create → start → snapshot → rollback → stop → delete) with
-  `PVE_RECORD=1` — the Phase 2 QEMU live Success Criterion is now
-  **live-verified** (rollback-while-running worked on real PVE). The LXC half
-  and the other phases' live criteria remain written-but-unverified until run
-  against the node.
+- **Live verification (user-run, 9.2-1 node `r740a`):** the suite has now run
+  end-to-end against real PVE with `PVE_RECORD=1`, and the resulting cassettes
+  are committed + replay green in CI (`just test-replay` / the
+  `Test Replay (cassettes)` job). **Live-verified:** P1 version round-trip; the
+  P2–P6 read criteria (compute/storage/cluster+HA/network/access reads); P2
+  **QEMU** lifecycle (create → start → snapshot → rollback-while-running → stop
+  → delete) **and P2 LXC** lifecycle; P3 **ISO upload** (drove out the
+  chunked-body 501 + redundant-multipart-field 400 bugs); and P6 **VNC ticket
+  mint** (`TestConsoleMint`, spins up its own scratch VM). **Still
+  written-but-unverified (genuinely live-only here):** P4 resource-affinity HA
+  rule (`TestResourceAffinityRule` — needs a second 9.2 node for a real HA
+  cluster; no cassette) and the P6 **VNC (RFB) wire payload** carried by
+  `console.Connect` (the ticket mint is verified; the live RFB byte stream is
+  not). Volume-chain snapshots are **not** a gap — confirmed via `r740a`'s own
+  `apidoc.js` that PVE has no storage-level snapshot endpoint, so they were
+  honestly reclassified to `pverr.ErrUnsupported`.
 - **Task exit status `WARNINGS: N` is success, not failure.** PVE finishes some
   tasks (routinely an LXC create on a modern-systemd template — e.g. debian-13's
   "Systemd 257 detected. You may need to enable nesting.") with exit status
