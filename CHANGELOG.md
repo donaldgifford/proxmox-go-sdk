@@ -9,6 +9,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 ### Documentation
 
 - *(readme)* Point badges at the SDK and fix stale scaffold content ([#5](https://github.com/donaldgifford/proxmox-go-sdk/issues/5))
+- Dogfood harness docs — INV-0002, DESIGN-0002, IMPL-0002
 
 ## [0.1.1] - 2026-07-07
 

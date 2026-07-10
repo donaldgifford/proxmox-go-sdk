@@ -12,9 +12,10 @@ Design docs, plans, and implementation docs can reference investigations by ID
 
 ## All Investigations
 
-| ID       | Title                                               | Status | Date       | Author         | Link                                                                                                                       |
-| -------- | --------------------------------------------------- | ------ | ---------- | -------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| INV-0001 | Nested Proxmox nodes for automated live SDK testing | Open   | 2026-07-05 | Donald Gifford | [0001-nested-proxmox-nodes-for-automated-live-sdk-testing.md](0001-nested-proxmox-nodes-for-automated-live-sdk-testing.md) |
+| ID       | Title                                                                            | Status | Date       | Author         | Link                                                                                                                                         |
+| -------- | -------------------------------------------------------------------------------- | ------ | ---------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| INV-0001 | Nested Proxmox nodes for automated live SDK testing                              | Open   | 2026-07-05 | Donald Gifford | [0001-nested-proxmox-nodes-for-automated-live-sdk-testing.md](0001-nested-proxmox-nodes-for-automated-live-sdk-testing.md)                   |
+| INV-0002 | Dogfood harness: SDK-provisioned nested PVE clusters for P4/P6 live verification | Open   | 2026-07-08 | Donald Gifford | [0002-dogfood-harness-sdk-provisioned-nested-pve-clusters-for-p4p6.md](0002-dogfood-harness-sdk-provisioned-nested-pve-clusters-for-p4p6.md) |
 
 <!-- END DOCZ AUTO-GENERATED -->
 <!-- BEGIN DOCZ AUTO-GENERATED -->
