@@ -31,8 +31,9 @@ docz create impl "Your Implementation Title"
 
 ## All Implementation Plans
 
-| ID        | Title                       | Status | Date       | Author         | Link                                                                     |
-| --------- | --------------------------- | ------ | ---------- | -------------- | ------------------------------------------------------------------------ |
-| IMPL-0001 | Proxmox VE 9.x SDK coverage | Draft  | 2026-06-22 | Donald Gifford | [0001-proxmox-ve-9x-sdk-coverage.md](0001-proxmox-ve-9x-sdk-coverage.md) |
+| ID        | Title                                                            | Status | Date       | Author         | Link                                                                                                                                         |
+| --------- | ---------------------------------------------------------------- | ------ | ---------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| IMPL-0001 | Proxmox VE 9.x SDK coverage                                      | Draft  | 2026-06-22 | Donald Gifford | [0001-proxmox-ve-9x-sdk-coverage.md](0001-proxmox-ve-9x-sdk-coverage.md)                                                                     |
+| IMPL-0002 | Dogfood harness buildout: pvelab, cluster surface, P4/P6 closure | Draft  | 2026-07-09 | Donald Gifford | [0002-dogfood-harness-buildout-pvelab-cluster-surface-p4p6-closure.md](0002-dogfood-harness-buildout-pvelab-cluster-surface-p4p6-closure.md) |
 
 <!-- END DOCZ AUTO-GENERATED -->

@@ -31,8 +31,9 @@ docz create design "Your Design Title"
 
 ## All Design
 
-| ID          | Title                      | Status | Date       | Author         | Link                                                                     |
-| ----------- | -------------------------- | ------ | ---------- | -------------- | ------------------------------------------------------------------------ |
-| DESIGN-0001 | Proxmox SDK package layout | Draft  | 2026-06-22 | Donald Gifford | [0001-proxmox-sdk-package-layout.md](0001-proxmox-sdk-package-layout.md) |
+| ID          | Title                                                                            | Status | Date       | Author         | Link                                                                                                                                     |
+| ----------- | -------------------------------------------------------------------------------- | ------ | ---------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| DESIGN-0001 | Proxmox SDK package layout                                                       | Draft  | 2026-06-22 | Donald Gifford | [0001-proxmox-sdk-package-layout.md](0001-proxmox-sdk-package-layout.md)                                                                 |
+| DESIGN-0002 | Dogfood harness: pvelab CLI, nested cluster provisioning, and recording pipeline | Draft  | 2026-07-09 | Donald Gifford | [0002-dogfood-harness-pvelab-cli-nested-cluster-provisioning-and.md](0002-dogfood-harness-pvelab-cli-nested-cluster-provisioning-and.md) |
 
 <!-- END DOCZ AUTO-GENERATED -->
