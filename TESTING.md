@@ -108,10 +108,12 @@ The harness reads everything from the environment. Put this in a file you can
 into your shell history:
 
 ```sh
-# --- required ---
+# --- required: endpoint + ONE credential pair ---
 export PVE_ENDPOINT="https://pve.example:8006"
-export PVE_TOKEN_ID="root@pam!sdk"
+export PVE_TOKEN_ID="root@pam!sdk"      # API-token auth (preferred for a real node)
 export PVE_TOKEN_SECRET="3fb7…-…-…"
+# export PVE_USERNAME="root@pam"        # password auth instead (what .pvelab.env
+# export PVE_PASSWORD="…"               # uses — tokens don't survive a cluster join)
 
 # --- common ---
 export PVE_NODE="pve"          # default "pve"
@@ -133,8 +135,10 @@ Every variable:
 | Variable                | Required | Purpose                                                    |
 | ----------------------- | -------- | ---------------------------------------------------------- |
 | `PVE_ENDPOINT`          | yes      | base URL, e.g. `https://pve.example:8006`                  |
-| `PVE_TOKEN_ID`          | yes      | e.g. `root@pam!sdk`                                        |
-| `PVE_TOKEN_SECRET`      | yes      | the token's secret                                         |
+| `PVE_TOKEN_ID`          | yes\*    | e.g. `root@pam!sdk`                                        |
+| `PVE_TOKEN_SECRET`      | yes\*    | the token's secret                                         |
+| `PVE_USERNAME`          | yes\*    | password auth, e.g. `root@pam` (when token vars absent)    |
+| `PVE_PASSWORD`          | yes\*    | password auth; pairs with `PVE_USERNAME`                   |
 | `PVE_NODE`              | no       | node under test (default `pve`)                            |
 | `PVE_INSECURE_TLS`      | no       | `1` to skip TLS verify (self-signed)                       |
 | `PVE_RECORD`            | no       | `1` to record cassettes while running                      |
@@ -148,6 +152,9 @@ Every variable:
 | `PVE_TEST_LXC_TEMPLATE` | gate     | OS template volid for the LXC lifecycle                    |
 | `PVE_TEST_ISO_PATH`     | gate     | local path to a small ISO to upload                        |
 | `PVE_TEST_HA_SIDS`      | gate     | CSV of ≥2 HA-managed SIDs                                  |
+
+\* one credential pair is required: `PVE_TOKEN_ID`+`PVE_TOKEN_SECRET` (wins when
+both pairs are set) or `PVE_USERNAME`+`PVE_PASSWORD`.
 
 ### How the harness finds these values
 

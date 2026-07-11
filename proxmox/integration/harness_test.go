@@ -24,8 +24,8 @@ import (
 // TestMain autoloads PVE_* credentials from a .env (or .env.local) at the module
 // root before the live suite runs, so a contributor can keep their token in a
 // file instead of exporting it into every shell. Precedence is the important
-// part: if the three required vars are already set in the environment, no file is
-// read at all — explicit `export`s, CI-injected secrets, and
+// part: if the endpoint plus a complete credential pair are already set in the
+// environment, no file is read at all — explicit `export`s, CI-injected secrets, and
 // `op run --env-file=… -- go test …` all take priority. A 1Password-mounted .env
 // works too, but because it is typically a single-use FIFO, the loader only opens
 // it when the creds are otherwise unset (opening a pipe twice would block or
@@ -70,9 +70,25 @@ func loadDotEnv() {
 	}
 }
 
-// credsSet reports whether the three required credential vars are all present.
+// credsSet reports whether the endpoint plus one complete credential pair
+// (API token, or username+password) is present.
 func credsSet() bool {
-	return os.Getenv(envEndpoint) != "" && os.Getenv(envTokenID) != "" && os.Getenv(envTokenSecret) != ""
+	return os.Getenv(envEndpoint) != "" && envCredentials() != nil
+}
+
+// envCredentials returns the credential strategy the environment selects: an
+// API token when PVE_TOKEN_ID/PVE_TOKEN_SECRET are set, otherwise root-style
+// password credentials when PVE_USERNAME/PVE_PASSWORD are set (the pvelab
+// nested cluster only has root@pam — API tokens do not survive a cluster
+// join), otherwise nil. Token wins when both are configured.
+func envCredentials() api.Credentials {
+	if id, secret := os.Getenv(envTokenID), os.Getenv(envTokenSecret); id != "" && secret != "" {
+		return api.TokenCredentials(id, secret)
+	}
+	if user, pass := os.Getenv(envUsername), os.Getenv(envPassword); user != "" && pass != "" {
+		return api.UserCredentials(user, pass, "")
+	}
+	return nil
 }
 
 // moduleRoot returns the nearest ancestor of the working directory that contains
@@ -101,6 +117,8 @@ const (
 	envEndpoint    = "PVE_ENDPOINT"     // e.g. https://pve.example:8006
 	envTokenID     = "PVE_TOKEN_ID"     // e.g. root@pam!sdk
 	envTokenSecret = "PVE_TOKEN_SECRET" // the token's secret UUID
+	envUsername    = "PVE_USERNAME"     // password auth, e.g. root@pam (used when PVE_TOKEN_* is absent)
+	envPassword    = "PVE_PASSWORD"     // password auth; pairs with PVE_USERNAME
 	envNode        = "PVE_NODE"         // node under test, default "pve"
 	envInsecureTLS = "PVE_INSECURE_TLS" // "1" to skip TLS verify (self-signed)
 	envRecord      = "PVE_RECORD"       // "1" to record go-vcr cassettes while running
@@ -128,10 +146,10 @@ func newClient(t *testing.T) *proxmox.Client {
 		return newReplayClient(t)
 	}
 	endpoint := os.Getenv(envEndpoint)
-	tokenID := os.Getenv(envTokenID)
-	secret := os.Getenv(envTokenSecret)
-	if endpoint == "" || tokenID == "" || secret == "" {
-		t.Skipf("live PVE node not configured (set %s, %s, %s)", envEndpoint, envTokenID, envTokenSecret)
+	creds := envCredentials()
+	if endpoint == "" || creds == nil {
+		t.Skipf("live PVE node not configured (set %s plus %s/%s or %s/%s)",
+			envEndpoint, envTokenID, envTokenSecret, envUsername, envPassword)
 	}
 
 	insecure := os.Getenv(envInsecureTLS) == "1"
@@ -164,7 +182,7 @@ func newClient(t *testing.T) *proxmox.Client {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	t.Cleanup(cancel)
-	c, err := proxmox.NewClient(ctx, endpoint, api.TokenCredentials(tokenID, secret), opts...)
+	c, err := proxmox.NewClient(ctx, endpoint, creds, opts...)
 	if err != nil {
 		t.Fatalf("NewClient(%s): %v", endpoint, err)
 	}

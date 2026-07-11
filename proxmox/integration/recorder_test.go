@@ -449,3 +449,57 @@ func TestRecorderRecordReplay(t *testing.T) {
 		t.Errorf("replay status = %q, want %q", replayed.Status, recorded.Status)
 	}
 }
+
+// TestRecorderPasswordAuthRedaction is the password-credential twin of
+// TestRecorderRecordReplay: it records a REAL password-auth exchange (the
+// /access/ticket mint UserCredentials performs, plus an authenticated read)
+// through the recorder against mockpve and asserts neither the password nor
+// the minted ticket/CSRF material reaches the cassette on disk. The pvelab
+// nested cluster authenticates the suite this way (PVE_USERNAME/PVE_PASSWORD),
+// so this guards every password-auth cassette before one is ever committed.
+func TestRecorderPasswordAuthRedaction(t *testing.T) {
+	const password = "hunter2-do-not-leak"
+
+	mock := mockpve.New()
+	mock.AddUser("root@pam", password)
+	mock.AddVM("pve", 100, "web", "running")
+	ts := mock.Serve()
+	defer ts.Close()
+
+	ctx := context.Background()
+	cassettePath := filepath.Join(t.TempDir(), "password-auth")
+
+	rec := newRecorder(t, cassettePath, recorder.ModeRecordOnly, http.DefaultTransport, topologyScrub{})
+	c, err := proxmox.NewClient(ctx, ts.URL, api.UserCredentials("root@pam", password, ""),
+		proxmox.WithHTTPClient(rec.GetDefaultClient()))
+	if err != nil {
+		t.Fatalf("record NewClient (password auth): %v", err)
+	}
+	if _, err := c.QEMU("pve").Get(ctx, 100); err != nil {
+		t.Fatalf("record Get: %v", err)
+	}
+	if serr := rec.Stop(); serr != nil {
+		t.Fatalf("flush cassette: %v", serr)
+	}
+
+	data, err := os.ReadFile(cassettePath + ".yaml")
+	if err != nil {
+		t.Fatalf("read cassette: %v", err)
+	}
+	if bytes.Contains(data, []byte(password)) {
+		t.Fatal("SECURITY: password leaked into the recorded cassette")
+	}
+	// The minted ticket rides the /access/ticket response body plus the Cookie
+	// header of subsequent requests, and the CSRF token rides a request header;
+	// none may survive. mockpve mints "mock-ticket-<user>"/"mock-csrf-<user>"
+	// (mockpve/handlers.go), so asserting on those prefixes proves the real
+	// minted values were scrubbed — not just that a pattern never occurred.
+	for _, leak := range []string{"mock-ticket-", "mock-csrf-"} {
+		if bytes.Contains(data, []byte(leak)) {
+			t.Errorf("ticket material %q survived into the cassette", leak)
+		}
+	}
+	if !bytes.Contains(data, []byte(redacted)) {
+		t.Error("expected the REDACTED marker in the cassette")
+	}
+}
