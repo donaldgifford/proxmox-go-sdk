@@ -95,3 +95,56 @@ func (b PVEBool) MarshalJSON() ([]byte, error) {
 // Bool returns the value as a plain bool, so callers can write
 // cfg.Template.Bool() without a conversion.
 func (b PVEBool) Bool() bool { return bool(b) }
+
+// PVEInt normalises Proxmox's inconsistent integer encoding on reads. The
+// guest config endpoints (/qemu/{vmid}/config, /lxc/{vmid}/config) return raw
+// config-file values, and PVE serializes some integer-typed keys as quoted
+// strings — observed live on PVE 9.2.4, where a VM's `memory` comes back as
+// "8192" (9.2-1 returned a JSON number; the encoding drifts across point
+// releases). Use PVEInt for any integer field in a config read struct; it
+// accepts both the number and quoted-string forms.
+//
+// In request bodies PVEInt marshals to a plain JSON number. Read structs are
+// never marshalled back to PVE, so this exists only for symmetry.
+type PVEInt int
+
+// UnmarshalJSON decodes the number and quoted-string forms PVE emits. A JSON
+// null is a no-op (the value is left unchanged), per the encoding/json
+// convention for Unmarshalers; an empty string decodes as 0.
+func (i *PVEInt) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+
+	var raw any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("types: decode PVEInt: %w", err)
+	}
+
+	switch v := raw.(type) {
+	case float64:
+		*i = PVEInt(v)
+	case string:
+		if v == "" {
+			*i = 0
+			return nil
+		}
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return fmt.Errorf("types: cannot unmarshal %q into PVEInt", v)
+		}
+		*i = PVEInt(n)
+	default:
+		return fmt.Errorf("types: cannot unmarshal %T into PVEInt", raw)
+	}
+	return nil
+}
+
+// MarshalJSON encodes the value as a plain JSON number.
+func (i PVEInt) MarshalJSON() ([]byte, error) {
+	return []byte(strconv.Itoa(int(i))), nil
+}
+
+// Int returns the value as a plain int, so callers can write
+// cfg.Memory.Int() without a conversion.
+func (i PVEInt) Int() int { return int(i) }

@@ -263,6 +263,26 @@ need. The answer files enable the first-boot hook only when a need appears (none
 for Phase 0–3). Phase 0 proves the exact assistant commands manually over SSH
 before `lab/iso.go` automates them.
 
+**Amended 2026-07-10 (Donald, during Phase 0): the CLI uses `--fetch-from http`
+with an embedded answer server, not per-node baked ISOs.** Two Phase 0 realities
+drove this: the assistant/xorriso/base-ISO were _not_ pre-installed on r740a
+(the OQ-5 premise was stale; `pvelab iso` must apt-install them or error with
+instructions), and baking answers means 3×1.6 GiB prepared ISOs that all need
+re-prepping on any IP/password change. Instead: `pvelab iso` prepares **one**
+ISO per PVE version (`--fetch-from http`, answer URL baked); `pvelab up` runs a
+small embedded HTTP answer server for the duration of the installs, rendering
+each node's `answer.toml` on demand and matching requests by the
+`smbios1: serial=<node>` stamped into each VM at create (the installer POSTs its
+system identity — MACs + DMI — to the answer URL). This also scales the Phase 5
+matrix to one ISO per version instead of nodes×versions. **REST-with-caveat
+pieces to verify live in Phase 1:** the exact POST payload shape (DMI serial
+field name), whether plain HTTP is accepted or HTTPS + a pinned
+`--cert-fingerprint` is required (if so, pvelab keeps a persistent self-signed
+cert in its state dir), and nested-VM → workstation reachability on the lab LAN.
+The Phase 0 spike deliberately used the baked single-node ISO
+(`--fetch-from iso`) — that mode remains the documented fallback if the
+answer-server path proves unreliable.
+
 ### Readiness, retries, and the join restart
 
 - **Install readiness:** after `Start`, poll each node's

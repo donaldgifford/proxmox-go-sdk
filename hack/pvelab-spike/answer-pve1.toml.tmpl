@@ -1,0 +1,40 @@
+# Phase 0 spike answer file for the pve1 nested node (IMPL-0002).
+# Render before use — substitute the __PLACEHOLDERS__, e.g.:
+#
+#   sed -e "s|__PVELAB_ROOT_PW__|$PVELAB_ROOT_PW|" \
+#       -e "s|__PVE1_FQDN__|pve1-dogfood.lab.example|" \
+#       -e "s|__PVE1_CIDR__|192.0.2.11/24|" \
+#       -e "s|__GATEWAY__|192.0.2.1|" \
+#       -e "s|__DNS__|192.0.2.1|" \
+#       answer-pve1.toml.tmpl > answer-pve1.toml
+#
+# The fqdn's hostname part becomes the PVE node name (pve1-dogfood above);
+# use your site's real domain when rendering — it stays out of the repo.
+#
+# then validate ON THE OUTER NODE before preparing the ISO:
+#
+#   proxmox-auto-install-assistant validate-answer answer-pve1.toml
+#
+# NEVER commit a rendered answer file — it contains the root password.
+# Phase 1 replaces this with a go:embed'ed text/template in cmd/pvelab/lab
+# (IMPL-0002 IQ-2 = a); keep the two in sync until then.
+
+[global]
+keyboard = "en-us"
+country = "us"
+fqdn = "__PVE1_FQDN__"
+mailto = "root@localhost"
+timezone = "UTC"
+root-password = "__PVELAB_ROOT_PW__"
+reboot-on-error = false
+
+[network]
+source = "from-answer"
+cidr = "__PVE1_CIDR__"
+gateway = "__GATEWAY__"
+dns = "__DNS__"
+filter.ID_NET_NAME_MAC = "*"
+
+[disk-setup]
+filesystem = "ext4"
+disk-list = ["sda"]

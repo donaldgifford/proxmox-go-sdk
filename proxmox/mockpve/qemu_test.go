@@ -52,16 +52,19 @@ func TestQEMUConfigSeed(t *testing.T) {
 	c, cleanup := mock.NewClient()
 	defer cleanup()
 
+	// memory is asserted as a string: the mock mirrors live PVE 9.2.4, which
+	// serializes it as a quoted string in config reads (the SDK's
+	// types.PVEInt tolerates both forms).
 	var cfg struct {
 		Cores  int    `json:"cores"`
-		Memory int    `json:"memory"`
+		Memory string `json:"memory"`
 		Net0   string `json:"net0"`
 	}
 	if err := c.DoRequest(context.Background(), http.MethodGet, "/nodes/pve/qemu/100/config", nil, &cfg); err != nil {
 		t.Fatalf("config: %v", err)
 	}
-	if cfg.Cores != 2 || cfg.Memory != 2048 || cfg.Net0 != "virtio,bridge=vmbr0" {
-		t.Errorf("config = %+v, want cores=2 memory=2048 net0=virtio,bridge=vmbr0", cfg)
+	if cfg.Cores != 2 || cfg.Memory != "2048" || cfg.Net0 != "virtio,bridge=vmbr0" {
+		t.Errorf("config = %+v, want cores=2 memory=\"2048\" net0=virtio,bridge=vmbr0", cfg)
 	}
 }
 

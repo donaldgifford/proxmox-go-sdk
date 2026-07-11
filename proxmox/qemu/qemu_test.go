@@ -2,6 +2,7 @@ package qemu_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -191,6 +192,36 @@ func TestConfig(t *testing.T) {
 	}
 	if got := cfg.Extra["virtio0"]; got != "local-lvm:vm-100-disk-0,size=32G" {
 		t.Errorf("Extra[virtio0] = %q, want the disk spec", got)
+	}
+}
+
+// TestConfigDecodesStringIntegers guards the PVE 9.2.4 config-read encoding:
+// integer keys come back as quoted strings ("8192"), where 9.2-1 returned
+// JSON numbers. Found live by the IMPL-0002 Phase 0 dogfood spike — the
+// decode must accept both forms (types.PVEInt).
+func TestConfigDecodesStringIntegers(t *testing.T) {
+	t.Parallel()
+	raw := `{
+		"name":    "pvelab-spike-9201",
+		"cores":   "4",
+		"sockets": 1,
+		"memory":  "8192",
+		"balloon": "0"
+	}`
+	var cfg qemu.Config
+	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+		t.Fatalf("Unmarshal 9.2.4-shaped config: %v", err)
+	}
+	if cfg.Cores != 4 || cfg.Sockets != 1 || cfg.Memory != 8192 || cfg.Balloon != 0 {
+		t.Errorf("decoded cores=%d sockets=%d memory=%d balloon=%d, want 4/1/8192/0",
+			cfg.Cores, cfg.Sockets, cfg.Memory, cfg.Balloon)
+	}
+	// The string-encoded keys are typed fields, so they must NOT leak into
+	// Extra as well.
+	for _, k := range []string{"cores", "memory", "balloon"} {
+		if _, ok := cfg.Extra[k]; ok {
+			t.Errorf("Extra[%q] populated; typed field must consume the key", k)
+		}
 	}
 }
 

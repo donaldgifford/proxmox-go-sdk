@@ -29,7 +29,9 @@ feedback incorporated 2026-07-09)
   - [Stage 3: Inner suite — P4 with recording, then P6](#stage-3-inner-suite--p4-with-recording-then-p6)
   - [Stage 4: Teardown](#stage-4-teardown)
 - [Environment](#environment)
-- [Findings (desk + web research, 2026-07-08 — not yet validated on hardware)](#findings-desk--web-research-2026-07-08--not-yet-validated-on-hardware)
+- [Findings](#findings)
+  - [Phase 0 hardware validation (2026-07-10, IMPL-0002 Phase 0 spike on r740a)](#phase-0-hardware-validation-2026-07-10-impl-0002-phase-0-spike-on-r740a)
+  - [Desk + web research (2026-07-08 — hardware-validated where noted above)](#desk--web-research-2026-07-08--hardware-validated-where-noted-above)
   - [Cluster create/join are real REST endpoints — new SDK surface](#cluster-createjoin-are-real-rest-endpoints--new-sdk-surface)
   - [Unattended PVE install is fully supported by upstream tooling](#unattended-pve-install-is-fully-supported-by-upstream-tooling)
   - [Three nodes match PVE's quorum guidance (decided)](#three-nodes-match-pves-quorum-guidance-decided)
@@ -291,12 +293,66 @@ works even when the working tree is broken mid-development.
 | Recording          | go-vcr v4, inner P4/P6 phase only, `PVE_RECORD=1`        |
 | SDK version        | needs new `cluster` config surface in a stable tag       |
 
-## Findings (desk + web research, 2026-07-08 — not yet validated on hardware)
+## Findings
 
-> No spike has run yet. Facts below are sourced from the upstream PVE API schema
+### Phase 0 hardware validation (2026-07-10, IMPL-0002 Phase 0 spike on r740a)
+
+The single-node spike ran end-to-end: unattended install from a prepared ISO
+inside a VM on r740a, nested API answering through password credentials, clean
+teardown. Everything below is measured, not estimated.
+
+- **Install wall-clock: 4m04s** from VM start to the nested `GET /version`
+  answering via a real `root@pam` password ticket mint (the first live exercise
+  of `api.UserCredentials` — the desk estimate said 5–10 min). Create/start
+  tasks each took ~3 s; `prepare-iso` took ~1 min. Observed poll cadence: 15 s
+  sleep + ~7 s connection-refused attempt ≈ 22 s effective. **Recommendation for
+  `lab/provision.go`: 15 s interval, 15-minute per-node ceiling** (≈3.7×
+  measured), replacing the design's 25-minute guess.
+- **The dogfood premise paid for itself on run one: a real SDK bug.** PVE 9.2.4
+  serializes the guest config's `memory` as a quoted string (`"memory":"8192"`)
+  where 9.2-1 returned a JSON number — point-release serialization drift,
+  confirmed by `pvesh get /nodes/r740a/qemu/9201/config --output-format json`
+  (`cores` stayed numeric; only `memory` is stringified, matching PVE's schema
+  move of memory to a string type). `qemu.Config`'s lossless decode crashed on
+  it. Fixed with the new **`types.PVEInt`** (accepts number + quoted string) on
+  all guest-config integer fields (qemu + lxc), and **mockpve now serves
+  `memory` as a string** to mirror 9.2.4 — the regression is unit-guarded, and
+  the 9.2-1-era cassettes still replay green (both encodings covered). This is
+  precisely the "PVE API changes → dogfood catches it → mock reconciled" loop
+  the harness exists for.
+- **The OQ-5 "already on node" premise was stale**:
+  `proxmox-auto-install-assistant` and `xorriso` were NOT installed and no base
+  9.2 ISO was present. Remediated during the spike (assistant via
+  `proxmox-installer-common` v9.2.7, xorriso 1.5.6, ISO from
+  `enterprise.proxmox.com/iso`). Consequence for `lab/iso.go`: verify the
+  tooling and install it (or error with instructions) rather than assuming it.
+- **The exact assistant pipeline `lab/iso.go` must reproduce**:
+  `validate-answer <file>` then
+  `prepare-iso <base_iso> --fetch-from iso --answer-file <file> --output <target>.iso`
+  (`--output` is valid; default writes `<name>-auto-from-iso.iso` beside the
+  source). The template's `filter.ID_NET_NAME_MAC = "*"` NIC matcher and
+  `[disk-setup]` ext4 keys validated clean on v9.2.7.
+- **fqdn drives the node name**: the hostname part of `[global].fqdn` becomes
+  the PVE node name (spike node: `pve1-dogfood` on the site domain). The inner
+  suite's `PVE_NODE` must use it, and the site domain must join the cassette
+  scrub pairs (the "hostnames are placeholder-safe by construction" assumption
+  is dead).
+- **Design amendment (mid-spike, Donald)**: the CLI moves to
+  `--fetch-from http` + an embedded answer server (one ISO per PVE version,
+  matched by `smbios1: serial=<node>`; the config read confirmed `smbios1` is a
+  plain config key). Baked per-node ISOs remain the fallback. Recorded in
+  DESIGN-0002's ISO section + IMPL-0002 Phase 1.
+- **Blast-radius guards** (added mid-spike, Donald-requested): the driver — and
+  Phase 1's teardown, per the amended task — refuses VMIDs outside the reserved
+  9200–9399 block and refuses to delete VMs lacking the harness's name prefix.
+  The guard's config-read happy path is what live-validated the PVEInt fix
+  during `down`.
+
+### Desk + web research (2026-07-08 — hardware-validated where noted above)
+
+> Facts below are sourced from the upstream PVE API schema
 > (`https://pve.proxmox.com/pve-docs/api-viewer/apidoc.js`, fetched 2026-07-08),
-> the PVE wiki/manual, and this repo's own live-verification record. Empirical
-> timings and behaviour are to be filled in by the spike.
+> the PVE wiki/manual, and this repo's own live-verification record.
 
 ### Cluster create/join are real REST endpoints — new SDK surface
 

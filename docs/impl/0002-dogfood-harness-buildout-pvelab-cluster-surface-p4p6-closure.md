@@ -123,39 +123,80 @@ phase's whole point is replacing desk estimates with measured reality.
 
 #### Tasks
 
-- [ ] **(live)** Substrate check on r740a:
+- [x] **(live)** Substrate check on r740a:
       `cat /sys/module/kvm_intel/parameters/nested` → `Y`; memory headroom for
       3× 8 GiB VMs; confirm `proxmox-auto-install-assistant` + `xorriso`
-      versions and the base 9.2 ISO path (the future `nested.base_iso`)
-- [ ] Draft `answer.toml` for pve1 (static IP/gateway/DNS from the reserved
+      versions and the base 9.2 ISO path (the future `nested.base_iso`) —
+      _2026-07-10: nested=Y, 121 GiB free, pve-manager 9.2.4, `local` +
+      `local-zfs` active, vmbr0 UP, VMIDs 9201–9203 free. **Finding: the
+      assistant, xorriso, and the base 9.2 ISO were NOT present** (design OQ-5's
+      "already on node" premise was stale) — remediated as part of this task:
+      assistant installed (proxmox-installer-common v9.2.7), xorriso 1.5.6, base
+      ISO downloaded to `/var/lib/vz/template/iso/proxmox-ve_9.2-1.iso` (1.6
+      GiB)._
+- [x] Draft `answer.toml` for pve1 (static IP/gateway/DNS from the reserved
       pool, `root-password` from `PVELAB_ROOT_PW`, ext4/LVM defaults) and check
-      it with `proxmox-auto-install-assistant validate-answer` on the node
-- [ ] **(live)** Run
+      it with `proxmox-auto-install-assistant validate-answer` on the node —
+      _2026-07-10: rendered from `hack/pvelab-spike/answer-pve1.toml.tmpl` (fqdn
+      = site domain, so the node name is `pve1-dogfood`; fqdn is a placeholder
+      in the committed template to keep the real domain out of the repo);
+      `validate-answer`: "parsed successfully, no errors found" — the
+      `filter.ID_NET_NAME_MAC = "*"` NIC matcher and `[disk-setup]` keys are
+      valid as written._
+- [x] **(live)** Run
       `proxmox-auto-install-assistant prepare-iso <base_iso> --fetch-from iso --answer-file answer-pve1.toml`
       manually over SSH; note the exact command line + output path that
-      `lab/iso.go` must reproduce
-- [ ] **(live)** Create + start the pve1 VM from the prepared ISO via a
+      `lab/iso.go` must reproduce — _2026-07-10: worked first try, ~1 min. The
+      exact command:
+      `proxmox-auto-install-assistant prepare-iso /var/lib/vz/template/iso/proxmox-ve_9.2-1.iso --fetch-from iso --answer-file /root/answer-pve1.toml --output /var/lib/vz/template/iso/proxmox-ve_9.2-1-auto-pve1.iso`
+      (`--output` is a valid flag; without it the assistant writes
+      `<name>-auto-from-iso.iso` beside the source). Prepared ISO volid:
+      `local:iso/proxmox-ve_9.2-1-auto-pve1.iso` (1.6 GiB)._
+- [x] **(live)** Create + start the pve1 VM from the prepared ISO via a
       throwaway SDK driver (CPU `host`, 4 vCPU, 8 GiB RAM, 32 GiB on
-      `local-zfs`, `vmbr0`, VMID 9201)
-- [ ] **(live)** Measure install wall-clock (VM start → nested `GET /version`
+      `local-zfs`, `vmbr0`, VMID 9201) — _2026-07-10: `hack/pvelab-spike up`;
+      create task ~3 s, start task ~3 s._
+- [x] **(live)** Measure install wall-clock (VM start → nested `GET /version`
       answering); confirm login with
       `api.UserCredentials("root@pam", $PVELAB_ROOT_PW, "")` + insecure TLS —
-      the first live proof of the user/password ticket-mint path
-- [ ] **(live)** Tear down via the SDK (stop → delete); verify r740a shows no VM
-      9201 and only the intended ISO artifacts remain
-- [ ] Commit the throwaway driver under `hack/pvelab-spike/` (IQ-5 = b) with a
+      the first live proof of the user/password ticket-mint path — _2026-07-10:
+      **4m04s** from VM start to `/version` answering through a real
+      password-credential mint (beats the 5–10 min desk estimate). Observed poll
+      cadence: 15 s sleep + ~7 s connection-refused attempt ≈ 22 s effective.
+      Readiness numbers for `lab/provision.go`: keep the 15 s interval, set the
+      per-node ceiling to 15 min (≈3.7× measured) instead of the design's 25
+      min._
+- [x] **(live)** Tear down via the SDK (stop → delete); verify r740a shows no VM
+      9201 and only the intended ISO artifacts remain — _2026-07-10: first
+      `down` attempt **crashed on a real SDK bug** — PVE 9.2.4 returns the guest
+      config's `memory` as a quoted string (9.2-1 returned a number; confirmed
+      via `pvesh`: only `memory` is stringified, `cores` stays numeric). Fixed
+      in this phase: new `types.PVEInt` on all guest-config int fields (qemu +
+      lxc), mockpve reconciled to serve `memory` as a string, regression
+      unit-guarded (`TestConfigDecodesStringIntegers`, PVEInt table tests),
+      9.2-1 cassettes still replay green. Re-run `down` succeeded —
+      live-validating the fix through the ownership guard's config read;
+      `zfs list` shows no 9201 datasets, ISOs intact._
+- [x] Commit the throwaway driver under `hack/pvelab-spike/` (IQ-5 = b) with a
       header comment marking it superseded by `cmd/pvelab` from Phase 1; it
-      lives in the module, so `go build ./...` + `just lint` must stay green
-- [ ] Record measured timings + gotchas in INV-0002's Findings (replace the 5–10
+      lives in the module, so `go build ./...` + `just lint` must stay green —
+      _2026-07-10: committed on `feat/pvelab-phase0` together with the answer
+      template and the PVEInt fix._
+- [x] Record measured timings + gotchas in INV-0002's Findings (replace the 5–10
       min/node and 25-min-ceiling desk estimates; tighten DESIGN-0002's
-      readiness numbers if reality differs)
+      readiness numbers if reality differs) — _2026-07-10: INV-0002 → Findings →
+      "Phase 0 hardware validation": 4m04s install, 15-min ceiling
+      recommendation, the memory-string SDK bug, the stale-packages premise, the
+      exact assistant pipeline, fqdn→node-name, the answer-server amendment, and
+      the blast-radius guards._
 
 #### Success Criteria
 
 - One nested PVE node installs **unattended** from a prepared ISO inside a VM on
   r740a, answers `GET /version` with password credentials, and tears down
   leaving the host clean — with the measured install wall-clock recorded in
-  INV-0002. **(live)**
+  INV-0002. **(live)** — _MET 2026-07-10 (4m04s; see task notes above). **Phase
+  0 complete.**_
 
 ---
 
@@ -178,19 +219,35 @@ state). Cluster formation is deliberately absent until Phase 2.
       = a auth fields `outer.ssh.key_file` / `outer.ssh.password_env` — at least
       one required, key preferred) + strict fail-fast validation (≥3 nodes,
       unique VMIDs/names/IPs, referenced env vars set); table-driven tests
-- [ ] `cmd/pvelab/lab/iso.go`: render per-node `answer.toml` from a `go:embed`ed
-      `text/template` (IQ-2 = a); connect with `proxmox/ssh` (known-hosts
-      mandatory; auth per IQ-3 = a); SFTP the answer files, run
-      `validate-answer` then `prepare-iso` per node via `Exec`; verify the
-      prepared volids via `Storage().ListContent` — unit-tested against the ssh
-      package's in-process SSH/SFTP server + mockpve
+- [ ] `cmd/pvelab/lab/iso.go` (design amended 2026-07-10: **one http-mode ISO
+      per PVE version + embedded answer server**, not per-node baked ISOs):
+      connect with `proxmox/ssh` (known-hosts mandatory; auth per IQ-3 = a);
+      verify/install the assistant + xorriso (Phase 0 found them absent —
+      apt-install or error with instructions); run
+      `prepare-iso <base_iso> --fetch-from http` once per version via `Exec`;
+      verify the prepared volid via `Storage().ListContent` — unit-tested
+      against the ssh package's in-process SSH/SFTP server + mockpve
+- [ ] `cmd/pvelab/lab/answers.go`: render per-node `answer.toml` from a
+      `go:embed`ed `text/template` (IQ-2 = a) and serve the answers from an
+      embedded HTTP server that `up` runs for the duration of the installs,
+      matching each installer's POST by the `smbios1: serial=<node>` stamped at
+      VM create; **verify live in this phase**: the POST payload shape (DMI
+      serial field name), plain HTTP vs HTTPS + `--cert-fingerprint` (persistent
+      self-signed cert in the state dir if required), and nested-VM →
+      workstation reachability; the baked `--fetch-from iso` mode stays as the
+      documented fallback; unit tests with `httptest`
 - [ ] `cmd/pvelab/lab/provision.go`: prepared-ISO presence check (error message
       points at `pvelab iso`), VMID-collision check, node-VM create (CPU `host`,
-      sizing from config), start, per-node `/version` readiness poll (interval +
-      ceiling from Phase 0 measurements); unit tests against mockpve
+      sizing from config, `smbios1: serial=<node>` for answer-server matching),
+      start, per-node `/version` readiness poll (interval + ceiling from Phase 0
+      measurements); unit tests against mockpve
 - [ ] `cmd/pvelab/lab/teardown.go`: stop + delete with bounded per-op contexts
       (the `cleanupCtx` pattern); `--force` tolerates missing/half-created
-      objects; optional `--purge-isos`; unit tests
+      objects; optional `--purge-isos`; unit tests. **Blast-radius guards**
+      (Phase 0 spike precedent, Donald-requested 2026-07-10): refuse any VMID
+      outside the reserved 9200–9399 block, and refuse to delete a VM whose name
+      lacks the harness's `pvelab-` prefix — teardown only deletes what the
+      harness created (both guards unit-tested, including the refusal paths)
 - [ ] `cmd/pvelab/lab/state.go`: `.pvelab-state.json` (schema-versioned)
       write/read + `.pvelab.env` emission
       (`PVE_ENDPOINT`/`PVE_USERNAME`/`PVE_PASSWORD`/`PVE_INSECURE_TLS`/
@@ -275,9 +332,12 @@ regression-guards it in CI forever after.
       TESTING.md env-table rows; redaction already covers `password=` form
       fields + `ticket` bodies — re-verify against a recorded password-auth
       exchange before committing any cassette
-- [ ] `topologyScrub` → multi-pair (outer endpoint + the three nested IPs;
-      hostnames `pve1/2/3` + cluster name `dogfood` are placeholder-safe by
-      construction); extend `TestScrubTopology`
+- [ ] `topologyScrub` → multi-pair (outer endpoint + the three nested IPs +
+      **the site DNS domain**: Phase 0 set real fqdns like
+      `pve<n>-dogfood.<site-domain>`, so the domain must scrub to a placeholder
+      — the original "hostnames are placeholder-safe by construction" assumption
+      no longer holds; the `pve<n>-dogfood` hostname part and cluster name
+      `dogfood` remain safe); extend `TestScrubTopology`
 - [ ] `TestResourceAffinityPlacement` (IQ-6 = a: gated on
       `PVE_TEST_PLACEMENT_VMID_1/2`, e.g. 9301/9302): two diskless dummy VMs →
       HA resources (`state=started`) → **negative** resource-affinity rule →
@@ -385,25 +445,25 @@ verified against which real PVE version.
 
 ## File Changes
 
-| File                                                      | Action | Phase | Description                                          |
-| --------------------------------------------------------- | ------ | ----- | ---------------------------------------------------- |
-| `hack/pvelab-spike/`                                      | Create | 0     | committed throwaway spike driver (IQ-5 = b)          |
-| `cmd/pvelab/main.go`                                      | Create | 1     | subcommand dispatch, slog, buildinfo version         |
-| `cmd/pvelab/lab/{config,iso,provision,teardown,state}.go` | Create | 1     | importable harness logic + tests                     |
-| `cmd/pvelab/lab/answer.toml.tmpl`                         | Create | 1     | embedded answer-file template (IQ-2)                 |
-| `pvelab.example.yaml` + `.gitignore` entries              | Create | 1     | committed schema example; real files git-ignored     |
-| `justfile` (`dogfood-*` recipes)                          | Modify | 1–4   | iso/up/down in P1, test + composite in P3, pin in P4 |
-| `proxmox/cluster/config.go`                               | Create | 2     | `CreateCluster` / `JoinInfo` / `JoinCluster`         |
-| `proxmox/mockpve/cluster.go` (or extend existing)         | Modify | 2     | cluster-config emulation                             |
-| `cmd/pvelab/lab/cluster.go`                               | Create | 2     | create + serialized joins + quorum poll              |
-| `proxmox/integration/harness_test.go`                     | Modify | 3     | `PVE_USERNAME`/`PVE_PASSWORD` creds; gate consts     |
-| `proxmox/integration/recorder_test.go`                    | Modify | 3     | multi-pair `topologyScrub`                           |
-| `proxmox/integration/ha_test.go`                          | Modify | 3     | `TestResourceAffinityPlacement`; old rule test gone  |
-| `proxmox/integration/console_test.go`                     | Modify | 3     | `TestConsoleRFB`                                     |
-| `testdata/cassettes/TestResourceAffinityPlacement.yaml`   | Create | 3     | the P4 cassette (live-recorded, scrubbed)            |
-| `testdata/cassettes/certification.yaml`                   | Create | 5     | per-version certification record                     |
-| `TESTING.md` / `CLAUDE.md` / `README.md`                  | Modify | 1–5   | dogfood docs, binary-statement amendments            |
-| `docs/impl/0001-proxmox-ve-9x-sdk-coverage.md`            | Modify | 3     | Outstanding-live-verification boxes checked, dated   |
+| File                                                              | Action | Phase | Description                                          |
+| ----------------------------------------------------------------- | ------ | ----- | ---------------------------------------------------- |
+| `hack/pvelab-spike/`                                              | Create | 0     | committed throwaway spike driver (IQ-5 = b)          |
+| `cmd/pvelab/main.go`                                              | Create | 1     | subcommand dispatch, slog, buildinfo version         |
+| `cmd/pvelab/lab/{config,iso,answers,provision,teardown,state}.go` | Create | 1     | importable harness logic + tests                     |
+| `cmd/pvelab/lab/answer.toml.tmpl`                                 | Create | 1     | embedded answer-file template (IQ-2)                 |
+| `pvelab.example.yaml` + `.gitignore` entries                      | Create | 1     | committed schema example; real files git-ignored     |
+| `justfile` (`dogfood-*` recipes)                                  | Modify | 1–4   | iso/up/down in P1, test + composite in P3, pin in P4 |
+| `proxmox/cluster/config.go`                                       | Create | 2     | `CreateCluster` / `JoinInfo` / `JoinCluster`         |
+| `proxmox/mockpve/cluster.go` (or extend existing)                 | Modify | 2     | cluster-config emulation                             |
+| `cmd/pvelab/lab/cluster.go`                                       | Create | 2     | create + serialized joins + quorum poll              |
+| `proxmox/integration/harness_test.go`                             | Modify | 3     | `PVE_USERNAME`/`PVE_PASSWORD` creds; gate consts     |
+| `proxmox/integration/recorder_test.go`                            | Modify | 3     | multi-pair `topologyScrub`                           |
+| `proxmox/integration/ha_test.go`                                  | Modify | 3     | `TestResourceAffinityPlacement`; old rule test gone  |
+| `proxmox/integration/console_test.go`                             | Modify | 3     | `TestConsoleRFB`                                     |
+| `testdata/cassettes/TestResourceAffinityPlacement.yaml`           | Create | 3     | the P4 cassette (live-recorded, scrubbed)            |
+| `testdata/cassettes/certification.yaml`                           | Create | 5     | per-version certification record                     |
+| `TESTING.md` / `CLAUDE.md` / `README.md`                          | Modify | 1–5   | dogfood docs, binary-statement amendments            |
+| `docs/impl/0001-proxmox-ve-9x-sdk-coverage.md`                    | Modify | 3     | Outstanding-live-verification boxes checked, dated   |
 
 ## Testing Plan
 
