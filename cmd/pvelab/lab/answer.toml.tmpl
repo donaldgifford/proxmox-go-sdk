@@ -1,0 +1,25 @@
+# pvelab auto-install answer file, rendered per node by the embedded answer
+# server (IMPL-0002 IQ-2 = a). Keep in sync with the Phase 0 spike template
+# hack/pvelab-spike/answer-pve1.toml.tmpl (validated clean on assistant
+# v9.2.7). The rendered form carries the root password — it is served over
+# the answer URL during installs and never written to disk.
+
+[global]
+keyboard = "en-us"
+country = "us"
+fqdn = "{{.FQDN}}"
+mailto = "root@localhost"
+timezone = "UTC"
+root-password = "{{.RootPassword}}"
+reboot-on-error = false
+
+[network]
+source = "from-answer"
+cidr = "{{.CIDR}}"
+gateway = "{{.Gateway}}"
+dns = "{{.DNS}}"
+filter.ID_NET_NAME_MAC = "*"
+
+[disk-setup]
+filesystem = "ext4"
+disk-list = ["sda"]

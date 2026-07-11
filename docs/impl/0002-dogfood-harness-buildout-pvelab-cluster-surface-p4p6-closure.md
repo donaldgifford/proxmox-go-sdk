@@ -254,12 +254,13 @@ state). Cluster formation is deliberately absent until Phase 2.
       documented deviations:** (1) config gained `outer.node` — the outer PVE
       node name every node-scoped SDK call needs; a gap in DESIGN-0002's YAML
       sample (the spike hardcoded it). (2) SSH tests use an `execer` seam
-      (scripted fake; `var _ execer = (*ssh.Client)(nil)` pins the contract)
+      (scripted fake; `var _ execer =     (\*ssh.Client)(nil)`pins the contract)
       rather than duplicating ~100 lines of the ssh package's unexported
       in-process server — the client's exec plumbing is already covered by
       `proxmox/ssh`'s own tests; lab's tests cover lab's logic (command lines,
       idempotence, install/verify failure paths) against mockpve. The
-      `--fetch-from http` flag shape is live-verified at the acceptance run._
+      `--fetch-from     http` flag shape is live-verified at the acceptance
+      run.\_
 - [ ] `cmd/pvelab/lab/answers.go`: render per-node `answer.toml` from a
       `go:embed`ed `text/template` (IQ-2 = a) and serve the answers from an
       embedded HTTP server that `up` runs for the duration of the installs,
@@ -268,7 +269,21 @@ state). Cluster formation is deliberately absent until Phase 2.
       serial field name), plain HTTP vs HTTPS + `--cert-fingerprint` (persistent
       self-signed cert in the state dir if required), and nested-VM →
       workstation reachability; the baked `--fetch-from iso` mode stays as the
-      documented fallback; unit tests with `httptest`
+      documented fallback; unit tests with `httptest` — _2026-07-10:
+      `RenderAnswer` renders the `go:embed`ed `answer.toml.tmpl` (mirror of the
+      validated spike template); `AnswerServer` implements `http.Handler` —
+      `Start` binds `nested.answer_listen` (bind errors synchronous), `Shutdown`
+      graceful, `Served()` reports first-answer times (debug only; readiness
+      stays the `/version` poll). Matching is **shape-agnostic by design** (the
+      POST payload shape is the live-verify unknown): the bounded body is
+      substring-scanned for each node's serial — raw and base64 forms,
+      longest-name-first so prefix names can't misroute — with a `?serial=` GET
+      fallback; every request body logs at Debug as the live-verification
+      instrument. httptest covers JSON/form/garbage/base64 bodies, no-match 404,
+      longest-match, and the real Start/Shutdown listener path. The three
+      live-verify items stay open for the acceptance run; HTTPS +
+      `--cert-fingerprint` is deliberately unimplemented until live evidence
+      says plain HTTP fails._
 - [ ] `cmd/pvelab/lab/provision.go`: prepared-ISO presence check (error message
       points at `pvelab iso`), VMID-collision check, node-VM create (CPU `host`,
       sizing from config, `smbios1: serial=<node>` for answer-server matching),
