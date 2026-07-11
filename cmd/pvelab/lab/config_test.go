@@ -181,6 +181,21 @@ func TestLoadRejects(t *testing.T) {
 	}
 }
 
+// TestExampleConfigValid pins the committed pvelab.example.yaml to the
+// schema: if a config field changes, the example must change with it.
+func TestExampleConfigValid(t *testing.T) {
+	t.Setenv("PVE_TOKEN_ID", "root@pam!lab")
+	t.Setenv("PVE_TOKEN_SECRET", "secret")
+	t.Setenv("PVELAB_ROOT_PW", "throwaway")
+	cfg, err := LoadConfig("../../../pvelab.example.yaml")
+	if err != nil {
+		t.Fatalf("pvelab.example.yaml does not validate: %v", err)
+	}
+	if len(cfg.Nested.Nodes) != 3 || cfg.Outer.Node == "" {
+		t.Errorf("example config shape unexpected: %+v", cfg)
+	}
+}
+
 func TestOuterHost(t *testing.T) {
 	tests := []struct {
 		endpoint string

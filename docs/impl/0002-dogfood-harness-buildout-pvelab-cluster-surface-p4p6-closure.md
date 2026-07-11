@@ -343,10 +343,15 @@ state). Cluster formation is deliberately absent until Phase 2.
       two handoff files on success unless `-no-state` (deletion itself is always
       config-driven, so a lost state file never strands VMs). Round-trip +
       newer-schema + perms + env content tests._
-- [ ] `justfile`: `dogfood-iso` / `dogfood-up` / `dogfood-down` recipes
+- [x] `justfile`: `dogfood-iso` / `dogfood-up` / `dogfood-down` recipes
       (branch-run `go run ./cmd/pvelab` — the designed Phase 0/buildout state);
       `.gitignore`: `pvelab.yaml`, `.pvelab-state.json`, `.pvelab.env`; commit
-      `pvelab.example.yaml` (design OQ-4)
+      `pvelab.example.yaml` (design OQ-4) — _2026-07-11: three pass-through
+      recipes (`*args` forwards `-force`/`-purge-isos`/etc.), the three
+      git-ignore entries, and the example config (placeholder domain/IPs per the
+      topology-scrub rule; every schema field represented).
+      `TestExampleConfigValid` pins the committed example to the schema — a
+      config-field change now fails tests until the example is updated._
 - [ ] Docs: CLAUDE.md layout + workflow notes; amend the "mockpve is the only
       binary" statements (CLAUDE.md, README) to "only _shipped_ binary — pvelab
       is a `go run` dev tool"

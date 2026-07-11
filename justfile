@@ -37,6 +37,23 @@ test-replay:
 run *args:
     go run ./cmd/mockpve {{args}}
 
+# --- pvelab: the nested-PVE dogfood lab (IMPL-0002) -------------------------
+# pvelab is a `go run`-only dev tool (design OQ-2, never released). It reads
+# pvelab.yaml (git-ignored — copy pvelab.example.yaml) and resolves secrets
+# from env-var NAMES in that config. All three recipes touch r740a.
+
+# Prepare the auto-install ISO on the outer host (assistant over SSH)
+dogfood-iso *args:
+    go run ./cmd/pvelab iso {{args}}
+
+# Provision the nested node VMs, wait ready, write .pvelab-state.json + .pvelab.env
+dogfood-up *args:
+    go run ./cmd/pvelab up {{args}}
+
+# Tear the lab down (add -force / -purge-isos / -no-state as needed)
+dogfood-down *args:
+    go run ./cmd/pvelab down {{args}}
+
 # Guard the API schema against drift (OQ-7). Runs against the committed synthetic
 # fixture by default; point --apidoc at a real Proxmox apidoc.js (from a live 9.x
 # node) to guard the live REST surface, and re-run with `-update` to rebaseline.
