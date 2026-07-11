@@ -142,7 +142,7 @@ func (s *Server) AddVM(node string, vmid int, name, status string) {
 	if s.st.qemu.vms[node] == nil {
 		s.st.qemu.vms[node] = make(map[int]*vmRecord)
 	}
-	s.st.qemu.vms[node][vmid] = &vmRecord{
+	rec := &vmRecord{
 		VMID:      vmid,
 		Node:      node,
 		Name:      name,
@@ -150,6 +150,11 @@ func (s *Server) AddVM(node string, vmid int, name, status string) {
 		Config:    make(map[string]any),
 		Snapshots: make(map[string]*snapRecord),
 	}
+	// Real PVE reports the name in config reads too.
+	if name != "" {
+		rec.Config["name"] = name
+	}
+	s.st.qemu.vms[node][vmid] = rec
 }
 
 // SetVMConfig merges fields into a seeded VM's config. Values should use the Go

@@ -304,13 +304,26 @@ state). Cluster formation is deliberately absent until Phase 2.
       create handlers dropped every create-form key except vmid/name, so
       create-then-Config-read returned empty — they now persist the form via
       `applyConfigForm` like real PVE._
-- [ ] `cmd/pvelab/lab/teardown.go`: stop + delete with bounded per-op contexts
+- [x] `cmd/pvelab/lab/teardown.go`: stop + delete with bounded per-op contexts
       (the `cleanupCtx` pattern); `--force` tolerates missing/half-created
       objects; optional `--purge-isos`; unit tests. **Blast-radius guards**
       (Phase 0 spike precedent, Donald-requested 2026-07-10): refuse any VMID
       outside the reserved 9200–9399 block, and refuse to delete a VM whose name
       lacks the harness's `pvelab-` prefix — teardown only deletes what the
-      harness created (both guards unit-tested, including the refusal paths)
+      harness created (both guards unit-tested, including the refusal paths) —
+      _2026-07-11: `Teardown` fans out per node (errors joined; one stuck node
+      hides nothing): `checkOwnership` (VMID-range + live-name-prefix via
+      `Config` read; refusals surface `ErrNotOurs` and are **never** skippable
+      by `Force` — Force forgives "already gone", never "not ours") →
+      best-effort stop → delete, every op on a 3-min bounded context; `purgeISO`
+      frees the `pvelab-`-prefixed volid (harness-owned by construction).
+      `cmdDown` wired (deletes what the CONFIG says — VMIDs declared, not
+      discovered; documented in its help). Refusal-path tests: foreign-named VM
+      survives while owned VMs still get deleted; out-of-range VMID refused even
+      when harness-named; missing VMs error without `-force`, no-op with it;
+      purge-missing-ISO likewise. Also seeder-side mockpve fidelity fix:
+      `AddVM`/`AddContainer` now seed `name`/`hostname` into config reads like
+      real PVE._
 - [ ] `cmd/pvelab/lab/state.go`: `.pvelab-state.json` (schema-versioned)
       write/read + `.pvelab.env` emission
       (`PVE_ENDPOINT`/`PVE_USERNAME`/`PVE_PASSWORD`/`PVE_INSECURE_TLS`/

@@ -198,16 +198,34 @@ func cmdUp(args []string) error {
 	return fmt.Errorf("pvelab up (config %s): %w", *cfgPath, errNotImplemented)
 }
 
+// cmdDown tears the lab down. It deletes what the CONFIG says (VMIDs are
+// declared, not discovered), guarded by the blast-radius checks in lab; the
+// state file only feeds status/env, so -no-state and normal down share the
+// same deletion path.
 func cmdDown(args []string) error {
 	fs := flag.NewFlagSet("down", flag.ContinueOnError)
 	cfgPath := configFlag(fs)
-	fs.Bool("force", false, "tolerate missing/half-created objects")
+	force := fs.Bool("force", false, "tolerate missing/half-created objects")
 	fs.Bool("no-state", false, "tear down from config alone (ignore the state file)")
-	fs.Bool("purge-isos", false, "also delete the prepared installer ISOs")
+	purgeISOs := fs.Bool("purge-isos", false, "also delete the prepared installer ISOs")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	return fmt.Errorf("pvelab down (config %s): %w", *cfgPath, errNotImplemented)
+	ctx, stop := signalContext()
+	defer stop()
+
+	cfg, err := lab.LoadConfig(*cfgPath)
+	if err != nil {
+		return err
+	}
+	client, err := outerClient(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	return lab.Teardown(ctx, client, cfg, lab.TeardownOptions{
+		Force:     *force,
+		PurgeISOs: *purgeISOs,
+	}, slog.Default())
 }
 
 func cmdStatus(args []string) error {
