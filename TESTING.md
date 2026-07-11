@@ -356,6 +356,24 @@ design. Review cassettes as described below before committing. The composite
 `dogfood` tears the lab down even when the suite fails; run the steps
 individually to keep it alive for debugging.
 
+### Faster spin-up via templates (Phase 5, live-verify pending)
+
+`pvelab template build` runs the unattended install **once**, then converts the
+result into an outer-host template named `pvelab-tmpl-<version>` (dots dashed;
+VMID from the `nested.template` block, reserved sub-range 9210–9219). Once it
+exists, `just dogfood-up` automatically provisions via **linked clones** instead
+of ISO installs — building the template is the opt-in; delete it (or rebuild
+with `pvelab template build -force`) to fall back.
+
+Every clone boots the template's baked-in identity, so `up` starts clones one at
+a time and re-identifies each over SSH at the template's address (new
+hostname/IP, regenerated SSH host keys, pmxcfs node-dir move) before starting
+the next. **PVE tolerating that rename end-to-end is written-but-unverified** —
+the unit tests pin the command sequence, not PVE's behaviour; the first live
+clone run (and the clone-vs-ISO wall-clock measurement) is the IMPL-0002 Phase 5
+live gate. One template per PVE minor can coexist: keep one config file per
+version, each with its own `nested.template.vmid`.
+
 ## Recording cassettes
 
 Add `PVE_RECORD=1` to any run and the harness records each HTTP exchange into a

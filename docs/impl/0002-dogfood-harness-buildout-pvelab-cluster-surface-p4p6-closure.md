@@ -616,7 +616,23 @@ verified against which real PVE version.
       against r740a is **live-only** (unattended install), still unrun._
 - [ ] `up` via **linked clones** when the version's template exists (ISO install
       as fallback when it doesn't); **(live)** measure clone-boot vs ISO-install
-      wall-clock
+      wall-clock — _2026-07-11: implemented + mock-verified; only the **(live)**
+      half keeps this box open. `cloneSource` picks the path: a real template +
+      a configured `nested.template` block (its CIDR is the clone boot address)
+      → `upViaClone` (no ISO, no answer server); else warn + the extracted
+      `upViaISO`. Building a template IS the opt-in — no flag. `CloneNodeVMs`
+      linked-clones all nodes STOPPED (Full unset = PVE's template default);
+      `ReidentifyClones` then starts them **one at a time** — every clone boots
+      the template's baked-in hostname/IP/host key, so parallel starts would
+      collide — SSH-ing in at the template's IP (dial retried through the boot
+      window; TOFU host-key pinned across the run's serialized dials), rewriting
+      hostname + /etc/hosts + /etc/network/interfaces, regenerating SSH host
+      keys, moving the pmxcfs node dir best-effort, rebooting, and polling the
+      node's OWN endpoint before touching the next clone. **PVE tolerating the
+      hostname/IP rename end-to-end is the clone path's load-bearing live-verify
+      unknown** — tests pin command sequence, dial retry, serialization order,
+      and the tolerated reboot drop, never PVE's behaviour. Wall-clock
+      measurement + first live clone run remain **(live)**._
 - [ ] Version matrix: base ISOs/templates for the supported minors
       (9.0/9.1/9.2); `nested.pve_version` selects; **(live)** run the
       capability-gate tests against at least one real non-9.2 minor

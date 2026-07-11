@@ -119,6 +119,19 @@ when the repos split (DESIGN-0001). New public packages are admitted under
   implicit on real PVE, so tests seed it via `QueueClusterJoin` (plus
   `SetClusterSelfNode`); join-info issues the exported
   `mockpve.ClusterFingerprint`, which the join handler requires.
+- **Templates + linked clones (Phase 5)**: `pvelab template build` installs once
+  and converts to an outer-host template (`pvelab-tmpl-<version>`, dots dashed;
+  VMID from `nested.template`, reserved sub-range 9210–9219 — the new SDK op
+  `qemu.ConvertToTemplate` is a maybe-UPID hedge). When the template exists,
+  `up` clones instead of ISO-installing (building it IS the opt-in; discovery is
+  per-run by name, never state-tracked — templates outlive labs). Clones boot
+  the template's baked-in identity, so `up` starts them ONE at a time and
+  re-identifies each over SSH at the template's IP (TOFU-pinned for the run; new
+  hostname/IP, `ssh-keygen -A`, best-effort pmxcfs node-dir move, reboot) before
+  the next. **PVE tolerating that rename is the clone path's load-bearing
+  live-verify unknown** — tests pin command sequence and serialization only.
+  Teardown safety is structural: `down` only enumerates `cfg.Nested.Nodes`,
+  which never contains the template VMID.
 
 ### Release
 
