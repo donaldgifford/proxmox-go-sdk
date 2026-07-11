@@ -43,6 +43,7 @@ created: 2026-07-09
 - [Dependencies](#dependencies)
 - [Open Questions](#open-questions)
 - [References](#references)
+
 <!--toc:end-->
 
 ## Objective
@@ -208,9 +209,11 @@ state). Cluster formation is deliberately absent until Phase 2.
 
 #### Tasks
 
-- [ ] `go.mod`: YAML dependency (IQ-1 = a): promote `go.yaml.in/yaml/v4` —
+- [x] `go.mod`: YAML dependency (IQ-1 = a): promote `go.yaml.in/yaml/v4` —
       already in the module graph via go-vcr — to a direct dependency; zero new
-      modules
+      modules — _2026-07-10: `go mod tidy` moved it to the direct require block
+      when `lab/config.go`'s import landed; no version change (v4.0.0-rc.6, the
+      go-vcr pin), zero new modules._
 - [x] `cmd/pvelab/main.go`: stdlib-`flag` subcommand dispatch (`iso`, `up`,
       `down`, `status`, `env`), `slog` to stderr, version via
       `runtime/debug.ReadBuildInfo` (no ldflags — pvelab is `go run`-only per
@@ -218,10 +221,19 @@ state). Cluster formation is deliberately absent until Phase 2.
       down's `-force`/`-no-state`/`-purge-isos`), `PVELAB_DEBUG` log level, exit
       codes 0/1/2; subcommands return a documented not-implemented error until
       their lab tasks land (each later task wires its own)._
-- [ ] `cmd/pvelab/lab/config.go`: YAML schema (DESIGN-0002 shape, plus the IQ-3
+- [x] `cmd/pvelab/lab/config.go`: YAML schema (DESIGN-0002 shape, plus the IQ-3
       = a auth fields `outer.ssh.key_file` / `outer.ssh.password_env` — at least
       one required, key preferred) + strict fail-fast validation (≥3 nodes,
-      unique VMIDs/names/IPs, referenced env vars set); table-driven tests
+      unique VMIDs/names/IPs, referenced env vars set); table-driven tests —
+      _2026-07-10: `lab.LoadConfig` = strict decode (`KnownFields`, unknown keys
+      error) → defaults (cores 4 / 8192 MB / 32 GB / answer listen `:8442`, the
+      Phase 0 spike values) → `errors.Join` validation: required fields, ≥3
+      unique nodes inside the reserved 9200–9399 VMID block (the front-door
+      blast-radius guard), `netip` parsing for CIDRs/gateway/DNS, and every
+      referenced env var present. Schema carries the 2026-07-10 amendments:
+      `nested.domain` (fqdn = `<name>.<domain>`), `nested.answer_url` (explicit
+      routable URL baked into the http-mode ISO) plus `nested.answer_listen`
+      (server bind address). Table-driven tests cover every refusal path._
 - [ ] `cmd/pvelab/lab/iso.go` (design amended 2026-07-10: **one http-mode ISO
       per PVE version + embedded answer server**, not per-node baked ISOs):
       connect with `proxmox/ssh` (known-hosts mandatory; auth per IQ-3 = a);
