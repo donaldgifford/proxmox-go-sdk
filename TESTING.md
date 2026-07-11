@@ -276,12 +276,15 @@ part of what you are confirming is whether a real endpoint exists on your node.
 ### Console / access (Phase 6)
 
 Lists users and tokens under the 9.x privilege model and mints a VNC ticket.
-Driving the raw RFB session is a manual step beyond the ticket mint.
+`TestConsoleRFB` goes one step further: it dials the vncwebsocket via
+`console.Connect` and asserts the live QEMU VNC server's RFB ProtocolVersion
+greeting — the raw byte stream cannot be recorded (no cassette by design), so it
+is live-only and skips under `PVE_REPLAY=1`.
 
 ```sh
 # needs: PVE_TEST_STORAGE, PVE_TEST_CONSOLE_VMID
-# (spins up its own scratch VM, mints against it, then tears it down)
-go test -tags=integration ./proxmox/integration/... -run TestConsoleMint -v
+# (each spins up its own scratch VM, works against it, then tears it down)
+go test -tags=integration ./proxmox/integration/... -run 'TestConsoleMint|TestConsoleRFB' -v
 ```
 
 ### Everything at once
@@ -314,11 +317,44 @@ Tick these off against your node. They map to the per-phase Success Criteria in
       (`TestNetworkReads`); confirm whether a real SDN live-status endpoint
       exists.
 - [ ] **Phase 6 — cluster/access/console:** list users/tokens and mint a VNC
-      ticket (`TestAccessReads`, `TestConsoleMint`); drive a real RFB session
-      (manual).
+      ticket (`TestAccessReads`, `TestConsoleMint`); read the live RFB greeting
+      over `console.Connect` (`TestConsoleRFB`).
 - [ ] **9.2-gated ops:** on a 9.2 node, confirm the real endpoints (or absence)
       behind Dynamic Load Balancer, HA arm/disarm, SDN BGP fabrics, ZFS RAIDZ
       expansion, and token-secret rotation.
+
+## The dogfood lab (pvelab)
+
+Two criteria above need a **quorate multi-node cluster** — the HA placement pair
+and (conveniently, though one node suffices) the RFB read. `pvelab` (IMPL-0002)
+provisions an ephemeral 3-node nested-PVE cluster on a single outer host so
+those run without touching real guests.
+
+**Prereqs:** an outer PVE host with nested virtualization enabled
+(`kvm_intel nested=Y`), ~24 GiB RAM headroom, an API token for the outer host,
+SSH root access to it (for the ISO preparation step), and a reserved VMID block
+(9200–9399 — pvelab refuses anything else).
+
+```sh
+cp pvelab.example.yaml pvelab.yaml   # edit: outer endpoint/node, nested IPs, domain
+export PVE_TOKEN_ID=… PVE_TOKEN_SECRET=…   # outer-host token (names set in pvelab.yaml)
+export PVELAB_ROOT_PW=…                    # nested nodes' root password (never stored)
+
+just dogfood-iso    # one-time per PVE version: prepare the auto-install ISO
+just dogfood        # up -> inner suite (records cassettes) -> down
+```
+
+`dogfood-up` installs three nested nodes from the prepared ISO, forms a quorate
+cluster, and writes `.pvelab.env` — the inner suite's environment:
+`PVE_ENDPOINT` (first nested node), `PVE_USERNAME`/`PVE_PASSWORD` (root@pam —
+API tokens do not survive a cluster join), the placement/console gates, and
+`PVE_SCRUB_EXTRA` (the recording-scrub pairs for the other nodes' IPs, the site
+domain, and the outer host). `dogfood-test` sources that file, sets
+`PVE_RECORD=1`, and runs `TestResourceAffinityPlacement` + `TestConsoleRFB`;
+placement records a cassette for CI replay, the RFB read is cassette-less by
+design. Review cassettes as described below before committing. The composite
+`dogfood` tears the lab down even when the suite fails; run the steps
+individually to keep it alive for debugging.
 
 ## Recording cassettes
 
