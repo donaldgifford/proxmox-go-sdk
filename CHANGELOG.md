@@ -20,6 +20,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 ### Bug Fixes
 
 - *(mockpve)* Persist create-form keys into guest config
+- *(pvelab)* Quote installer-supplied log values; static env-write error
 
 ### Refactor
 
