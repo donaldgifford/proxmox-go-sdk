@@ -656,8 +656,13 @@ verified against which real PVE version.
       `.gitignore` gains `!certification.yaml` — it is hand-maintained data, not
       a recording. Entries accrue per matrix run; the placement cassette joins
       the batch after the first full dogfood run (Phase 3, live-pending)._
-- [ ] Runbook: `pve-schemadiff` drift → dogfood run → refresh recordings →
-      re-certify (a TESTING.md section or docs page)
+- [x] Runbook: `pve-schemadiff` drift → dogfood run → refresh recordings →
+      re-certify (a TESTING.md section or docs page) — _2026-07-11: TESTING.md
+      "Certification: drift → dogfood → refresh → re-certify" section (under
+      Recording cassettes): schemadiff trip → `nested.pve_version` bump +
+      dogfood run → stale-cassette re-record/review/force-add → reconcile
+      mockpve + append the batch entry to `certification.yaml`, with
+      `just test-replay` as the regression guard._
 - [ ] Conclude INV-0001 + INV-0002 (→ Concluded, final findings); DESIGN-0002 →
       Implemented; this IMPL → Completed
 

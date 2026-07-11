@@ -451,6 +451,30 @@ A cassette that predates a code change replays as
 `requested interaction not found` — re-record it against a live node
 (`PVE_RECORD=1`).
 
+### Certification: drift → dogfood → refresh → re-certify
+
+`certification.yaml` (beside the cassettes) is the machine-readable record of
+**which PVE version mockpve's behaviour was verified against** — one entry per
+recording batch, with any mock divergences reconciled (fixed in mockpve, or
+named in `notes`) before the entry lands. The runbook when the PVE surface
+moves:
+
+1. **Drift trips.** `just schemadiff` (in CI) fails against the committed
+   baseline, or a new PVE minor lands on the lab host. Point `-apidoc` at the
+   node's real `apidoc.js` to see what changed; rebaseline with `-update` once
+   understood.
+2. **Dogfood run.** Set `nested.pve_version` to the new version (base ISO on the
+   outer host first — `just dogfood-iso`), then `just dogfood`. The inner suite
+   records fresh cassettes as it verifies the live criteria.
+3. **Refresh recordings.** Re-record any stale cassettes
+   (`requested interaction not found` on replay) with `PVE_RECORD=1`, review the
+   diff for leaks (see above), force-add.
+4. **Re-certify.** Compare mockpve against the fresh cassettes: fix genuine
+   envelope divergences in mockpve (or record them in `notes` when deliberate),
+   then append the batch's entry to `certification.yaml` — `pve_version`,
+   `recorded`, `commit`, `harness`, the cassette list, notes. `just test-replay`
+   green on the new batch is the regression guard.
+
 ## Troubleshooting
 
 | Symptom                                         | Likely cause / fix                                                                                                            |
