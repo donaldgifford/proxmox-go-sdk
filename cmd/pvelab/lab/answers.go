@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"text/template"
 	"time"
@@ -156,16 +157,13 @@ func (s *AnswerServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "read body", http.StatusBadRequest)
 		return
 	}
-	// Installer-supplied values are %q-quoted before logging: control bytes
-	// and newlines become escapes, so a crafted body cannot forge log lines
-	// (and binary payloads stay readable).
-	s.logger.Debug("answer request", "method", r.Method, "path", strconv.Quote(r.URL.Path),
-		"remote", r.RemoteAddr, "body", strconv.Quote(string(body)))
+	s.logger.Debug("answer request", "method", r.Method, "path", sanitizeLogValue(r.URL.Path),
+		"remote", r.RemoteAddr, "body", sanitizeLogValue(string(body)))
 
 	node, ok := s.matchNode(body, r.URL.Query().Get("serial"))
 	if !ok {
 		s.logger.Warn("answer request matched no configured node",
-			"remote", r.RemoteAddr, "body", strconv.Quote(string(truncateBytes(body, 256))))
+			"remote", r.RemoteAddr, "body", sanitizeLogValue(string(truncateBytes(body, 256))))
 		http.Error(w, "no matching node", http.StatusNotFound)
 		return
 	}
@@ -219,4 +217,13 @@ func truncateBytes(b []byte, n int) []byte {
 		return b[:n]
 	}
 	return b
+}
+
+// sanitizeLogValue neutralises installer-supplied bytes before logging: CR/LF
+// are removed (a crafted body cannot forge log lines) and the rest is
+// %q-quoted so control bytes become readable escapes.
+func sanitizeLogValue(s string) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "\r", " ")
+	return strconv.Quote(s)
 }
