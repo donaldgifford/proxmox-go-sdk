@@ -245,9 +245,9 @@ func cmdUp(args []string) error {
 	return nil
 }
 
-// provisionLab is `up`'s staged create → start → wait flow, updating the
-// state file after every stage (design OQ-7: a mid-up failure leaves evidence
-// on disk).
+// provisionLab is `up`'s staged create → start → wait → cluster flow,
+// updating the state file after every stage (design OQ-7: a mid-up failure
+// leaves evidence on disk).
 func provisionLab(ctx context.Context, client *proxmox.Client, cfg *lab.Config, isoVolid, rootPW string) error {
 	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
 		st.ClusterName = cfg.Nested.ClusterName
@@ -286,7 +286,19 @@ func provisionLab(ctx context.Context, client *proxmox.Client, cfg *lab.Config, 
 	}); err != nil {
 		return errors.Join(waitErr, err)
 	}
-	return waitErr
+	if waitErr != nil {
+		return waitErr
+	}
+
+	if err := lab.FormCluster(ctx, cfg, rootPW, slog.Default()); err != nil {
+		return err
+	}
+	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+		st.Clustered = true
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 // cmdDown tears the lab down. It deletes what the CONFIG says (VMIDs are
@@ -367,6 +379,9 @@ func cmdStatus(args []string) error {
 			}
 		}
 		fmt.Printf("%s\tvmid=%d\touter=%s\t%s\n", n.Name, n.VMID, outer, readiness)
+	}
+	if st != nil && st.Clustered {
+		fmt.Printf("cluster\t%s\tformed (quorate at up)\n", st.ClusterName)
 	}
 	return nil
 }
