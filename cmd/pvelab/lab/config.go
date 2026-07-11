@@ -25,6 +25,14 @@ const (
 	vmidRangeHi = 9399
 )
 
+// The template sub-range inside the reserved block (IMPL-0002 Phase 5): one
+// template per PVE minor, so the version matrix can keep several on the outer
+// host at once. Each per-version config file picks a distinct VMID in here.
+const (
+	templateVMIDLo = 9210
+	templateVMIDHi = 9219
+)
+
 // Sizing defaults applied when the nested block leaves them zero (the Phase 0
 // spike values).
 const (
@@ -87,7 +95,20 @@ type Nested struct {
 	DiskGB          int    `yaml:"disk_gb"`
 	AnswerURL       string `yaml:"answer_url"`    // baked into the http-mode ISO; must be reachable from the nested VMs.
 	AnswerListen    string `yaml:"answer_listen"` // answer server bind address (default ":8442").
-	Nodes           []Node `yaml:"nodes"`
+	// Template reserves the VMID/CIDR `pvelab template build` uses for this
+	// version's template (IMPL-0002 Phase 5). Optional: without it `template
+	// build` refuses to run and `up` always takes the ISO-install path.
+	Template *TemplateSpec `yaml:"template,omitempty"`
+	Nodes    []Node        `yaml:"nodes"`
+}
+
+// TemplateSpec reserves the outer-host VMID (in the 9210–9219 template
+// sub-range) and install-time CIDR for this version's nested-PVE template. The
+// template's NAME is not configured — it is always pvelab-tmpl-<pve_version>,
+// computed, so it cannot drift from the version it represents.
+type TemplateSpec struct {
+	VMID int    `yaml:"vmid"`
+	CIDR string `yaml:"cidr"`
 }
 
 // Node is one nested PVE node. Name is used verbatim as the hostname (and so
@@ -198,8 +219,36 @@ func (c *Config) Validate() error {
 	}
 
 	errs = append(errs, c.validateNodes()...)
+	errs = append(errs, c.validateTemplate()...)
 	errs = append(errs, c.validateEnvRefs()...)
 	return errors.Join(errs...)
+}
+
+// validateTemplate checks the optional nested.template block: VMID inside the
+// template sub-range (so it can never collide with a node VMID), CIDR
+// parseable and distinct from every node's.
+func (c *Config) validateTemplate() []error {
+	t := c.Nested.Template
+	if t == nil {
+		return nil
+	}
+	var errs []error
+	if t.VMID < templateVMIDLo || t.VMID > templateVMIDHi {
+		errs = append(errs, fmt.Errorf("nested.template.vmid %d outside the reserved template sub-range %d-%d",
+			t.VMID, templateVMIDLo, templateVMIDHi))
+	}
+	if _, err := netip.ParsePrefix(t.CIDR); err != nil {
+		errs = append(errs, fmt.Errorf("nested.template.cidr: %w", err))
+	}
+	for _, n := range c.Nested.Nodes {
+		if n.VMID == t.VMID {
+			errs = append(errs, fmt.Errorf("nested.template.vmid %d collides with node %s", t.VMID, n.Name))
+		}
+		if n.CIDR == t.CIDR {
+			errs = append(errs, fmt.Errorf("nested.template.cidr %q collides with node %s", t.CIDR, n.Name))
+		}
+	}
+	return errs
 }
 
 func (c *Config) validateNodes() []error {
