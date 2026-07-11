@@ -594,9 +594,26 @@ verified against which real PVE version.
 
 #### Tasks
 
-- [ ] `pvelab template build`: run the unattended install once per
+- [x] `pvelab template build`: run the unattended install once per
       `nested.pve_version` → convert the result to an outer-node template;
-      template VMID/naming convention recorded in `pvelab.example.yaml`
+      template VMID/naming convention recorded in `pvelab.example.yaml` —
+      _2026-07-11: implemented + mock-verified (go-architect designed; see the
+      pvelab-template-clone-architecture memory). New SDK op
+      `qemu.ConvertToTemplate` (action-option pattern, **maybe-UPID hedge** —
+      the return shape is unconfirmed on 9.x, callers check `Ref.IsZero()`; the
+      `nodes.ApplyNetworkConfig` precedent); mockpve rejects running VMs and
+      flags templates in the VM listing. `lab.BuildTemplate` reuses the
+      provision path unchanged via a synthetic single-node `TemplateConfig`
+      (name `tmpl-<version>` with dots dashed — it doubles as the guest hostname
+      label) → graceful shutdown → installer-ISO detach → convert. Template name
+      is COMPUTED (`pvelab-tmpl-<version>`), never configured; VMID is explicit
+      config in the new **9210–9219 template sub-range**
+      (`nested.template {vmid, cidr}`, validated against node collisions;
+      recorded in `pvelab.example.yaml` with the one-template-per-minor matrix
+      convention). Discovery is per-run by name (`FindTemplate`) — no state-file
+      tracking, templates outlive labs. `-force` deletes ours by computed name;
+      a foreign VM on the template VMID is always refused. The actual build
+      against r740a is **live-only** (unattended install), still unrun._
 - [ ] `up` via **linked clones** when the version's template exists (ISO install
       as fallback when it doesn't); **(live)** measure clone-boot vs ISO-install
       wall-clock
