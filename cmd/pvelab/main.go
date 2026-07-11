@@ -387,6 +387,10 @@ func cmdEnv(args []string) error {
 	if err != nil {
 		return err
 	}
-	_, err = os.Stdout.Write(lab.RenderEnv(env))
-	return err
+	// A static error on write failure: the rendered env carries the password,
+	// so nothing derived from it belongs in the logged error chain.
+	if _, err := os.Stdout.Write(lab.RenderEnv(env)); err != nil {
+		return errors.New("write env to stdout failed")
+	}
+	return nil
 }
