@@ -149,6 +149,23 @@ func newClient(t *testing.T) *proxmox.Client {
 	if os.Getenv(envReplay) == "1" {
 		return newReplayClient(t)
 	}
+	return newLiveClient(t, true)
+}
+
+// newStreamClient builds a live client that BYPASSES record mode even when
+// PVE_RECORD=1: a websocket upgrade (console.Connect) hijacks the connection
+// and the raw duplex stream cannot ride go-vcr's request/response model, so a
+// stream-carrying test runs live-only and deliberately leaves no cassette
+// (design OQ-6). Callers must skip under PVE_REPLAY themselves.
+func newStreamClient(t *testing.T) *proxmox.Client {
+	t.Helper()
+	return newLiveClient(t, false)
+}
+
+// newLiveClient builds a client against the configured live node, recording to
+// the running test's cassette when record is true and PVE_RECORD=1.
+func newLiveClient(t *testing.T, record bool) *proxmox.Client {
+	t.Helper()
 	endpoint := os.Getenv(envEndpoint)
 	creds := envCredentials()
 	if endpoint == "" || creds == nil {
@@ -160,7 +177,7 @@ func newClient(t *testing.T) *proxmox.Client {
 
 	var opts []proxmox.Option
 	switch {
-	case os.Getenv(envRecord) == "1":
+	case record && os.Getenv(envRecord) == "1":
 		// Recording: the SDK must use the go-vcr client, which bypasses the
 		// SDK's own TLS options, so the insecure choice is applied to the
 		// recorder's real transport instead.
