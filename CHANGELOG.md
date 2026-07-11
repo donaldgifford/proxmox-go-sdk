@@ -53,6 +53,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 ### Miscellaneous Tasks
 
 - *(just)* Dogfood-test + composite dogfood recipes
+- *(release)* Guard .goreleaser.yml against a pvelab builds entry
 
 ## [0.2.0] - 2026-07-11
 
