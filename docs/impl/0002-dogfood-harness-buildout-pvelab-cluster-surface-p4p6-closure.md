@@ -441,14 +441,21 @@ The one new SDK surface this design needs: PVE cluster-config REST ops, plus
 - [ ] Fallback posture: an `ssh.Exec pvecm` path behind a config flag **only
       if** the live run shows REST unreliable; otherwise a doc note recording
       why no fallback exists
-- [ ] `just lint` + `just test` green; changelog regenerated
+- [x] `just lint` + `just test` green; changelog regenerated — _2026-07-11: full
+      suite (race, 25 packages) + `just test-replay` green; go-style review of
+      the change set returned 0 errors (2 advisory notes matching existing repo
+      precedent: the design-pinned `ClusterCreateSpec` name, and mockpve's
+      naked-bool seeder shape)._
 
 #### Success Criteria
 
 - `just dogfood-up` ends with a **3-node quorate cluster** — `/cluster/status`
-  reports 3 nodes online + quorate — reproducibly from scratch. **(live)**
+  reports 3 nodes online + quorate — reproducibly from scratch. **(live)** —
+  _written-but-unverified: awaits the live run (task above); joins the Phase 1
+  acceptance run Donald executes._
 - The new cluster surface is mock-tested in default CI, with the join
-  fingerprint/membership flow emulated in mockpve.
+  fingerprint/membership flow emulated in mockpve. — _2026-07-11: met (unit
+  tests in `proxmox/cluster` + `cmd/pvelab/lab` run in the default suite)._
 
 ---
 
