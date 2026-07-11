@@ -380,25 +380,61 @@ The one new SDK surface this design needs: PVE cluster-config REST ops, plus
 
 #### Tasks
 
-- [ ] `proxmox/cluster/config.go`: `ClusterCreateSpec` / `JoinInfo` (lossless
+- [x] `proxmox/cluster/config.go`: `ClusterCreateSpec` / `JoinInfo` (lossless
       read: known fields + `Extra`) / `JoinSpec`;
       `CreateCluster`/`JoinInfo`/`JoinCluster` implemented as **fire-and-poll**
       writes (response body ignored beyond error status — upstream return shapes
       are unverified); `JoinCluster` docs state it is fresh-node-only, wipes the
       joining node's pmxcfs users/tokens, and restarts the API daemons mid-call
-- [ ] `proxmox/cluster/doc.go`: promote the package overview to cover the config
-      ops
-- [ ] mockpve: cluster-config handlers (`POST /cluster/config`,
+      — _2026-07-11: landed per the pinned signatures plus `ListConfigNodes`
+      (the convergence read both writes' docs point at) on the `API` interface.
+      Two shape-hedges beyond the sketch: `JoinInfo.Fingerprint` is a METHOD
+      (the wire carries per-node `pve_fp` inside `nodelist`, no top-level
+      fingerprint field — it selects the preferred node's, falling back to the
+      first entry's), and `JoinNode`/`ConfigNode` model only string fields
+      (`name`/`pve_addr`/`pve_fp`; `node`+`name` with a `NodeName()` accessor)
+      routing everything numeric to `Extra`, so an unverified live shape can't
+      hard-fail the decode. `JoinSpec.Force` is `*types.PVEBool` (the repo's
+      Force precedent); links/nodeid/votes go via `Extra`._
+- [x] `proxmox/cluster/doc.go`: promote the package overview to cover the config
+      ops — _2026-07-11: fire-and-poll semantics, the fresh-node-only join
+      warning, and the Fingerprint flow; `go doc` renders clean._
+- [x] mockpve: cluster-config handlers (`POST /cluster/config`,
       `GET`/`POST /cluster/config/join`, membership visible via
       `GET /cluster/config/nodes`); the join handler validates the fingerprint
-      issued by the mock's own join-info; reuse the shared `parseForm` helper
-- [ ] Unit tests: happy-path create → join-info → join → membership; bad
-      fingerprint rejected; double create errors
-- [ ] `cmd/pvelab/lab/cluster.go`: create on pve1 → `JoinInfo` → **serialized**
+      issued by the mock's own join-info; reuse the shared `parseForm` helper —
+      _2026-07-11: join-info issues the exported `ClusterFingerprint` const for
+      every member and the join handler requires exactly it. One emulation seam
+      the wire protocol forces: on real PVE the joining node's identity is
+      implicit (the request is served BY the joining node), but one mock serves
+      every role, so `QueueClusterJoin(name)` seeds the identity each join
+      consumes (in order) and `SetClusterSelfNode` names the mock's own node
+      (default "pve"). Double create and wrong-fingerprint joins 400 like real
+      PVE; a standalone mock's `config/nodes` returns an empty list
+      (REST-with-caveat — live shape unverified)._
+- [x] Unit tests: happy-path create → join-info → join → membership; bad
+      fingerprint rejected; double create errors — _2026-07-11: plus lossless
+      Extra assertions (nodelist `nodeid`, top-level `totem`), standalone
+      join-info/join errors, spec validation, and `Fingerprint()` selection
+      order. All against mockpve._
+- [x] `cmd/pvelab/lab/cluster.go`: create on pve1 → `JoinInfo` → **serialized**
       joins for pve2/pve3 (one SDK client per nested node), each tolerating the
       mid-join connection drop and converging via `GET /cluster/config/nodes`
       polls (~3 min/join bound) → final quorum check via `GET /cluster/status`
-      (3 online + quorate); wired into `up`; unit tests against mockpve
+      (3 online + quorate); wired into `up`; unit tests against mockpve —
+      _2026-07-11: `FormCluster` with a `clusterDialer` seam (endpoint →
+      `cluster.API`, the `readyProbe` pattern); production dials a fresh SDK
+      client per poll attempt (root@pam password creds — tokens don't survive a
+      join; insecure TLS — certs churn at join), so a ticket invalidated by the
+      formation restarts can never wedge a poll. Join request errors are
+      swallowed with a Warn by design; a genuinely rejected join surfaces as the
+      bounded membership-poll timeout naming the node. `up` runs formation after
+      readiness and records `Clustered` in state (additive schema key); `status`
+      prints it. Tests back the dialer with ONE mock playing every node (its
+      cluster state is the shared world; join identities via `QueueClusterJoin`,
+      quorum via seeded status): happy path, join-never- converges (names the
+      stuck node), create-failure fatal, quorum timeout, and the production
+      dialer against the mock's password-ticket flow._
 - [ ] **(live)** Verify REST create/join end-to-end on the nested nodes; record
       the actual return shapes (UPID vs null) in a dated status note here +
       INV-0002, and tighten the SDK docs if warranted
