@@ -124,6 +124,7 @@ const (
 	envRecord      = "PVE_RECORD"       // "1" to record go-vcr cassettes while running
 	envReplay      = "PVE_REPLAY"       // "1" to replay committed cassettes (no live node; CI)
 	envDebug       = "PVE_DEBUG"        // "1" to stream a debug line per SDK request to stderr
+	envScrubExtra  = "PVE_SCRUB_EXTRA"  // CSV of extra live=placeholder scrub pairs for recording (pvelab writes it)
 
 	// Destructive-test gates. Absent -> the corresponding test skips.
 	envTestStorage     = "PVE_TEST_STORAGE"      // target storage for a scratch guest disk / uploads
@@ -164,9 +165,14 @@ func newClient(t *testing.T) *proxmox.Client {
 		if insecure {
 			rt = insecureTransport()
 		}
-		// Scrub the live endpoint host and node name from the cassette so a
-		// committed fixture does not expose lab topology.
-		scrub := newTopologyScrub(endpoint, testNode())
+		// Scrub the live endpoint host and node name — plus any extra
+		// live=placeholder pairs (the other cluster members' IPs and the site
+		// DNS domain, via PVE_SCRUB_EXTRA) — from the cassette so a committed
+		// fixture does not expose lab topology.
+		scrub, serr := newTopologyScrub(endpoint, testNode()).withExtraPairs(os.Getenv(envScrubExtra))
+		if serr != nil {
+			t.Fatalf("%s: %v", envScrubExtra, serr)
+		}
 		client := newRecorderClient(t, cassetteName(t), recorder.ModeRecordOnly, rt, scrub)
 		opts = append(opts, proxmox.WithHTTPClient(client))
 	case insecure:

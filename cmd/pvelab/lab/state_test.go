@@ -78,6 +78,8 @@ func TestLoadStateNewerSchema(t *testing.T) {
 
 func TestNewEnvFileAndRender(t *testing.T) {
 	cfg := provisionTestConfig()
+	cfg.Outer.Endpoint = "https://outer-host.internal:8006"
+	cfg.Nested.Domain = "lab.internal"
 	env, err := NewEnvFile(cfg, "hunter2")
 	if err != nil {
 		t.Fatalf("NewEnvFile: %v", err)
@@ -97,6 +99,10 @@ func TestNewEnvFileAndRender(t *testing.T) {
 		"export PVE_TEST_PLACEMENT_VMID_1='9301'\n",
 		"export PVE_TEST_PLACEMENT_VMID_2='9302'\n",
 		"export PVE_TEST_CONSOLE_VMID='9303'\n",
+		// Recording-scrub pairs: the other nodes' IPs, the site domain, and the
+		// outer host — the first node's IP is scrubbed via PVE_ENDPOINT already.
+		"export PVE_SCRUB_EXTRA='192.0.2.202=192.0.2.11,192.0.2.203=192.0.2.12," +
+			"lab.internal=lab.example,outer-host.internal=outer.example'\n",
 	} {
 		if !strings.Contains(rendered, want) {
 			t.Errorf("rendered env missing %q:\n%s", want, rendered)

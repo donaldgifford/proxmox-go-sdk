@@ -108,45 +108,66 @@ const (
 	placeholderNode     = "pve"
 )
 
-// topologyScrub rewrites the live endpoint host:port and node name to fixed
-// placeholders across a recorded interaction's URL and bodies. The node also
-// rides response-body UPIDs (UPID:<node>:…) and the task-poll URLs the SDK
-// derives from them, so it must be replaced everywhere for a replay to stay
-// internally consistent. The zero value (empty fields) is a no-op, so unit tests
-// and the mockpve self-test record verbatim.
+// topologyScrub rewrites live topology values to fixed placeholders across a
+// recorded interaction's URL and bodies, as an ordered list of
+// live → placeholder pairs. Beyond the endpoint host and node name, cluster
+// responses can carry the OTHER members' IPs (corosync ring addresses, status
+// entries) and the site DNS domain (Phase 0 set real fqdns like
+// pve1-dogfood.<site-domain>), so extra pairs ride in via PVE_SCRUB_EXTRA
+// (withExtraPairs). The node also rides response-body UPIDs (UPID:<node>:…)
+// and the task-poll URLs the SDK derives from them, so it must be replaced
+// everywhere for a replay to stay internally consistent. The zero value (no
+// pairs) is a no-op, so unit tests and the mockpve self-tests record verbatim.
 type topologyScrub struct {
-	host string // live "host:port", e.g. "10.10.11.20:8006"
-	node string // live node name, e.g. "r740a"
+	pairs [][2]string // ordered {live, placeholder} replacements.
 }
 
 // newTopologyScrub derives the scrub from a live endpoint URL and node name.
+// The host:port pair precedes the bare-host pair, so the ":port" form is never
+// left dangling.
 func newTopologyScrub(endpoint, node string) topologyScrub {
-	s := topologyScrub{node: node}
-	if u, err := url.Parse(endpoint); err == nil {
-		s.host = u.Host
+	var s topologyScrub
+	if u, err := url.Parse(endpoint); err == nil && u.Host != "" {
+		s.pairs = append(s.pairs, [2]string{u.Host, placeholderHost})
+		if h, _, herr := net.SplitHostPort(u.Host); herr == nil {
+			s.pairs = append(s.pairs, [2]string{h, placeholderBareHost})
+		}
+	}
+	if node != "" {
+		s.pairs = append(s.pairs, [2]string{node, placeholderNode})
 	}
 	return s
 }
 
-func (s topologyScrub) apply(i *cassette.Interaction) {
-	if s.host == "" && s.node == "" {
-		return
+// withExtraPairs returns the scrub extended with live=placeholder pairs from a
+// CSV (the PVE_SCRUB_EXTRA shape pvelab writes into .pvelab.env), e.g.
+// "10.0.0.12=192.0.2.11,lab.internal=lab.example". Empty entries are skipped;
+// a malformed entry errors so a typo cannot silently leak topology.
+func (s topologyScrub) withExtraPairs(csv string) (topologyScrub, error) {
+	for entry := range strings.SplitSeq(csv, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		live, placeholder, ok := strings.Cut(entry, "=")
+		if !ok || live == "" || placeholder == "" {
+			return s, fmt.Errorf("scrub pair %q: want live=placeholder", entry)
+		}
+		s.pairs = append(s.pairs, [2]string{live, placeholder})
 	}
-	bareHost := s.host
-	if h, _, err := net.SplitHostPort(s.host); err == nil {
-		bareHost = h
+	return s, nil
+}
+
+func (s topologyScrub) apply(i *cassette.Interaction) {
+	if len(s.pairs) == 0 {
+		return
 	}
 	rep := func(v string) string {
 		if v == "" {
 			return v
 		}
-		if s.host != "" {
-			// host:port before bare host, so the ":port" form is not left dangling.
-			v = strings.ReplaceAll(v, s.host, placeholderHost)
-			v = strings.ReplaceAll(v, bareHost, placeholderBareHost)
-		}
-		if s.node != "" {
-			v = strings.ReplaceAll(v, s.node, placeholderNode)
+		for _, p := range s.pairs {
+			v = strings.ReplaceAll(v, p[0], p[1])
 		}
 		return v
 	}
@@ -340,6 +361,57 @@ func TestScrubTopology(t *testing.T) {
 	topologyScrub{}.apply(blank)
 	if blank.Request.URL != "https://127.0.0.1:9/x" {
 		t.Errorf("zero scrub altered URL: %q", blank.Request.URL)
+	}
+}
+
+// TestScrubTopologyMultiPair covers the Phase 3 nested-cluster shape: beyond
+// the endpoint (pve1) and node, a cluster response carries the OTHER members'
+// IPs (corosync ring addresses) and the site DNS domain inside fqdns —
+// PVE_SCRUB_EXTRA pairs must rewrite them all, and a malformed pair must error
+// rather than silently leak.
+func TestScrubTopologyMultiPair(t *testing.T) {
+	scrub, err := newTopologyScrub("https://10.0.0.11:8006", "pve1-dogfood").
+		withExtraPairs("10.0.0.12=192.0.2.11, 10.0.0.13=192.0.2.12,lab.internal=lab.example")
+	if err != nil {
+		t.Fatalf("withExtraPairs: %v", err)
+	}
+
+	i := &cassette.Interaction{
+		Request: cassette.Request{
+			Method: http.MethodGet,
+			URL:    "https://10.0.0.11:8006/api2/json/cluster/status",
+		},
+		Response: cassette.Response{
+			Body: `{"data":[` +
+				`{"type":"node","name":"pve1-dogfood","ip":"10.0.0.11"},` +
+				`{"type":"node","name":"pve2-dogfood","ip":"10.0.0.12"},` +
+				`{"type":"node","name":"pve3-dogfood","ip":"10.0.0.13"},` +
+				`{"fqdn":"pve2-dogfood.lab.internal","ring0_addr":"10.0.0.12"}]}`,
+		},
+	}
+	scrub.apply(i)
+
+	for _, leak := range []string{"10.0.0.11", "10.0.0.12", "10.0.0.13", "lab.internal"} {
+		if strings.Contains(i.Request.URL, leak) || strings.Contains(i.Response.Body, leak) {
+			t.Errorf("topology %q survived scrub: url=%q body=%q", leak, i.Request.URL, i.Response.Body)
+		}
+	}
+	for _, want := range []string{`"ip":"192.0.2.11"`, `"ip":"192.0.2.12"`, "pve2-dogfood.lab.example"} {
+		if !strings.Contains(i.Response.Body, want) {
+			t.Errorf("scrubbed body = %q, want %q", i.Response.Body, want)
+		}
+	}
+
+	// A malformed entry errors — a typo must not silently leak topology.
+	if _, err := (topologyScrub{}).withExtraPairs("10.0.0.12"); err == nil {
+		t.Error("withExtraPairs with a pairless entry succeeded, want error")
+	}
+	if _, err := (topologyScrub{}).withExtraPairs("=x"); err == nil {
+		t.Error("withExtraPairs with an empty live value succeeded, want error")
+	}
+	// An empty CSV (env var unset) is fine.
+	if _, err := (topologyScrub{}).withExtraPairs(""); err != nil {
+		t.Errorf("withExtraPairs(\"\") = %v, want nil", err)
 	}
 }
 

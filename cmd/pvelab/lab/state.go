@@ -156,6 +156,7 @@ type EnvFile struct {
 	PlacementVMID1 int
 	PlacementVMID2 int
 	ConsoleVMID    int
+	ScrubExtra     string // PVE_SCRUB_EXTRA: extra live=placeholder recording-scrub pairs
 }
 
 // NewEnvFile derives the inner-suite environment from the config and the
@@ -170,6 +171,10 @@ func NewEnvFile(cfg *Config, rootPassword string) (*EnvFile, error) {
 	if err != nil {
 		return nil, err
 	}
+	scrub, err := scrubExtra(cfg)
+	if err != nil {
+		return nil, err
+	}
 	return &EnvFile{
 		Endpoint:       endpoint,
 		Username:       "root@pam",
@@ -180,7 +185,34 @@ func NewEnvFile(cfg *Config, rootPassword string) (*EnvFile, error) {
 		PlacementVMID1: placementVMID1,
 		PlacementVMID2: placementVMID2,
 		ConsoleVMID:    consoleVMID,
+		ScrubExtra:     scrub,
 	}, nil
+}
+
+// scrubExtra derives the PVE_SCRUB_EXTRA pairs (live=placeholder CSV) the
+// recording harness needs beyond what it derives from PVE_ENDPOINT/PVE_NODE:
+// the OTHER nodes' IPs (they ride corosync ring addresses and cluster-status
+// bodies; the first node's IP is already scrubbed via the endpoint), the site
+// DNS domain (fqdns like pve2-dogfood.<domain>), and the outer host
+// (defensive — it should never appear in nested-cluster responses). The
+// placeholders are stable RFC-friendly stand-ins; a live value that already
+// equals its placeholder makes the pair a harmless no-op.
+func scrubExtra(cfg *Config) (string, error) {
+	var pairs []string
+	for i, n := range cfg.Nested.Nodes[1:] {
+		ip, err := n.IP()
+		if err != nil {
+			return "", err
+		}
+		pairs = append(pairs, ip+"=192.0.2."+strconv.Itoa(11+i))
+	}
+	if d := cfg.Nested.Domain; d != "" {
+		pairs = append(pairs, d+"=lab.example")
+	}
+	if host, err := cfg.OuterHost(); err == nil && host != "" {
+		pairs = append(pairs, host+"=outer.example")
+	}
+	return strings.Join(pairs, ","), nil
 }
 
 // RenderEnv formats e as sourceable `export KEY='VALUE'` lines (the
@@ -201,6 +233,9 @@ func RenderEnv(e *EnvFile) []byte {
 	set("PVE_TEST_PLACEMENT_VMID_1", strconv.Itoa(e.PlacementVMID1))
 	set("PVE_TEST_PLACEMENT_VMID_2", strconv.Itoa(e.PlacementVMID2))
 	set("PVE_TEST_CONSOLE_VMID", strconv.Itoa(e.ConsoleVMID))
+	if e.ScrubExtra != "" {
+		set("PVE_SCRUB_EXTRA", e.ScrubExtra)
+	}
 	return []byte(b.String())
 }
 
