@@ -211,10 +211,13 @@ state). Cluster formation is deliberately absent until Phase 2.
 - [ ] `go.mod`: YAML dependency (IQ-1 = a): promote `go.yaml.in/yaml/v4` —
       already in the module graph via go-vcr — to a direct dependency; zero new
       modules
-- [ ] `cmd/pvelab/main.go`: stdlib-`flag` subcommand dispatch (`iso`, `up`,
+- [x] `cmd/pvelab/main.go`: stdlib-`flag` subcommand dispatch (`iso`, `up`,
       `down`, `status`, `env`), `slog` to stderr, version via
       `runtime/debug.ReadBuildInfo` (no ldflags — pvelab is `go run`-only per
-      design OQ-2)
+      design OQ-2) — _2026-07-11: dispatch + per-command FlagSets (`-config`,
+      down's `-force`/`-no-state`/`-purge-isos`), `PVELAB_DEBUG` log level, exit
+      codes 0/1/2; subcommands return a documented not-implemented error until
+      their lab tasks land (each later task wires its own)._
 - [ ] `cmd/pvelab/lab/config.go`: YAML schema (DESIGN-0002 shape, plus the IQ-3
       = a auth fields `outer.ssh.key_file` / `outer.ssh.password_env` — at least
       one required, key preferred) + strict fail-fast validation (≥3 nodes,
