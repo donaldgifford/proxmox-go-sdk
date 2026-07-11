@@ -36,6 +36,18 @@ type API interface {
 	// GetOptions / SetOptions read and write the datacenter options block.
 	GetOptions(ctx context.Context) (*Options, error)
 	SetOptions(ctx context.Context, update *OptionsUpdate) error
+	// CreateCluster forms a new cluster on the responding node; JoinCluster
+	// joins the responding (fresh) node to an existing cluster. Both are
+	// fire-and-poll writes: the response body is ignored beyond error status
+	// and convergence is observed via ListConfigNodes.
+	CreateCluster(ctx context.Context, spec *ClusterCreateSpec) error
+	JoinCluster(ctx context.Context, spec *JoinSpec) error
+	// JoinInfo returns what a joining node needs to know about this node's
+	// cluster (nodelist, fingerprints, preferred contact node).
+	JoinInfo(ctx context.Context) (*JoinInfo, error)
+	// ListConfigNodes returns the corosync nodelist — the configured cluster
+	// membership, and the convergence signal for the two writes above.
+	ListConfigNodes(ctx context.Context) ([]ConfigNode, error)
 }
 
 // Compile-time assertion that *Service implements the published contract.
