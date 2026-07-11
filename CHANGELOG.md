@@ -21,9 +21,14 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 - *(mockpve)* Persist create-form keys into guest config
 
+### Refactor
+
+- *(pvelab)* Address style-review findings
+
 ### Documentation
 
 - Pvelab layout + workflow notes; mockpve is the only SHIPPED binary
+- *(impl)* Check the Phase 1 lint/test/changelog gate
 
 ## [0.2.0] - 2026-07-11
 
