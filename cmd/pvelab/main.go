@@ -192,10 +192,11 @@ func outerClient(ctx context.Context, cfg *lab.Config) (*proxmox.Client, error) 
 	return proxmox.NewClient(ctx, cfg.Outer.Endpoint, creds, opts...)
 }
 
-// cmdUp provisions the lab: preflight (VMIDs free, ISO prepared) → answer
-// server up → create VMs → start (unattended installs begin) → wait for every
-// nested API → write the env handoff. State is updated after every stage so a
-// mid-up failure leaves evidence on disk (design OQ-7).
+// cmdUp provisions the lab: preflight (VMIDs free) → provision the node VMs —
+// linked clones when this version's template exists on the outer host
+// (building one via `pvelab template build` IS the opt-in), else the ISO
+// install path — → cluster → write the env handoff. State is updated after
+// every stage so a mid-up failure leaves evidence on disk (design OQ-7).
 func cmdUp(args []string) error {
 	fs := flag.NewFlagSet("up", flag.ContinueOnError)
 	cfgPath := configFlag(fs)
@@ -216,25 +217,18 @@ func cmdUp(args []string) error {
 	if err := lab.EnsureVMIDsFree(ctx, client, cfg); err != nil {
 		return err
 	}
-	if err := lab.EnsureISOPrepared(ctx, client, cfg); err != nil {
-		return err
-	}
-	isoVolid := lab.PreparedISOVolid(cfg.Outer.ISOStorage, cfg.Nested.PVEVersion)
 	rootPW := os.Getenv(cfg.Nested.RootPasswordEnv) // presence validated at load.
 
-	answers := lab.NewAnswerServer(cfg, rootPW, slog.Default())
-	if err := answers.Start(ctx); err != nil {
+	templateVMID, useClone, err := cloneSource(ctx, client, cfg)
+	if err != nil {
 		return err
 	}
-	defer func() {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := answers.Shutdown(shutdownCtx); err != nil {
-			slog.Debug("answer server shutdown", "err", err)
-		}
-	}()
-
-	if err := provisionLab(ctx, client, cfg, isoVolid, rootPW); err != nil {
+	if useClone {
+		err = upViaClone(ctx, client, cfg, templateVMID, rootPW)
+	} else {
+		err = upViaISO(ctx, client, cfg, rootPW)
+	}
+	if err != nil {
 		return err
 	}
 
@@ -246,6 +240,112 @@ func cmdUp(args []string) error {
 		return err
 	}
 	slog.Info("lab is up", "nodes", len(cfg.Nested.Nodes), "env", lab.DefaultEnvPath)
+	return nil
+}
+
+// cloneSource decides `up`'s provisioning path: linked clones when this
+// version's template exists AND nested.template is configured (its CIDR is
+// the clone's boot address); otherwise the ISO install, with a warning when a
+// template was found but cannot be used.
+func cloneSource(ctx context.Context, client *proxmox.Client, cfg *lab.Config) (vmid int, useClone bool, err error) {
+	tvm, found, err := lab.FindTemplate(ctx, client, cfg)
+	if err != nil {
+		return 0, false, err
+	}
+	switch {
+	case found && tvm.Template.Bool() && cfg.Nested.Template != nil:
+		return int(tvm.VMID), true, nil
+	case found && tvm.Template.Bool():
+		slog.Warn("template exists but nested.template is not configured (its cidr is the clone boot address) — falling back to ISO install",
+			"template", lab.TemplateName(cfg))
+	case found:
+		slog.Warn(
+			"a VM carries this version's template name but is not a template — falling back to ISO install; rebuild with `pvelab template build -force`",
+			"vmid",
+			int(tvm.VMID),
+		)
+	}
+	return 0, false, nil
+}
+
+// upViaISO is the original provisioning path: prepared-ISO preflight, the
+// answer server for the unattended installs, then the staged provision flow.
+func upViaISO(ctx context.Context, client *proxmox.Client, cfg *lab.Config, rootPW string) error {
+	if err := lab.EnsureISOPrepared(ctx, client, cfg); err != nil {
+		return err
+	}
+	isoVolid := lab.PreparedISOVolid(cfg.Outer.ISOStorage, cfg.Nested.PVEVersion)
+
+	answers := lab.NewAnswerServer(cfg, rootPW, slog.Default())
+	if err := answers.Start(ctx); err != nil {
+		return err
+	}
+	defer func() {
+		// WithoutCancel: the shutdown must run even when ctx was cancelled.
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+		if err := answers.Shutdown(shutdownCtx); err != nil {
+			slog.Debug("answer server shutdown", "err", err)
+		}
+	}()
+
+	return provisionLab(ctx, client, cfg, isoVolid, rootPW)
+}
+
+// upViaClone provisions from this version's template: linked-clone every node
+// (stopped), then the serialized re-identify pass boots each clone and gives
+// it its own identity — no ISO, no answer server. The re-identify rename is
+// still live-verify pending (IMPL-0002 Phase 5); this path only runs when the
+// operator has built a template.
+func upViaClone(ctx context.Context, client *proxmox.Client, cfg *lab.Config, templateVMID int, rootPW string) error {
+	slog.Info("template found — provisioning via linked clones (ISO install skipped)",
+		"template", lab.TemplateName(cfg), "vmid", templateVMID)
+
+	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+		st.ClusterName = cfg.Nested.ClusterName
+		st.PVEVersion = cfg.Nested.PVEVersion
+		st.SeedNodes(cfg.Nested.Nodes)
+	}); err != nil {
+		return err
+	}
+
+	if err := lab.CloneNodeVMs(ctx, client, cfg, templateVMID, slog.Default()); err != nil {
+		return err
+	}
+	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+		for i := range st.Nodes {
+			st.Nodes[i].Created = true
+		}
+	}); err != nil {
+		return err
+	}
+
+	readiness, reidErr := lab.ReidentifyClones(ctx, client, cfg, rootPW, slog.Default())
+	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+		// The pass is serialized, so on failure only the nodes it reported
+		// ready are known-started; `pvelab status` shows the outer power
+		// state for the rest.
+		for i, r := range readiness {
+			if r.Ready && i < len(st.Nodes) {
+				st.Nodes[i].Started = true
+			}
+		}
+		st.ApplyReadiness(readiness)
+	}); err != nil {
+		return errors.Join(reidErr, err)
+	}
+	if reidErr != nil {
+		return reidErr
+	}
+
+	if err := lab.FormCluster(ctx, cfg, rootPW, slog.Default()); err != nil {
+		return err
+	}
+	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+		st.Clustered = true
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
