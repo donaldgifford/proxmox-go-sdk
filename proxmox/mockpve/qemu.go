@@ -98,9 +98,10 @@ type agentResult struct {
 
 // qemuListEntry is one element of GET /nodes/{node}/qemu.
 type qemuListEntry struct {
-	VMID   int    `json:"vmid"`
-	Name   string `json:"name,omitempty"`
-	Status string `json:"status"`
+	VMID     int    `json:"vmid"`
+	Name     string `json:"name,omitempty"`
+	Status   string `json:"status"`
+	Template int    `json:"template,omitempty"`
 }
 
 // qemuStatusPayload is the data of GET /nodes/{node}/qemu/{vmid}/status/current.
@@ -221,6 +222,7 @@ func (s *Server) registerQEMURoutes() {
 	s.mux.HandleFunc("GET /api2/json/nodes/{node}/qemu/{vmid}/config", s.handleQEMUConfig)
 	s.mux.HandleFunc("PUT /api2/json/nodes/{node}/qemu/{vmid}/config", s.handleQEMUSetConfig)
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/clone", s.handleQEMUClone)
+	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/template", s.handleQEMUTemplate)
 	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/qemu/{vmid}", s.handleQEMUDelete)
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/status/{action}", s.handleQEMUPower)
 	s.mux.HandleFunc("PUT /api2/json/nodes/{node}/qemu/{vmid}/resize", s.handleQEMUResize)
@@ -243,7 +245,15 @@ func (s *Server) handleQEMUList(w http.ResponseWriter, r *http.Request) {
 	s.st.mu.Lock()
 	entries := make([]qemuListEntry, 0, len(s.st.qemu.vms[node]))
 	for _, rec := range s.st.qemu.vms[node] {
-		entries = append(entries, qemuListEntry{VMID: rec.VMID, Name: rec.Name, Status: rec.Status})
+		entry := qemuListEntry{VMID: rec.VMID, Name: rec.Name, Status: rec.Status}
+		// Real PVE flags templates in the listing; mirror it so consumers can
+		// discover templates without a per-VM config read.
+		if t, ok := rec.Config["template"]; ok {
+			if n, isInt := t.(int); isInt {
+				entry.Template = n
+			}
+		}
+		entries = append(entries, entry)
 	}
 	s.st.mu.Unlock()
 	s.writeData(w, entries)
@@ -392,6 +402,35 @@ func (s *Server) handleQEMUClone(w http.ResponseWriter, r *http.Request) {
 	}
 	s.AddVM(node, newID, r.PostForm.Get("name"), vmStatusStopped)
 	s.writeData(w, s.finishedTask(node, "qmclone", strconv.Itoa(src)))
+}
+
+func (s *Server) handleQEMUTemplate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	vmid, err := strconv.Atoi(r.PathValue("vmid"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+		return
+	}
+	s.st.mu.Lock()
+	rec := s.lookupVM(node, vmid)
+	running := rec != nil && rec.Status != vmStatusStopped
+	if rec != nil && !running {
+		rec.Config["template"] = 1
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+		return
+	}
+	// Real PVE refuses to convert a running VM.
+	if running {
+		s.writeError(w, http.StatusBadRequest, "you can't convert a VM to template if the VM is running")
+		return
+	}
+	s.writeData(w, s.finishedTask(node, "qmtemplate", strconv.Itoa(vmid)))
 }
 
 func (s *Server) handleQEMUDelete(w http.ResponseWriter, r *http.Request) {
