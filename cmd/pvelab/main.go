@@ -10,11 +10,12 @@
 //
 //	pvelab <command> [flags]
 //
-//	iso     prepare the auto-install ISO on the outer host (assistant over SSH)
-//	up      create node VMs -> wait ready -> cluster -> write state + env files
-//	down    stop + delete the lab VMs (reads state; config-only via -no-state)
-//	status  show the lab's current state (outer view + per-node readiness)
-//	env     print the .pvelab.env exports for the inner test suite
+//	iso       prepare the auto-install ISO on the outer host (assistant over SSH)
+//	up        create node VMs -> wait ready -> cluster -> write state + env files
+//	down      stop + delete the lab VMs (reads state; config-only via -no-state)
+//	status    show the lab's current state (outer view + per-node readiness)
+//	env       print the .pvelab.env exports for the inner test suite
+//	template  build this version's nested-PVE template (template build [-force])
 //
 // Every command reads the YAML config (default pvelab.yaml — settings only;
 // secrets are env-var NAMES resolved at runtime, never values in the file).
@@ -68,11 +69,12 @@ func usage() {
 usage: pvelab <command> [flags]
 
 commands:
-  iso     prepare the auto-install ISO on the outer host
-  up      provision node VMs, form the cluster, write state + env files
-  down    stop + delete the lab VMs
-  status  show the lab's current state
-  env     print the inner suite's environment exports
+  iso       prepare the auto-install ISO on the outer host
+  up        provision node VMs, form the cluster, write state + env files
+  down      stop + delete the lab VMs
+  status    show the lab's current state
+  env       print the inner suite's environment exports
+  template  build this version's nested-PVE template (template build [-force])
 
 run "pvelab <command> -h" for that command's flags.
 `, buildVersion())
@@ -96,6 +98,8 @@ func run(args []string) int {
 		err = cmdStatus(args[1:])
 	case "env":
 		err = cmdEnv(args[1:])
+	case "template":
+		err = cmdTemplate(args[1:])
 	case "version", "-version", "--version":
 		fmt.Println("pvelab", buildVersion())
 	case "help", "-h", "-help", "--help":
@@ -299,6 +303,59 @@ func provisionLab(ctx context.Context, client *proxmox.Client, cfg *lab.Config, 
 		return err
 	}
 	return nil
+}
+
+// cmdTemplate dispatches the template sub-subcommands; only `build` exists
+// so far (IMPL-0002 Phase 5).
+func cmdTemplate(args []string) error {
+	if len(args) == 0 || args[0] != "build" {
+		fmt.Fprint(os.Stderr, "usage: pvelab template build [-config pvelab.yaml] [-force]\n")
+		return flag.ErrHelp
+	}
+	return cmdTemplateBuild(args[1:])
+}
+
+// cmdTemplateBuild runs the unattended install once for the configured PVE
+// version and converts the result into the outer-host template `up` linked-
+// clones from. The answer server runs for the install, exactly as in `up`,
+// but matched to the synthetic template node.
+func cmdTemplateBuild(args []string) error {
+	fs := flag.NewFlagSet("template build", flag.ContinueOnError)
+	cfgPath := configFlag(fs)
+	force := fs.Bool("force", false, "delete this version's existing template first (conversion is one-way)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	ctx, stop := signalContext()
+	defer stop()
+
+	cfg, err := lab.LoadConfig(*cfgPath)
+	if err != nil {
+		return err
+	}
+	client, err := outerClient(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	tcfg, err := lab.TemplateConfig(cfg)
+	if err != nil {
+		return err
+	}
+	rootPW := os.Getenv(cfg.Nested.RootPasswordEnv) // presence validated at load.
+
+	answers := lab.NewAnswerServer(tcfg, rootPW, slog.Default())
+	if err := answers.Start(ctx); err != nil {
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := answers.Shutdown(shutdownCtx); err != nil {
+			slog.Debug("answer server shutdown", "err", err)
+		}
+	}()
+
+	return lab.BuildTemplate(ctx, client, cfg, rootPW, *force, slog.Default())
 }
 
 // cmdDown tears the lab down. It deletes what the CONFIG says (VMIDs are
