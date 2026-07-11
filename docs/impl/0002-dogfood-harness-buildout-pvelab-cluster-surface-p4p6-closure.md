@@ -560,9 +560,13 @@ stays what's under test.
 
 #### Tasks
 
-- [ ] Confirm `.goreleaser.yml` builds only `cmd/mockpve` (pvelab must not ship
+- [x] Confirm `.goreleaser.yml` builds only `cmd/mockpve` (pvelab must not ship
       — design OQ-2); add an explanatory comment if the config could silently
-      drift
+      drift — _2026-07-11: confirmed — the `builds` list has exactly one entry
+      (`main: ./cmd/mockpve`); the drift risk is someone appending a second
+      entry for a future `cmd/`, so a comment now sits directly on the `builds`
+      block naming pvelab as `go run`-only per OQ-2 and pointing at
+      DESIGN-0002/IMPL-0002. `goreleaser check` green._
 - [ ] Land pvelab + the cluster surface in a stable tag (target `v0.2.0`,
       `just release`)
 - [ ] Switch the `dogfood-*` recipes to

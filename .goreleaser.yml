@@ -12,6 +12,9 @@ version: 2
 
 project_name: proxmox-go-sdk
 
+# mockpve is the ONLY binary this repo releases (design OQ-2). cmd/pvelab is a
+# `go run`-only dev harness and must never gain a builds entry here — if you are
+# adding a second entry, stop and re-read DESIGN-0002/IMPL-0002 first.
 builds:
   - id: mockpve
     main: ./cmd/mockpve
