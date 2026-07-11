@@ -234,14 +234,32 @@ state). Cluster formation is deliberately absent until Phase 2.
       `nested.domain` (fqdn = `<name>.<domain>`), `nested.answer_url` (explicit
       routable URL baked into the http-mode ISO) plus `nested.answer_listen`
       (server bind address). Table-driven tests cover every refusal path._
-- [ ] `cmd/pvelab/lab/iso.go` (design amended 2026-07-10: **one http-mode ISO
+- [x] `cmd/pvelab/lab/iso.go` (design amended 2026-07-10: **one http-mode ISO
       per PVE version + embedded answer server**, not per-node baked ISOs):
       connect with `proxmox/ssh` (known-hosts mandatory; auth per IQ-3 = a);
       verify/install the assistant + xorriso (Phase 0 found them absent —
       apt-install or error with instructions); run
       `prepare-iso <base_iso> --fetch-from http` once per version via `Exec`;
       verify the prepared volid via `Storage().ListContent` — unit-tested
-      against the ssh package's in-process SSH/SFTP server + mockpve
+      against the ssh package's in-process SSH/SFTP server + mockpve —
+      _2026-07-10: `PrepareISO` is idempotent (skips when `PreparedISOVolid` =
+      `<iso_storage>:iso/pvelab-<version>-auto-http.iso` already lists) →
+      `ensureAssistant` (check-first `command -v`, apt-install on miss,
+      manual-install guidance on failure — the one mutation outside the VMID
+      blast radius, logged before mutating) →
+      `prepare-iso     --fetch-from http --url <answer_url> --output <beside base_iso>`
+      → re-verify via `ListContent` (catches base_iso outside the storage's iso
+      dir). `cmdISO` wired: signal-cancelled ctx, `LoadConfig` → outer client →
+      `Client.SSH(cfg.SSHOptions()...)` + `Connect(cfg.OuterHost())`. **Two
+      documented deviations:** (1) config gained `outer.node` — the outer PVE
+      node name every node-scoped SDK call needs; a gap in DESIGN-0002's YAML
+      sample (the spike hardcoded it). (2) SSH tests use an `execer` seam
+      (scripted fake; `var _ execer = (*ssh.Client)(nil)` pins the contract)
+      rather than duplicating ~100 lines of the ssh package's unexported
+      in-process server — the client's exec plumbing is already covered by
+      `proxmox/ssh`'s own tests; lab's tests cover lab's logic (command lines,
+      idempotence, install/verify failure paths) against mockpve. The
+      `--fetch-from http` flag shape is live-verified at the acceptance run._
 - [ ] `cmd/pvelab/lab/answers.go`: render per-node `answer.toml` from a
       `go:embed`ed `text/template` (IQ-2 = a) and serve the answers from an
       embedded HTTP server that `up` runs for the duration of the installs,

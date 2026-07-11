@@ -3,11 +3,17 @@ package lab
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/netip"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"go.yaml.in/yaml/v4"
+
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ssh"
 )
 
 // The reserved pvelab VMID block (DESIGN-0002 OQ-10: nodes 9201–9203, test
@@ -42,7 +48,12 @@ type Config struct {
 
 // Outer locates and authenticates the physical PVE host the lab runs on.
 type Outer struct {
-	Endpoint       string   `yaml:"endpoint"`
+	Endpoint string `yaml:"endpoint"`
+	// Node is the outer host's PVE node name (e.g. "r740a") — required by
+	// every node-scoped SDK call (storage content listing, VM create). Not in
+	// DESIGN-0002's sample (a gap found wiring `pvelab iso`; the Phase 0 spike
+	// hardcoded it).
+	Node           string   `yaml:"node"`
 	TokenIDEnv     string   `yaml:"token_id_env"`
 	TokenSecretEnv string   `yaml:"token_secret_env"`
 	InsecureTLS    bool     `yaml:"insecure_tls"`
@@ -148,6 +159,7 @@ func (c *Config) Validate() error {
 		}
 	}
 	req(c.Outer.Endpoint, "outer.endpoint")
+	req(c.Outer.Node, "outer.node")
 	req(c.Outer.TokenIDEnv, "outer.token_id_env")
 	req(c.Outer.TokenSecretEnv, "outer.token_secret_env")
 	req(c.Outer.Storage, "outer.storage")
@@ -157,6 +169,11 @@ func (c *Config) Validate() error {
 	req(c.Outer.SSH.KnownHosts, "outer.ssh.known_hosts")
 	if c.Outer.SSH.KeyFile == "" && c.Outer.SSH.PasswordEnv == "" {
 		errs = append(errs, errors.New("outer.ssh needs key_file and/or password_env (key preferred)"))
+	}
+	if c.Outer.Endpoint != "" {
+		if _, err := c.OuterHost(); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	req(c.Nested.PVEVersion, "nested.pve_version")
@@ -220,6 +237,64 @@ func (c *Config) validateNodes() []error {
 		cidrs[n.CIDR] = true
 	}
 	return errs
+}
+
+// OuterHost extracts the hostname pvelab dials for SSH from outer.endpoint,
+// which NewClient accepts as a bare host, host:port, or URL.
+func (c *Config) OuterHost() (string, error) {
+	e := c.Outer.Endpoint
+	if strings.Contains(e, "://") {
+		u, err := url.Parse(e)
+		if err != nil {
+			return "", fmt.Errorf("outer.endpoint: %w", err)
+		}
+		if u.Hostname() == "" {
+			return "", fmt.Errorf("outer.endpoint %q has no host", e)
+		}
+		return u.Hostname(), nil
+	}
+	if host, _, err := net.SplitHostPort(e); err == nil {
+		return host, nil
+	}
+	return e, nil
+}
+
+// OuterCredentials resolves the outer token env refs into api.Credentials.
+func (c *Config) OuterCredentials() (api.Credentials, error) {
+	id, secret := os.Getenv(c.Outer.TokenIDEnv), os.Getenv(c.Outer.TokenSecretEnv)
+	if id == "" || secret == "" {
+		return nil, fmt.Errorf("env vars %s and %s must both be set", c.Outer.TokenIDEnv, c.Outer.TokenSecretEnv)
+	}
+	return api.TokenCredentials(id, secret), nil
+}
+
+// SSHOptions builds the proxmox/ssh options from outer.ssh: user + mandatory
+// known-hosts verification, then key auth (preferred) and/or a password from
+// the environment.
+func (c *Config) SSHOptions() ([]ssh.Option, error) {
+	s := c.Outer.SSH
+	opts := []ssh.Option{ssh.WithUser(s.User), ssh.WithKnownHostsFile(expandHome(s.KnownHosts))}
+	if s.KeyFile != "" {
+		pem, err := os.ReadFile(expandHome(s.KeyFile)) // #nosec G304 -- path is the operator's own config value.
+		if err != nil {
+			return nil, fmt.Errorf("read outer.ssh.key_file: %w", err)
+		}
+		opts = append(opts, ssh.WithPrivateKey(pem))
+	}
+	if s.PasswordEnv != "" {
+		opts = append(opts, ssh.WithPassword(os.Getenv(s.PasswordEnv)))
+	}
+	return opts, nil
+}
+
+// expandHome resolves a leading "~/" — YAML values never see shell expansion.
+func expandHome(p string) string {
+	if p == "~" || strings.HasPrefix(p, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(home, strings.TrimPrefix(p, "~"))
+		}
+	}
+	return p
 }
 
 // validateEnvRefs checks that every env var the config names is actually set,

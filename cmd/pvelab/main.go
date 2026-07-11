@@ -21,12 +21,18 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"runtime/debug"
+	"syscall"
+
+	"github.com/donaldgifford/proxmox-go-sdk/cmd/pvelab/lab"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox"
 )
 
 func main() {
@@ -125,7 +131,62 @@ func cmdISO(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	return fmt.Errorf("pvelab iso (config %s): %w", *cfgPath, errNotImplemented)
+	ctx, stop := signalContext()
+	defer stop()
+
+	cfg, err := lab.LoadConfig(*cfgPath)
+	if err != nil {
+		return err
+	}
+	client, err := outerClient(ctx, cfg)
+	if err != nil {
+		return err
+	}
+
+	sshOpts, err := cfg.SSHOptions()
+	if err != nil {
+		return err
+	}
+	host, err := cfg.OuterHost()
+	if err != nil {
+		return err
+	}
+	sc := client.SSH(sshOpts...)
+	if err := sc.Connect(ctx, host); err != nil {
+		return fmt.Errorf("ssh connect to outer host %s: %w", host, err)
+	}
+	defer func() {
+		if err := sc.Close(); err != nil {
+			slog.Debug("close ssh", "err", err)
+		}
+	}()
+
+	volid, err := lab.PrepareISO(ctx, client, sc, cfg, slog.Default())
+	if err != nil {
+		return err
+	}
+	fmt.Println(volid)
+	return nil
+}
+
+// signalContext is the root context every subcommand runs under: Ctrl-C /
+// SIGTERM cancels in-flight SDK calls instead of killing mid-operation.
+func signalContext() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+}
+
+// outerClient builds the SDK client for the outer PVE host from config +
+// resolved env credentials.
+func outerClient(ctx context.Context, cfg *lab.Config) (*proxmox.Client, error) {
+	creds, err := cfg.OuterCredentials()
+	if err != nil {
+		return nil, err
+	}
+	var opts []proxmox.Option
+	if cfg.Outer.InsecureTLS {
+		opts = append(opts, proxmox.WithInsecureSkipVerify(true))
+	}
+	return proxmox.NewClient(ctx, cfg.Outer.Endpoint, creds, opts...)
 }
 
 func cmdUp(args []string) error {

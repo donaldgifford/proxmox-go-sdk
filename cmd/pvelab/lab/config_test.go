@@ -11,6 +11,7 @@ import (
 const validYAML = `
 outer:
   endpoint: https://outer.example:8006
+  node: r740a
   token_id_env: PVELAB_TEST_TOKEN_ID
   token_secret_env: PVELAB_TEST_TOKEN_SECRET
   insecure_tls: true
@@ -101,6 +102,11 @@ func TestLoadRejects(t *testing.T) {
 			wantErr: "outer.endpoint is required",
 		},
 		{
+			name:    "missing node",
+			mutate:  func(d string) string { return strings.Replace(d, "  node: r740a\n", "", 1) },
+			wantErr: "outer.node is required",
+		},
+		{
 			name:    "unknown key",
 			mutate:  func(d string) string { return d + "\nsurprise: true\n" },
 			wantErr: "field surprise not found",
@@ -172,6 +178,69 @@ func TestLoadRejects(t *testing.T) {
 				t.Errorf("Load error = %q, want it to contain %q", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestOuterHost(t *testing.T) {
+	tests := []struct {
+		endpoint string
+		want     string
+		wantErr  bool
+	}{
+		{endpoint: "https://outer.example:8006", want: "outer.example"},
+		{endpoint: "outer.example:8006", want: "outer.example"},
+		{endpoint: "outer.example", want: "outer.example"},
+		{endpoint: "https://", wantErr: true},
+	}
+	for _, tt := range tests {
+		c := &Config{Outer: Outer{Endpoint: tt.endpoint}}
+		got, err := c.OuterHost()
+		if tt.wantErr {
+			if err == nil {
+				t.Errorf("OuterHost(%q) = %q, want error", tt.endpoint, got)
+			}
+			continue
+		}
+		if err != nil || got != tt.want {
+			t.Errorf("OuterHost(%q) = %q, %v; want %q", tt.endpoint, got, err, tt.want)
+		}
+	}
+}
+
+func TestOuterCredentials(t *testing.T) {
+	c := &Config{Outer: Outer{TokenIDEnv: "PVELAB_TEST_TOKEN_ID", TokenSecretEnv: "PVELAB_TEST_TOKEN_SECRET"}}
+
+	t.Setenv("PVELAB_TEST_TOKEN_ID", "root@pam!lab")
+	t.Setenv("PVELAB_TEST_TOKEN_SECRET", "")
+	if _, err := c.OuterCredentials(); err == nil {
+		t.Error("OuterCredentials with empty secret = nil error, want error")
+	}
+
+	t.Setenv("PVELAB_TEST_TOKEN_SECRET", "secret")
+	if _, err := c.OuterCredentials(); err != nil {
+		t.Errorf("OuterCredentials = %v, want nil", err)
+	}
+}
+
+func TestSSHOptions(t *testing.T) {
+	keyPath := filepath.Join(t.TempDir(), "id_test")
+	if err := os.WriteFile(keyPath, []byte("fake-pem"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	c := &Config{Outer: Outer{SSH: OuterSSH{User: "root", KnownHosts: "/tmp/kh", KeyFile: keyPath}}}
+	opts, err := c.SSHOptions()
+	if err != nil {
+		t.Fatalf("SSHOptions: %v", err)
+	}
+	// user + known-hosts + key.
+	if len(opts) != 3 {
+		t.Errorf("options = %d, want 3", len(opts))
+	}
+
+	c.Outer.SSH.KeyFile = filepath.Join(t.TempDir(), "missing")
+	if _, err := c.SSHOptions(); err == nil || !strings.Contains(err.Error(), "outer.ssh.key_file") {
+		t.Errorf("SSHOptions with missing key = %v, want read error", err)
 	}
 }
 
