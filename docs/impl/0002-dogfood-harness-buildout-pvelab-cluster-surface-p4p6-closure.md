@@ -324,11 +324,25 @@ state). Cluster formation is deliberately absent until Phase 2.
       purge-missing-ISO likewise. Also seeder-side mockpve fidelity fix:
       `AddVM`/`AddContainer` now seed `name`/`hostname` into config reads like
       real PVE._
-- [ ] `cmd/pvelab/lab/state.go`: `.pvelab-state.json` (schema-versioned)
+- [x] `cmd/pvelab/lab/state.go`: `.pvelab-state.json` (schema-versioned)
       write/read + `.pvelab.env` emission
       (`PVE_ENDPOINT`/`PVE_USERNAME`/`PVE_PASSWORD`/`PVE_INSECURE_TLS`/
       `PVE_NODE` + test-gate vars); `down --no-state` recovery path from config
-      alone; round-trip tests
+      alone; round-trip tests — _2026-07-11: schema-versioned `State`
+      (`LoadState` surfaces `ErrNoState` for a missing file — normal before the
+      first up — and rejects a newer `schema_version`; older/unknown keys
+      tolerated by `encoding/json`); `UpdateState` load-or-init + mutate + 0600
+      write, called after **every** up stage (seed → created → started →
+      readiness) so a mid-up failure leaves evidence (OQ-7). `.pvelab.env` emits
+      the design vars plus the IQ-6 = a gates (`PVE_TEST_PLACEMENT_VMID_1/2` =
+      9301/9302, `PVE_TEST_CONSOLE_VMID` = 9303, `PVE_TEST_STORAGE` = local-lvm
+      — the ext4 install's default), all values shell-quoted, 0600.
+      `cmdUp`/`cmdStatus`/`cmdEnv` wired (all five subcommands now real): up =
+      preflight → answer server → staged provision → env write; status = outer
+      VM view + state readiness; env = re-derive to stdout. `down` removes the
+      two handoff files on success unless `-no-state` (deletion itself is always
+      config-driven, so a lost state file never strands VMs). Round-trip +
+      newer-schema + perms + env content tests._
 - [ ] `justfile`: `dogfood-iso` / `dogfood-up` / `dogfood-down` recipes
       (branch-run `go run ./cmd/pvelab` — the designed Phase 0/buildout state);
       `.gitignore`: `pvelab.yaml`, `.pvelab-state.json`, `.pvelab.env`; commit

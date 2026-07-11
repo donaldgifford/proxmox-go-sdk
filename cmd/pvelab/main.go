@@ -30,6 +30,7 @@ import (
 	"os/signal"
 	"runtime/debug"
 	"syscall"
+	"time"
 
 	"github.com/donaldgifford/proxmox-go-sdk/cmd/pvelab/lab"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox"
@@ -120,11 +121,6 @@ func configFlag(fs *flag.FlagSet) *string {
 	return fs.String("config", "pvelab.yaml", "path to the lab YAML config")
 }
 
-// errNotImplemented marks subcommands whose lab-package implementation lands
-// later in IMPL-0002 Phase 1; the dispatch skeleton ships first so each task
-// wires into a compiling binary.
-var errNotImplemented = errors.New("not implemented yet (IMPL-0002 Phase 1 in progress)")
-
 func cmdISO(args []string) error {
 	fs := flag.NewFlagSet("iso", flag.ContinueOnError)
 	cfgPath := configFlag(fs)
@@ -189,13 +185,105 @@ func outerClient(ctx context.Context, cfg *lab.Config) (*proxmox.Client, error) 
 	return proxmox.NewClient(ctx, cfg.Outer.Endpoint, creds, opts...)
 }
 
+// cmdUp provisions the lab: preflight (VMIDs free, ISO prepared) → answer
+// server up → create VMs → start (unattended installs begin) → wait for every
+// nested API → write the env handoff. State is updated after every stage so a
+// mid-up failure leaves evidence on disk (design OQ-7).
 func cmdUp(args []string) error {
 	fs := flag.NewFlagSet("up", flag.ContinueOnError)
 	cfgPath := configFlag(fs)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	return fmt.Errorf("pvelab up (config %s): %w", *cfgPath, errNotImplemented)
+	ctx, stop := signalContext()
+	defer stop()
+
+	cfg, err := lab.LoadConfig(*cfgPath)
+	if err != nil {
+		return err
+	}
+	client, err := outerClient(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	if err := lab.EnsureVMIDsFree(ctx, client, cfg); err != nil {
+		return err
+	}
+	if err := lab.EnsureISOPrepared(ctx, client, cfg); err != nil {
+		return err
+	}
+	isoVolid := lab.PreparedISOVolid(cfg.Outer.ISOStorage, cfg.Nested.PVEVersion)
+	rootPW := os.Getenv(cfg.Nested.RootPasswordEnv) // presence validated at load.
+
+	answers := lab.NewAnswerServer(cfg, rootPW, slog.Default())
+	if err := answers.Start(ctx); err != nil {
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := answers.Shutdown(shutdownCtx); err != nil {
+			slog.Debug("answer server shutdown", "err", err)
+		}
+	}()
+
+	if err := provisionLab(ctx, client, cfg, isoVolid, rootPW); err != nil {
+		return err
+	}
+
+	env, err := lab.NewEnvFile(cfg, rootPW)
+	if err != nil {
+		return err
+	}
+	if err := lab.WriteEnvFile(lab.DefaultEnvPath, env); err != nil {
+		return err
+	}
+	slog.Info("lab is up", "nodes", len(cfg.Nested.Nodes), "env", lab.DefaultEnvPath)
+	return nil
+}
+
+// provisionLab is `up`'s staged create → start → wait flow, updating the
+// state file after every stage (design OQ-7: a mid-up failure leaves evidence
+// on disk).
+func provisionLab(ctx context.Context, client *proxmox.Client, cfg *lab.Config, isoVolid, rootPW string) error {
+	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+		st.ClusterName = cfg.Nested.ClusterName
+		st.PVEVersion = cfg.Nested.PVEVersion
+		st.ISOVolid = isoVolid
+		st.SeedNodes(cfg.Nested.Nodes)
+	}); err != nil {
+		return err
+	}
+
+	if err := lab.CreateNodeVMs(ctx, client, cfg, isoVolid, slog.Default()); err != nil {
+		return err
+	}
+	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+		for i := range st.Nodes {
+			st.Nodes[i].Created = true
+		}
+	}); err != nil {
+		return err
+	}
+
+	if err := lab.StartNodeVMs(ctx, client, cfg, slog.Default()); err != nil {
+		return err
+	}
+	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+		for i := range st.Nodes {
+			st.Nodes[i].Started = true
+		}
+	}); err != nil {
+		return err
+	}
+
+	readiness, waitErr := lab.WaitReady(ctx, cfg, rootPW, slog.Default())
+	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+		st.ApplyReadiness(readiness)
+	}); err != nil {
+		return errors.Join(waitErr, err)
+	}
+	return waitErr
 }
 
 // cmdDown tears the lab down. It deletes what the CONFIG says (VMIDs are
@@ -206,7 +294,7 @@ func cmdDown(args []string) error {
 	fs := flag.NewFlagSet("down", flag.ContinueOnError)
 	cfgPath := configFlag(fs)
 	force := fs.Bool("force", false, "tolerate missing/half-created objects")
-	fs.Bool("no-state", false, "tear down from config alone (ignore the state file)")
+	noState := fs.Bool("no-state", false, "tear down from config alone (leave the state/env files)")
 	purgeISOs := fs.Bool("purge-isos", false, "also delete the prepared installer ISOs")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -222,26 +310,80 @@ func cmdDown(args []string) error {
 	if err != nil {
 		return err
 	}
-	return lab.Teardown(ctx, client, cfg, lab.TeardownOptions{
+	if err := lab.Teardown(ctx, client, cfg, lab.TeardownOptions{
 		Force:     *force,
 		PurgeISOs: *purgeISOs,
-	}, slog.Default())
+	}, slog.Default()); err != nil {
+		return err
+	}
+	if !*noState {
+		for _, p := range []string{lab.DefaultStatePath, lab.DefaultEnvPath} {
+			if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+				slog.Warn("lab is down but a handoff file could not be removed", "path", p, "err", err)
+			}
+		}
+	}
+	return nil
 }
 
+// cmdStatus prints the outer view (VM presence/power) beside the state
+// file's readiness evidence, one line per configured node.
 func cmdStatus(args []string) error {
 	fs := flag.NewFlagSet("status", flag.ContinueOnError)
 	cfgPath := configFlag(fs)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	return fmt.Errorf("pvelab status (config %s): %w", *cfgPath, errNotImplemented)
+	ctx, stop := signalContext()
+	defer stop()
+
+	cfg, err := lab.LoadConfig(*cfgPath)
+	if err != nil {
+		return err
+	}
+	client, err := outerClient(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	st, err := lab.LoadState(lab.DefaultStatePath)
+	if err != nil && !errors.Is(err, lab.ErrNoState) {
+		return err
+	}
+
+	svc := client.QEMU(cfg.Outer.Node)
+	for _, n := range cfg.Nested.Nodes {
+		outer := "absent"
+		if vm, err := svc.Get(ctx, n.VMID); err == nil {
+			outer = string(vm.Status)
+		}
+		readiness := "readiness unknown (no state file)"
+		if st != nil {
+			readiness = "not ready"
+			if ns := st.FindNode(n.Name); ns != nil && ns.Ready {
+				readiness = fmt.Sprintf("ready (install took %.0fs)", ns.ReadySeconds)
+			}
+		}
+		fmt.Printf("%s\tvmid=%d\touter=%s\t%s\n", n.Name, n.VMID, outer, readiness)
+	}
+	return nil
 }
 
+// cmdEnv re-derives and prints the inner-suite environment from config —
+// same content `up` writes to .pvelab.env, without touching any file.
 func cmdEnv(args []string) error {
 	fs := flag.NewFlagSet("env", flag.ContinueOnError)
 	cfgPath := configFlag(fs)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	return fmt.Errorf("pvelab env (config %s): %w", *cfgPath, errNotImplemented)
+	cfg, err := lab.LoadConfig(*cfgPath)
+	if err != nil {
+		return err
+	}
+	env, err := lab.NewEnvFile(cfg, os.Getenv(cfg.Nested.RootPasswordEnv))
+	if err != nil {
+		return err
+	}
+	_, err = os.Stdout.Write(lab.RenderEnv(env))
+	return err
 }
