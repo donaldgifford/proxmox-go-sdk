@@ -121,6 +121,9 @@ func configFlag(fs *flag.FlagSet) *string {
 	return fs.String("config", "pvelab.yaml", "path to the lab YAML config")
 }
 
+// cmdISO prepares the http-mode auto-install ISO on the outer host: SSH in
+// (host-key verification mandatory), install the assistant if missing, run
+// prepare-iso once per PVE version, and print the resulting volid.
 func cmdISO(args []string) error {
 	fs := flag.NewFlagSet("iso", flag.ContinueOnError)
 	cfgPath := configFlag(fs)

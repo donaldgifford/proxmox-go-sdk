@@ -73,6 +73,7 @@ type AnswerServer struct {
 
 	srv  *http.Server
 	addr net.Addr
+	done chan struct{} // closed when the serving goroutine exits.
 }
 
 // NewAnswerServer builds a server for cfg's nodes; call Start to serve.
@@ -98,7 +99,9 @@ func (s *AnswerServer) Start(ctx context.Context) error {
 	}
 	s.addr = ln.Addr()
 	s.srv = &http.Server{Handler: s, ReadHeaderTimeout: 10 * time.Second}
+	s.done = make(chan struct{})
 	go func() {
+		defer close(s.done)
 		if err := s.srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			s.logger.Error("answer server", "err", err)
 		}
@@ -115,12 +118,19 @@ func (s *AnswerServer) Addr() string {
 	return s.addr.String()
 }
 
-// Shutdown gracefully stops the server, bounded by ctx.
+// Shutdown gracefully stops the server, bounded by ctx, and waits for the
+// serving goroutine to exit — no goroutine outlives the call.
 func (s *AnswerServer) Shutdown(ctx context.Context) error {
 	if s.srv == nil {
 		return nil
 	}
-	return s.srv.Shutdown(ctx)
+	err := s.srv.Shutdown(ctx)
+	select {
+	case <-s.done:
+	case <-ctx.Done():
+		return errors.Join(err, ctx.Err())
+	}
+	return err
 }
 
 // Served reports which nodes have fetched an answer (first-served times).

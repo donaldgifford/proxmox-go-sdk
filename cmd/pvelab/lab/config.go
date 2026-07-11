@@ -183,10 +183,11 @@ func (c *Config) Validate() error {
 	req(c.Nested.RootPasswordEnv, "nested.root_password_env")
 	req(c.Nested.AnswerURL, "nested.answer_url")
 
-	for field, addr := range map[string]string{
-		"nested.gateway": c.Nested.Gateway,
-		"nested.dns":     c.Nested.DNS,
+	for _, a := range []struct{ field, addr string }{
+		{"nested.gateway", c.Nested.Gateway},
+		{"nested.dns", c.Nested.DNS},
 	} {
+		field, addr := a.field, a.addr
 		if addr == "" {
 			errs = append(errs, fmt.Errorf("%s is required", field))
 			continue
@@ -206,9 +207,9 @@ func (c *Config) validateNodes() []error {
 	if len(c.Nested.Nodes) < 3 {
 		errs = append(errs, fmt.Errorf("nested.nodes needs at least 3 nodes for quorum, got %d", len(c.Nested.Nodes)))
 	}
-	names := map[string]bool{}
-	vmids := map[int]bool{}
-	cidrs := map[string]bool{}
+	names := make(map[string]bool, len(c.Nested.Nodes))
+	vmids := make(map[int]bool, len(c.Nested.Nodes))
+	cidrs := make(map[string]bool, len(c.Nested.Nodes))
 	for _, n := range c.Nested.Nodes {
 		if n.Name == "" {
 			errs = append(errs, errors.New("every node needs a name"))

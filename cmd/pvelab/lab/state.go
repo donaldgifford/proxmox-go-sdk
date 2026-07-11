@@ -162,7 +162,7 @@ type EnvFile struct {
 // point.
 func NewEnvFile(cfg *Config, rootPassword string) (*EnvFile, error) {
 	if len(cfg.Nested.Nodes) == 0 {
-		return nil, fmt.Errorf("config has no nodes")
+		return nil, errors.New("config has no nodes")
 	}
 	first := cfg.Nested.Nodes[0]
 	endpoint, err := nodeEndpoint(first)
