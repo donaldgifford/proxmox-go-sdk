@@ -448,7 +448,8 @@ func cmdTemplateBuild(args []string) error {
 		return err
 	}
 	defer func() {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		// WithoutCancel: the shutdown must run even when ctx was cancelled.
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 		defer cancel()
 		if err := answers.Shutdown(shutdownCtx); err != nil {
 			slog.Debug("answer server shutdown", "err", err)

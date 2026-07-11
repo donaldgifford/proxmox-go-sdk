@@ -116,6 +116,10 @@ func reidentifyClones(ctx context.Context, c *proxmox.Client, cfg *Config, dial 
 func reidentifyOne(ctx context.Context, cfg *Config, n Node, oldName, templateIP string,
 	dial cloneDialer, interval, ceiling time.Duration, logger *slog.Logger,
 ) error {
+	newIP, err := n.IP()
+	if err != nil {
+		return err
+	}
 	sess, err := dialWithRetry(ctx, n, templateIP, dial, interval, ceiling, logger)
 	if err != nil {
 		return err
@@ -126,7 +130,7 @@ func reidentifyOne(ctx context.Context, cfg *Config, n Node, oldName, templateIP
 		}
 	}()
 
-	script := reidentifyScript(oldName, templateIP, cfg.Nested.Template.CIDR, n)
+	script := reidentifyScript(oldName, templateIP, cfg.Nested.Template.CIDR, n, newIP)
 	logger.Info("rewriting clone identity", "node", n.Name, "from", oldName, "to", n.Name)
 	if out, err := sess.Exec(ctx, script); err != nil {
 		return fmt.Errorf("re-identify clone %s: %w (output: %s)", n.Name, err, out)
@@ -152,7 +156,8 @@ func dialWithRetry(ctx context.Context, n Node, host string, dial cloneDialer,
 		logger.Debug("clone not SSH-able yet", "node", n.Name, "host", host, "err", err)
 		select {
 		case <-dialCtx.Done():
-			return nil, fmt.Errorf("clone %s never became SSH-able at the template address %s within %s", n.Name, host, ceiling)
+			return nil, fmt.Errorf("clone %s never became SSH-able at the template address %s within %s: %w",
+				n.Name, host, ceiling, err)
 		case <-time.After(interval):
 		}
 	}
@@ -166,43 +171,35 @@ func awaitEndpoint(ctx context.Context, probe readyProbe, endpoint, node string,
 	pollCtx, cancel := context.WithTimeout(ctx, ceiling)
 	defer cancel()
 	for {
-		if err := probe(pollCtx, endpoint); err == nil {
+		err := probe(pollCtx, endpoint)
+		if err == nil {
 			return nil
 		}
-		logger.Debug("re-identified clone not answering yet", "node", node, "endpoint", endpoint)
+		logger.Debug("re-identified clone not answering yet", "node", node, "endpoint", endpoint, "err", err)
 		select {
 		case <-pollCtx.Done():
-			return fmt.Errorf("node %s (%s) not ready within %s after re-identify", node, endpoint, ceiling)
+			return fmt.Errorf("node %s (%s) not ready within %s after re-identify: %w", node, endpoint, ceiling, err)
 		case <-time.After(interval):
 		}
 	}
 }
 
 // reidentifyScript renders the shell script that rewrites a booted clone's
-// identity from the template's to node n's. The /etc/pve/nodes move is
-// best-effort (`|| true`): on a fresh clone the old directory holds only
-// per-node certificates, which PVE regenerates for the new name at boot.
-func reidentifyScript(oldName, oldIP, oldCIDR string, n Node) string {
+// identity from the template's to node n's (newIP is n's address, resolved by
+// the caller). The /etc/pve/nodes move is best-effort (`|| true`): on a fresh
+// clone the old directory holds only per-node certificates, which PVE
+// regenerates for the new name at boot.
+func reidentifyScript(oldName, oldIP, oldCIDR string, n Node, newIP string) string {
 	lines := []string{
 		"set -e",
 		"hostnamectl set-hostname " + n.Name,
-		fmt.Sprintf("sed -i 's/%s/%s/g; s/%s/%s/g' /etc/hosts", oldIP, mustNodeIP(n), oldName, n.Name),
+		fmt.Sprintf("sed -i 's/%s/%s/g; s/%s/%s/g' /etc/hosts", oldIP, newIP, oldName, n.Name),
 		fmt.Sprintf("sed -i 's|address %s|address %s|' /etc/network/interfaces", oldCIDR, n.CIDR),
 		"rm -f /etc/ssh/ssh_host_*",
 		"ssh-keygen -A",
 		fmt.Sprintf("mv /etc/pve/nodes/%s /etc/pve/nodes/%s || true", oldName, n.Name),
 	}
 	return strings.Join(lines, "\n")
-}
-
-// mustNodeIP is n.IP for script rendering; the CIDR was validated at config
-// load, so a parse failure here is a programming error.
-func mustNodeIP(n Node) string {
-	ip, err := n.IP()
-	if err != nil {
-		panic(err)
-	}
-	return ip
 }
 
 // nestedCloneDialer builds the production dialer: root@<template IP> with the

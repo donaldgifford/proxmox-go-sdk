@@ -248,10 +248,8 @@ func (s *Server) handleQEMUList(w http.ResponseWriter, r *http.Request) {
 		entry := qemuListEntry{VMID: rec.VMID, Name: rec.Name, Status: rec.Status}
 		// Real PVE flags templates in the listing; mirror it so consumers can
 		// discover templates without a per-VM config read.
-		if t, ok := rec.Config["template"]; ok {
-			if n, isInt := t.(int); isInt {
-				entry.Template = n
-			}
+		if n, ok := rec.Config["template"].(int); ok {
+			entry.Template = n
 		}
 		entries = append(entries, entry)
 	}

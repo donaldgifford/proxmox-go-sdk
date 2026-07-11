@@ -133,7 +133,7 @@ func TestReidentifyClonesHappyPath(t *testing.T) {
 func TestReidentifyScriptContent(t *testing.T) {
 	cfg := templateTestConfig()
 	n := cfg.Nested.Nodes[0] // pve1-dogfood, 192.0.2.201/24.
-	script := reidentifyScript(templateNodeName(cfg), "192.0.2.210", cfg.Nested.Template.CIDR, n)
+	script := reidentifyScript(templateNodeName(cfg), "192.0.2.210", cfg.Nested.Template.CIDR, n, "192.0.2.201")
 
 	for _, want := range []string{
 		"set -e",
