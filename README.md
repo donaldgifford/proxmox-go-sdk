@@ -63,7 +63,8 @@ proxmox/                the SDK: unified client + per-domain services
 ├── qemu/ lxc/ storage/ ha/ sdn/ …   typed per-domain services
 ├── mockpve/            importable in-memory PVE responder for tests
 └── integration/        live-node suite + recorded go-vcr cassettes
-cmd/mockpve/            runnable mockpve server (the only binary)
+cmd/mockpve/            runnable mockpve server (the only SHIPPED binary)
+cmd/pvelab/             nested-PVE dogfood lab CLI (go run-only dev tool)
 Dockerfile              multi-stage distroless build (mockpve image)
 .goreleaser.yml         release config
 mise.toml               pinned toolchain

@@ -20,8 +20,10 @@ first consumer.
   root is a doc-only `package sdk`.
 - **It ships `mockpve`** — an in-memory PVE responder (`proxmox/mockpve`,
   importable) so consumers integration-test without a live cluster. It is also
-  runnable as a standalone server via `cmd/mockpve`, which is the _only_
-  binary/container this repo produces (a test helper, not the SDK).
+  runnable as a standalone server via `cmd/mockpve`, which is the only _shipped_
+  binary/container this repo produces (a test helper, not the SDK). `cmd/pvelab`
+  also exists but is a `go run`-only dev tool (DESIGN-0002 OQ-2) — never
+  released, never in goreleaser.
 - **Targets Proxmox VE 9.x only** (ADR-0002): 9.0 floor, per-minor capability
   gating. No 8.x.
 - Lives on Forgejo (`github.com/donaldgifford/proxmox-go-sdk`); a
@@ -45,7 +47,12 @@ proxmox/                # the SDK (its own module on the eventual repo split)
 ├── ssh/                # SFTP/exec side-channel for non-REST ops
 ├── mockpve/            # in-memory PVE responder for consumer tests (public)
 └── internal/           # unexported helpers ONLY (0/1-bool, marshalling, redaction)
-cmd/mockpve/            # runnable mockpve server (the only binary; a test helper)
+cmd/mockpve/            # runnable mockpve server (the only SHIPPED binary; a test helper)
+cmd/pvelab/             # nested-PVE dogfood lab CLI (go run-only dev tool, IMPL-0002)
+├── main.go             # subcommand dispatch: iso / up / down / status / env
+└── lab/                # importable logic (config/iso/answers/provision/teardown/state)
+cmd/pve-schemadiff/     # apidoc.js schema-drift guard (CI)
+hack/pvelab-spike/      # Phase 0 spike driver (superseded record, do not grow)
 Dockerfile              # builds the mockpve image (NOT an SDK service image)
 .goreleaser.yml         # ships the mockpve helper binary + checksums/SBOM/sigs
 mise.toml               # pinned go + golangci-lint + goreleaser + universal tools
@@ -71,7 +78,34 @@ when the repos split (DESIGN-0001). New public packages are admitted under
 - `just lint` — `golangci-lint run` + yamllint + actionlint + markdownlint +
   prettier (covers the universal linters too). `yamllint` ignores the workflow
   dirs (`actionlint` owns those) and `mkdocs.yml`.
-- `just fmt` — `go fmt ./...` + yamlfmt + prettier `--write`.
+- `just fmt` — `go fmt ./...` + yamlfmt + prettier `--write`. yamlfmt excludes
+  the go-vcr cassettes (committed as-recorded) and `mkdocs.yml`.
+
+### Dogfood lab (pvelab, IMPL-0002)
+
+- `pvelab` provisions an ephemeral nested-PVE cluster on the outer host so the
+  live-only IMPL-0001 criteria (P4 HA placement, P6 VNC/RFB) can be verified
+  without touching real guests. Run via `just dogfood-iso` / `dogfood-up` /
+  `dogfood-down` (all `go run ./cmd/pvelab`, all touch r740a — Donald runs
+  these).
+- Config is `pvelab.yaml` (git-ignored; copy `pvelab.example.yaml`). Secrets are
+  env-var NAMES in the config, resolved+validated at load; site topology stays
+  out of the repo. `TestExampleConfigValid` pins the example to the schema.
+- **Blast-radius guards**: config validation refuses node VMIDs outside the
+  reserved 9200–9399 block; teardown re-checks the range AND refuses any VM
+  whose live name lacks the `pvelab-` prefix (`ErrNotOurs`, never skippable by
+  `-force` — Force forgives "already gone", never "not ours"); `up` never adopts
+  leftover VMIDs.
+- `up` writes `.pvelab-state.json` (schema-versioned, updated after every stage)
+  and `.pvelab.env` (the inner suite's `PVE_*` env, 0600 — carries the nested
+  root password); `down` removes both unless `-no-state`, and always deletes
+  from **config**, so a lost state file never strands VMs.
+- The install flow is the 2026-07-10 amendment: ONE http-mode ISO per PVE
+  version (`pvelab iso`, assistant over the ssh side-channel) + an embedded
+  answer server during `up` that matches installer requests by the
+  `smbios1: serial=<node>` stamped at VM create. The POST payload shape,
+  HTTP-vs-HTTPS, and nested→workstation reachability are live-verify items for
+  the Phase 1 acceptance run.
 
 ### Release
 

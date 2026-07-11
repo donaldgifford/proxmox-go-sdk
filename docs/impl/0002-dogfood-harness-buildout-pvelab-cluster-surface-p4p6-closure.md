@@ -254,13 +254,9 @@ state). Cluster formation is deliberately absent until Phase 2.
       documented deviations:** (1) config gained `outer.node` — the outer PVE
       node name every node-scoped SDK call needs; a gap in DESIGN-0002's YAML
       sample (the spike hardcoded it). (2) SSH tests use an `execer` seam
-      (scripted fake; `var _ execer =     (\*ssh.Client)(nil)`pins the contract)
-      rather than duplicating ~100 lines of the ssh package's unexported
-      in-process server — the client's exec plumbing is already covered by
-      `proxmox/ssh`'s own tests; lab's tests cover lab's logic (command lines,
-      idempotence, install/verify failure paths) against mockpve. The
-      `--fetch-from     http` flag shape is live-verified at the acceptance
-      run.\_
+      (scripted fake; `var _ execer =
+      (\*ssh.Client)(nil)`pins the contract)     rather than duplicating ~100 lines of the ssh package's unexported     in-process server — the client's exec plumbing is already covered by     `proxmox/ssh`'s own tests; lab's tests cover lab's logic (command lines,     idempotence, install/verify failure paths) against mockpve. The     `--fetch-from
+      http` flag shape is live-verified at the acceptance run.\_
 - [ ] `cmd/pvelab/lab/answers.go`: render per-node `answer.toml` from a
       `go:embed`ed `text/template` (IQ-2 = a) and serve the answers from an
       embedded HTTP server that `up` runs for the duration of the installs,
@@ -352,9 +348,13 @@ state). Cluster formation is deliberately absent until Phase 2.
       topology-scrub rule; every schema field represented).
       `TestExampleConfigValid` pins the committed example to the schema — a
       config-field change now fails tests until the example is updated._
-- [ ] Docs: CLAUDE.md layout + workflow notes; amend the "mockpve is the only
+- [x] Docs: CLAUDE.md layout + workflow notes; amend the "mockpve is the only
       binary" statements (CLAUDE.md, README) to "only _shipped_ binary — pvelab
-      is a `go run` dev tool"
+      is a `go run` dev tool" — _2026-07-11: both amendments made; CLAUDE.md
+      layout now shows `cmd/pvelab` (+ `cmd/pve-schemadiff`,
+      `hack/pvelab-spike`) and a new "Dogfood lab (pvelab)" workflow section
+      covers the recipes, config/secrets rules, blast-radius guards, state/env
+      handoff, and the http-mode install flow with its live-verify items._
 - [ ] `just lint` + `just test` green; changelog regenerated
 - [ ] **(live)** Acceptance run: `just dogfood-iso && just dogfood-up` → 3
       nested nodes answering `/version` → `just dogfood-down` → r740a clean;
