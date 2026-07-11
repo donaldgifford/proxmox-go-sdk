@@ -284,11 +284,26 @@ state). Cluster formation is deliberately absent until Phase 2.
       live-verify items stay open for the acceptance run; HTTPS +
       `--cert-fingerprint` is deliberately unimplemented until live evidence
       says plain HTTP fails._
-- [ ] `cmd/pvelab/lab/provision.go`: prepared-ISO presence check (error message
+- [x] `cmd/pvelab/lab/provision.go`: prepared-ISO presence check (error message
       points at `pvelab iso`), VMID-collision check, node-VM create (CPU `host`,
       sizing from config, `smbios1: serial=<node>` for answer-server matching),
       start, per-node `/version` readiness poll (interval + ceiling from Phase 0
-      measurements); unit tests against mockpve
+      measurements); unit tests against mockpve — _2026-07-11:
+      `EnsureISOPrepared` (points at `pvelab iso`) + `EnsureVMIDsFree` (up never
+      adopts leftovers, OQ-7) + `CreateNodeVMs`/`StartNodeVMs` (the spike's VM
+      spec: CPU `host`, ostype l26, scsi0 on `outer.storage`, virtio NIC, boot
+      `order=scsi0;ide2`, prepared ISO on ide2, plus
+      `smbios1 serial=<base64 name>,base64=1` — the answer-server match key;
+      parallel per node via a shared `errors.Join` helper, every task awaited) +
+      `WaitReady` (per-node parallel `/version` poll with root@pam password
+      creds + insecure TLS; Phase 0 cadence: 15 s interval, 15 min ceiling, 10 s
+      per-attempt timeout; `readyProbe` seam keeps the loop testable and
+      `versionProbe` is itself tested against mockpve's ticket flow).
+      `ownedNamePrefix` (`pvelab-`) lands here as the VM-name guard teardown
+      enforces. **Drove a mockpve fidelity fix** (separate commit): the qemu/lxc
+      create handlers dropped every create-form key except vmid/name, so
+      create-then-Config-read returned empty — they now persist the form via
+      `applyConfigForm` like real PVE._
 - [ ] `cmd/pvelab/lab/teardown.go`: stop + delete with bounded per-op contexts
       (the `cleanupCtx` pattern); `--force` tolerates missing/half-created
       objects; optional `--purge-isos`; unit tests. **Blast-radius guards**
