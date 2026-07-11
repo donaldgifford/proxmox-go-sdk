@@ -355,7 +355,9 @@ state). Cluster formation is deliberately absent until Phase 2.
       `hack/pvelab-spike`) and a new "Dogfood lab (pvelab)" workflow section
       covers the recipes, config/secrets rules, blast-radius guards, state/env
       handoff, and the http-mode install flow with its live-verify items._
-- [ ] `just lint` + `just test` green; changelog regenerated
+- [x] `just lint` + `just test` green; changelog regenerated — _2026-07-11: both
+      green locally (race + coverage; the full linter set);
+      `git-cliff -o CHANGELOG.md` regenerated in the phase's changelog commit._
 - [ ] **(live)** Acceptance run: `just dogfood-iso && just dogfood-up` → 3
       nested nodes answering `/version` → `just dogfood-down` → r740a clean;
       repeat back-to-back to prove repeatability
