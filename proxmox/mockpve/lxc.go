@@ -210,6 +210,15 @@ func (s *Server) handleLXCCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.AddContainer(node, id, r.PostForm.Get("hostname"), vmStatusStopped)
+	// Real PVE persists every create key into the container config (a later
+	// GET /config returns them), so mirror that for create-then-read
+	// consumers. vmid addresses the record; it is not a config key.
+	r.PostForm.Del("vmid")
+	s.st.mu.Lock()
+	if rec := s.lookupCT(node, id); rec != nil {
+		applyConfigForm(rec, r.PostForm)
+	}
+	s.st.mu.Unlock()
 	s.writeData(w, s.finishedTask(node, "vzcreate", strconv.Itoa(id)))
 }
 

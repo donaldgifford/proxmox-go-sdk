@@ -349,6 +349,15 @@ func (s *Server) handleQEMUCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.AddVM(node, id, r.PostForm.Get("name"), vmStatusStopped)
+	// Real PVE persists every create key into the VM config (a later GET
+	// /config returns them), so mirror that for create-then-read consumers.
+	// vmid addresses the record; it is not a config key.
+	r.PostForm.Del("vmid")
+	s.st.mu.Lock()
+	if rec := s.lookupVM(node, id); rec != nil {
+		applyConfigForm(rec, r.PostForm)
+	}
+	s.st.mu.Unlock()
 	s.writeData(w, s.finishedTask(node, "qmcreate", vmid))
 }
 
