@@ -58,9 +58,9 @@ var configKnownFields = map[string]bool{
 type Config struct {
 	Hostname     string        `json:"hostname,omitempty"`
 	Description  string        `json:"description,omitempty"`
-	Cores        int           `json:"cores,omitempty"`
-	Memory       int           `json:"memory,omitempty"` // MiB.
-	Swap         int           `json:"swap,omitempty"`   // MiB.
+	Cores        types.PVEInt  `json:"cores,omitempty"`
+	Memory       types.PVEInt  `json:"memory,omitempty"` // MiB.
+	Swap         types.PVEInt  `json:"swap,omitempty"`   // MiB.
 	Arch         string        `json:"arch,omitempty"`   // "amd64", "arm64", …
 	OSType       string        `json:"ostype,omitempty"` // "debian", "alpine", …
 	RootFS       string        `json:"rootfs,omitempty"`

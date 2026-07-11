@@ -63,10 +63,10 @@ type Config struct {
 	VMID        types.VMID    `json:"vmid,omitempty"`
 	Name        string        `json:"name,omitempty"`
 	Description string        `json:"description,omitempty"`
-	Cores       int           `json:"cores,omitempty"`
-	Sockets     int           `json:"sockets,omitempty"`
-	Memory      int           `json:"memory,omitempty"`  // MiB.
-	Balloon     int           `json:"balloon,omitempty"` // MiB; 0 disables ballooning.
+	Cores       types.PVEInt  `json:"cores,omitempty"`
+	Sockets     types.PVEInt  `json:"sockets,omitempty"`
+	Memory      types.PVEInt  `json:"memory,omitempty"`  // MiB.
+	Balloon     types.PVEInt  `json:"balloon,omitempty"` // MiB; 0 disables ballooning.
 	CPU         string        `json:"cpu,omitempty"`     // "host", "kvm64", …
 	Boot        string        `json:"boot,omitempty"`    // e.g. "order=scsi0;net0".
 	OSType      string        `json:"ostype,omitempty"`  // "l26", "win11", …

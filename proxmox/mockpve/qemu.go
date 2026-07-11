@@ -1,6 +1,7 @@
 package mockpve
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -284,6 +285,13 @@ func (s *Server) handleQEMUConfig(w http.ResponseWriter, r *http.Request) {
 		cfg = make(map[string]any, len(rec.Config))
 		for k, v := range rec.Config {
 			cfg[k] = v
+		}
+		// Live PVE 9.2.4 serializes memory as a quoted string in config
+		// reads (9.2-1 returned a JSON number — the encoding drifted in a
+		// point release; found by the IMPL-0002 Phase 0 dogfood spike).
+		// Mirror it so unit tests exercise the SDK's tolerant decode.
+		if v, ok := cfg["memory"]; ok {
+			cfg["memory"] = fmt.Sprintf("%v", v)
 		}
 	}
 	s.st.mu.Unlock()

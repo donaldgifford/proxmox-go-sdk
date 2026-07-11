@@ -109,3 +109,64 @@ func TestGuestRefString(t *testing.T) {
 		t.Errorf("GuestRef.String() = %q, want %q", got, want)
 	}
 }
+
+func TestPVEIntUnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name    string
+		in      string
+		want    int
+		wantErr bool
+	}{
+		{name: "number", in: `8192`, want: 8192},
+		{name: "zero", in: `0`, want: 0},
+		// PVE 9.2.4 serializes integer config keys as quoted strings in
+		// guest config reads (found live by the IMPL-0002 dogfood spike).
+		{name: "quoted number", in: `"8192"`, want: 8192},
+		{name: "quoted zero", in: `"0"`, want: 0},
+		{name: "empty string", in: `""`, want: 0},
+		{name: "non-numeric string", in: `"lots"`, wantErr: true},
+		{name: "bool", in: `true`, wantErr: true},
+		{name: "object", in: `{}`, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var i PVEInt
+			err := json.Unmarshal([]byte(tt.in), &i)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("Unmarshal(%s) = nil error, want error", tt.in)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unmarshal(%s) = %v, want nil", tt.in, err)
+			}
+			if i.Int() != tt.want {
+				t.Errorf("Unmarshal(%s) = %d, want %d", tt.in, i.Int(), tt.want)
+			}
+		})
+	}
+}
+
+// TestPVEIntUnmarshalNullNoop verifies that a JSON null leaves the value
+// unchanged, matching PVEBool's convention.
+func TestPVEIntUnmarshalNullNoop(t *testing.T) {
+	i := PVEInt(7)
+	if err := json.Unmarshal([]byte(`null`), &i); err != nil {
+		t.Fatalf("Unmarshal(null) = %v, want nil", err)
+	}
+	if i != 7 {
+		t.Errorf("Unmarshal(null) changed value to %d, want 7 (no-op)", i)
+	}
+}
+
+func TestPVEIntMarshalJSON(t *testing.T) {
+	out, err := json.Marshal(PVEInt(8192))
+	if err != nil {
+		t.Fatalf("Marshal = %v, want nil", err)
+	}
+	if string(out) != "8192" {
+		t.Errorf("Marshal = %s, want 8192 (plain number)", out)
+	}
+}
