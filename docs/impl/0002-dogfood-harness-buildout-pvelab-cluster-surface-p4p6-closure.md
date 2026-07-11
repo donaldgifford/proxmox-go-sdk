@@ -635,12 +635,27 @@ verified against which real PVE version.
       measurement + first live clone run remain **(live)**._
 - [ ] Version matrix: base ISOs/templates for the supported minors
       (9.0/9.1/9.2); `nested.pve_version` selects; **(live)** run the
-      capability-gate tests against at least one real non-9.2 minor
-- [ ] `proxmox/integration/testdata/cassettes/certification.yaml` (design OQ-8
+      capability-gate tests against at least one real non-9.2 minor —
+      _2026-07-11: the non-live half fell out of tasks 1–2 (deliberately
+      doc-only, per the phase design): `nested.pve_version` already selects the
+      prepared ISO AND the computed template name, and the template VMID
+      sub-range (9210–9219) plus the one-config-file-per-minor convention are
+      documented in `pvelab.example.yaml`. No new code. Open on the **(live)**
+      half: a second minor's base ISO on r740a + the capability-gate run against
+      it._
+- [x] `proxmox/integration/testdata/cassettes/certification.yaml` (design OQ-8
       schema: `pve_version`, `recorded`, `commit`, `harness`, `cassettes`,
       `notes`): first entry for the 9.2 batch, one entry per matrix run
       thereafter; mock divergences reconciled (fixed in mockpve or recorded in
-      `notes`) before an entry lands
+      `notes`) before an entry lands — _2026-07-11: file created with the first
+      entry describing the REAL existing batch: the ten committed cassettes
+      recorded live on r740a (9.2-1, commit c36b7da, 2026-07-06, harness
+      `branch` — pre-pvelab). All known divergences are reconciled and named in
+      `notes` (SDK upload 501/400 fixes, recorder no-replayable-interactions,
+      mockpve memory-as-string + create-form persistence). The cassette dir's
+      `.gitignore` gains `!certification.yaml` — it is hand-maintained data, not
+      a recording. Entries accrue per matrix run; the placement cassette joins
+      the batch after the first full dogfood run (Phase 3, live-pending)._
 - [ ] Runbook: `pve-schemadiff` drift → dogfood run → refresh recordings →
       re-certify (a TESTING.md section or docs page)
 - [ ] Conclude INV-0001 + INV-0002 (→ Concluded, final findings); DESIGN-0002 →
