@@ -19,6 +19,8 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(cluster)* Cluster create/join config surface
 - *(mockpve)* Cluster-config emulation (create/join-info/join/nodes)
 - *(pvelab)* Cluster formation wired into up (lab/cluster.go)
+- *(integration)* Password-credential support (PVE_USERNAME/PVE_PASSWORD)
+- *(integration)* Multi-pair topology scrub (PVE_SCRUB_EXTRA)
 
 ### Bug Fixes
 
@@ -38,10 +40,19 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(impl)* Check off IMPL-0002 Phase 2 tasks 1-5 with dated notes
 - *(claude)* Dogfood section covers Phase 2 cluster formation
 - *(impl)* Phase 2 task 8 + success-criteria status notes
+- *(testing)* Dogfood-lab walkthrough + testing-reality refresh
+- *(impl)* Check off IMPL-0002 Phase 3 non-live tasks with dated notes
 
 ### Testing
 
 - *(cluster)* Create/join-info/join/membership unit tests
+- *(integration)* TestResourceAffinityPlacement (scheduler-observed P4)
+- *(integration)* Retire TestResourceAffinityRule + PVE_TEST_HA_SIDS
+- *(integration)* TestConsoleRFB (live RFB greeting over console.Connect)
+
+### Miscellaneous Tasks
+
+- *(just)* Dogfood-test + composite dogfood recipes
 
 ## [0.2.0] - 2026-07-11
 
