@@ -33,6 +33,10 @@ type clusterDialer func(ctx context.Context, endpoint string) (cluster.API, erro
 // rest, each tolerating the mid-join connection drop and converging via the
 // first node's corosync nodelist AND a /cluster/status quorum gate before the
 // next join is issued (the last gate doubles as the final quorum check).
+//
+// There is deliberately no `pvecm` ssh fallback (IMPL-0002 Phase 2): two live
+// formations (2026-07-12) showed the REST endpoints reliable — the only
+// failure was this file's own config-vs-runtime race, fixed by the gate.
 func FormCluster(ctx context.Context, cfg *Config, rootPassword string, logger *slog.Logger) error {
 	return formCluster(ctx, cfg, rootPassword, nestedClusterDialer(rootPassword),
 		memberPollInterval, joinConvergeCeiling, quorumCeiling, logger)

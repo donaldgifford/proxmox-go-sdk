@@ -356,6 +356,30 @@ design. Review cassettes as described below before committing. The composite
 `dogfood` tears the lab down even when the suite fails; run the steps
 individually to keep it alive for debugging.
 
+### Running pvelab on the outer host
+
+The answer fetch is the only connection the flow initiates _toward_ the machine
+running `up` — the installing nodes POST to the baked `answer_url`; everything
+else is outbound from wherever pvelab runs. If your lab network cannot reach
+your workstation (typical inter-VLAN policy), run the CLI on the outer host
+itself — the first live formation (2026-07-12) used exactly this posture, and
+the answer server's default `:8442` bind needs no change:
+
+```sh
+GOOS=linux GOARCH=amd64 go build -o pvelab ./cmd/pvelab
+scp pvelab pvelab.yaml root@<outer-host>:
+# in pvelab.yaml on the host: answer_url points at the OUTER HOST's address;
+# outer.ssh.known_hosts/key_file must be valid paths THERE (the host SSHes to
+# itself for `iso`), then re-run `./pvelab iso` — the URL is baked into the ISO.
+# export the token + root-password env vars in that shell, never into files.
+./pvelab iso && ./pvelab up
+```
+
+`up` writes `.pvelab.env` into its working directory on the host — `scp` it back
+(or run `./pvelab env` and paste) so the inner suite, which runs from your
+checkout as usual, can source it. Run `./pvelab down` on the host too, so it
+also removes the state/env files it wrote there.
+
 ### Faster spin-up via templates (Phase 5, live-verify pending)
 
 `pvelab template build` runs the unattended install **once**, then converts the

@@ -348,6 +348,28 @@ teardown. Everything below is measured, not estimated.
   The guard's config-read happy path is what live-validated the PVEInt fix
   during `down`.
 
+### First live formations (2026-07-12, IMPL-0002 Phase 1/2 acceptance runs)
+
+Two `pvelab up` runs on r740a, run-on-host posture (linux binary + config on the
+outer node; `answer_url` pointing at r740a itself — the lab VLAN cannot initiate
+connections to a workstation, and running near the nodes sidesteps that
+requirement entirely; see INV-0003 for the productization thread).
+
+- **Unattended installs**: 3 parallel nodes in ~4 min per run, twice; all six
+  installer fetches matched their node by SMBIOS serial over plain HTTP.
+- **REST cluster formation is real and reliable** — with one lab-side race found
+  and fixed: convergence originally polled the corosync **config** nodelist, but
+  config presence precedes runtime health (a freshly joined node raises expected
+  votes before its corosync is online, leaving the cluster momentarily
+  non-quorate and pmxcfs read-only), so the next join's task failed server-side.
+  A per-join `/cluster/status` quorum gate fixed it; the second run formed
+  fully: create → pve2 join 14 s → quorate(2) → pve3 join 6 s → quorate(3),
+  whole `up` 4m41s.
+- **Create/join return shapes (UPID vs null) are deliberately unobserved**: the
+  SDK's fire-and-poll writes ignore response bodies by design, and convergence
+  never depends on the shape. Recorded here per the Phase 2 task; the ops' doc
+  comments already state it.
+
 ### Desk + web research (2026-07-08 — hardware-validated where noted above)
 
 > Facts below are sourced from the upstream PVE API schema

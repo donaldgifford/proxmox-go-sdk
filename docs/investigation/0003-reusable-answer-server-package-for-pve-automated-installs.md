@@ -110,7 +110,9 @@ the service toward the PVE host or a persistent in-fabric box rather than an
 operator workstation. `nested.answer_listen` already binds all interfaces by
 default, so running `pvelab` on the outer host needs no code change — evidence
 that the primitives, packaged consumably, would cover the production posture
-too. (The run itself will confirm; see Approach step 1.)
+too. Confirmed 2026-07-12: the first live acceptance runs used exactly this
+posture (binary + config on the PVE node), and the flow worked first try — six
+installer fetches across two runs, matched by SMBIOS serial over plain HTTP.
 
 ## Conclusion
 

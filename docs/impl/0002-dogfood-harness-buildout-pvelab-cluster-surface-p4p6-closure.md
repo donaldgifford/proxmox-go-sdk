@@ -257,7 +257,7 @@ state). Cluster formation is deliberately absent until Phase 2.
       (scripted fake; `var _ execer =
       (\*ssh.Client)(nil)`pins the contract)     rather than duplicating ~100 lines of the ssh package's unexported     in-process server — the client's exec plumbing is already covered by     `proxmox/ssh`'s own tests; lab's tests cover lab's logic (command lines,     idempotence, install/verify failure paths) against mockpve. The     `--fetch-from
       http` flag shape is live-verified at the acceptance run.\_
-- [ ] `cmd/pvelab/lab/answers.go`: render per-node `answer.toml` from a
+- [x] `cmd/pvelab/lab/answers.go`: render per-node `answer.toml` from a
       `go:embed`ed `text/template` (IQ-2 = a) and serve the answers from an
       embedded HTTP server that `up` runs for the duration of the installs,
       matching each installer's POST by the `smbios1: serial=<node>` stamped at
@@ -279,7 +279,17 @@ state). Cluster formation is deliberately absent until Phase 2.
       longest-match, and the real Start/Shutdown listener path. The three
       live-verify items stay open for the acceptance run; HTTPS +
       `--cert-fingerprint` is deliberately unimplemented until live evidence
-      says plain HTTP fails._
+      says plain HTTP fails._ — _2026-07-12 (live, first acceptance runs on
+      r740a): all three items answered. (1) Serial matching worked on the wire
+      first try — all six installer fetches across two runs matched their nodes
+      (the shape-agnostic scan does its job; the exact DMI field name stays
+      unexamined because the matcher never needs it). (2) Plain HTTP sufficed —
+      HTTPS/`--cert-fingerprint` stays unimplemented. (3) Reachability resolved
+      by **posture, not networking**: nested→workstation was never opened (lab
+      VLAN → workstation inbound blocked); instead pvelab ran ON the outer host
+      (linux binary + config with `answer_url` pointing at r740a itself) — now
+      the documented recommendation in TESTING.md. Six answers served across two
+      runs, ~43 s after VM start each time._
 - [x] `cmd/pvelab/lab/provision.go`: prepared-ISO presence check (error message
       points at `pvelab iso`), VMID-collision check, node-VM create (CPU `host`,
       sizing from config, `smbios1: serial=<node>` for answer-server matching),
@@ -360,7 +370,14 @@ state). Cluster formation is deliberately absent until Phase 2.
       `git-cliff -o CHANGELOG.md` regenerated in the phase's changelog commit._
 - [ ] **(live)** Acceptance run: `just dogfood-iso && just dogfood-up` → 3
       nested nodes answering `/version` → `just dogfood-down` → r740a clean;
-      repeat back-to-back to prove repeatability
+      repeat back-to-back to prove repeatability — _2026-07-12, in progress:
+      `iso` + two `up` runs completed on r740a (run-on-host posture — the pvelab
+      linux binary on the outer node itself). Both runs installed all 3 nodes in
+      ~4 min (answers matched by serial, `/version` ready); the first exposed
+      the join-quorum race (found + fixed, see Phase 2), the second was green
+      end-to-end (`lab is up`, 3-node quorate cluster, 4m41s total). Still open
+      for this box: the formal cycle — `down` → r740a-clean check → repeat
+      back-to-back._
 
 #### Success Criteria
 
@@ -435,7 +452,7 @@ The one new SDK surface this design needs: PVE cluster-config REST ops, plus
       quorum via seeded status): happy path, join-never- converges (names the
       stuck node), create-failure fatal, quorum timeout, and the production
       dialer against the mock's password-ticket flow._
-- [ ] **(live)** Verify REST create/join end-to-end on the nested nodes; record
+- [x] **(live)** Verify REST create/join end-to-end on the nested nodes; record
       the actual return shapes (UPID vs null) in a dated status note here +
       INV-0002, and tighten the SDK docs if warranted — _2026-07-12, first live
       formation run (pvelab binary ON r740a): REST create succeeded and the
@@ -448,12 +465,22 @@ The one new SDK surface this design needs: PVE cluster-config REST ops, plus
       join task failed server-side (pmxcfs read-only). Fixed by a per-join
       `/cluster/status` quorum gate (quorate + members-so-far online) before the
       next join; the last gate doubles as the final quorum check. Pinned by
-      `TestFormClusterGatesNextJoinOnQuorum` (scripted settle window). Return
-      shapes (UPID vs null) still unobserved — needs `PVE_DEBUG=1` on the
-      re-run; box stays open on that + a full converged formation._
-- [ ] Fallback posture: an `ssh.Exec pvecm` path behind a config flag **only
+      `TestFormClusterGatesNextJoinOnQuorum` (scripted settle window)._ —
+      _2026-07-12, second run (gate fix in): **fully converged formation** —
+      create; pve2 joined in 14 s, quorate members=2 after 5 s more; pve3 joined
+      in 6 s, quorate members=3; `cluster formed`; whole `up` 4m41s from bare
+      VMIDs. REST create/join verified reliable end-to-end. Return shapes (UPID
+      vs null) recorded as **deliberately unobservable through the SDK**: the
+      fire-and-poll ops ignore response bodies by design and `PVE_DEBUG` logs
+      requests only — the shape is irrelevant to convergence, and the ops' docs
+      already say precisely this (no tightening needed). Noted in INV-0002
+      Findings._
+- [x] Fallback posture: an `ssh.Exec pvecm` path behind a config flag **only
       if** the live run shows REST unreliable; otherwise a doc note recording
-      why no fallback exists
+      why no fallback exists — _2026-07-12: no fallback. Two live formations
+      showed the REST endpoints themselves reliable — the only failure was the
+      lab's own config-vs-runtime quorum race (fixed by the per-join gate), not
+      a PVE endpoint. Recorded on `FormCluster`'s doc comment._
 - [x] `just lint` + `just test` green; changelog regenerated — _2026-07-11: full
       suite (race, 25 packages) + `just test-replay` green; go-style review of
       the change set returned 0 errors (2 advisory notes matching existing repo
@@ -464,8 +491,9 @@ The one new SDK surface this design needs: PVE cluster-config REST ops, plus
 
 - `just dogfood-up` ends with a **3-node quorate cluster** — `/cluster/status`
   reports 3 nodes online + quorate — reproducibly from scratch. **(live)** —
-  _written-but-unverified: awaits the live run (task above); joins the Phase 1
-  acceptance run Donald executes._
+  _met 2026-07-12 (second formation run, quorum-gate fix in): 3 nodes online +
+  quorate from scratch in 4m41s. Formal repeatability evidence (back-to-back
+  cycle) accrues with the Phase 1 acceptance box._
 - The new cluster surface is mock-tested in default CI, with the join
   fingerprint/membership flow emulated in mockpve. — _2026-07-11: met (unit
   tests in `proxmox/cluster` + `cmd/pvelab/lab` run in the default suite)._
