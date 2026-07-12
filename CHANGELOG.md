@@ -59,6 +59,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(inv)* Park INV-0003 — reusable answer-server package idea
 - *(pvelab)* Record the first live formation — P2 live boxes closed
 - *(impl)* Flip the Phase 3 dogfood-run box its pass note already recorded
+- *(impl)* Phase 1 acceptance cycle complete — box + criteria checked
 
 ### Testing
 
