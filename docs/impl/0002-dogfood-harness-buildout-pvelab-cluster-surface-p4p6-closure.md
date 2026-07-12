@@ -368,7 +368,7 @@ state). Cluster formation is deliberately absent until Phase 2.
 - [x] `just lint` + `just test` green; changelog regenerated — _2026-07-11: both
       green locally (race + coverage; the full linter set);
       `git-cliff -o CHANGELOG.md` regenerated in the phase's changelog commit._
-- [ ] **(live)** Acceptance run: `just dogfood-iso && just dogfood-up` → 3
+- [x] **(live)** Acceptance run: `just dogfood-iso && just dogfood-up` → 3
       nested nodes answering `/version` → `just dogfood-down` → r740a clean;
       repeat back-to-back to prove repeatability — _2026-07-12, in progress:
       `iso` + two `up` runs completed on r740a (run-on-host posture — the pvelab
@@ -377,13 +377,27 @@ state). Cluster formation is deliberately absent until Phase 2.
       the join-quorum race (found + fixed, see Phase 2), the second was green
       end-to-end (`lab is up`, 3-node quorate cluster, 4m41s total). Still open
       for this box: the formal cycle — `down` → r740a-clean check → repeat
-      back-to-back._
+      back-to-back._ — _2026-07-12, formal cycle COMPLETE (Donald, on r740a):
+      after the Phase 3 dogfood run's `down`, the clean check passed — zero
+      VMIDs in the reserved 9200–9399 block (`qm list` shows no stray guests at
+      all), `.pvelab-state.json` + `.pvelab.env` removed, prepared ISO preserved
+      by design. Then the back-to-back repeat: `./pvelab iso` skipped
+      idempotently (volid already present); `./pvelab up` from bare VMIDs →
+      quorate 3-node cluster in **4m39s** (vs 4m41s on run two — near-identical
+      timings: parallel installs ~4m00s/node, answers served ~43 s after VM
+      start, create → pve2 join 14 s → quorate(2) → pve3 join 6 s → quorate(3));
+      `./pvelab down` deleted all three VMIDs; the second clean check passed
+      identically. No manual cleanup at any point in either cycle._
 
 #### Success Criteria
 
 - `just dogfood-up` provisions 3 booted, API-answering nested PVE nodes on r740a
   and `just dogfood-down` removes them completely — repeatable back-to-back with
-  no manual cleanup. **(live)**
+  no manual cleanup. **(live)** — _2026-07-12: MET — two full up/down cycles
+  (the Phase 3 dogfood lab lifetime, then the formal repeat), both formed
+  quorate(3) in under 5 min and both left r740a clean (VMID block empty, state
+  files removed, prepared ISO intact). Run-on-host posture note: the recipes
+  wrap the same `pvelab` subcommands the acceptance ran directly on r740a._
 - The `lab` package (config/iso/provision/teardown/state) is unit-tested against
   `mockpve` + the in-process SSH server in default CI — `just test` keeps zero
   live dependencies.
@@ -493,7 +507,8 @@ The one new SDK surface this design needs: PVE cluster-config REST ops, plus
   reports 3 nodes online + quorate — reproducibly from scratch. **(live)** —
   _met 2026-07-12 (second formation run, quorum-gate fix in): 3 nodes online +
   quorate from scratch in 4m41s. Formal repeatability evidence (back-to-back
-  cycle) accrues with the Phase 1 acceptance box._
+  cycle) accrues with the Phase 1 acceptance box._ — _accrued 2026-07-12: the
+  formal repeat formed quorate(3) again in 4m39s (see Phase 1)._
 - The new cluster surface is mock-tested in default CI, with the join
   fingerprint/membership flow emulated in mockpve. — _2026-07-11: met (unit
   tests in `proxmox/cluster` + `cmd/pvelab/lab` run in the default suite)._
