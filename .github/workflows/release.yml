@@ -60,6 +60,14 @@ jobs:
         with:
           experimental: true
 
+      # .goreleaser.yml signs checksums.txt with {{ .Env.GPG_FINGERPRINT }};
+      # without this import + env, goreleaser fails at the signing step after
+      # building everything (every v0.2.0-v0.6.0 release run died here).
+      - name: Import GPG signing key
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
@@ -67,3 +75,4 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}

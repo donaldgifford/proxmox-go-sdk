@@ -40,21 +40,28 @@ run *args:
     go run ./cmd/mockpve {{args}}
 
 # --- pvelab: the nested-PVE dogfood lab (IMPL-0002) -------------------------
-# pvelab is a `go run`-only dev tool (design OQ-2, never released). It reads
-# pvelab.yaml (git-ignored — copy pvelab.example.yaml) and resolves secrets
-# from env-var NAMES in that config. All three recipes touch r740a.
+# pvelab is a `go run`-only dev tool (design OQ-2, never a release artifact).
+# It reads pvelab.yaml (git-ignored — copy pvelab.example.yaml) and resolves
+# secrets from env-var NAMES in that config. All three recipes touch r740a.
+#
+# The recipes run the STABLE-PINNED pvelab (IMPL-0002 Phase 4: released code
+# provisions, branch code is what gets tested). Bump the pin intentionally.
+# Set PVELAB_DEV=1 to run the branch's ./cmd/pvelab instead (harness dev).
+
+pvelab_pin := "v0.6.0"
+pvelab_pkg := if env("PVELAB_DEV", "") == "1" { "./cmd/pvelab" } else { "github.com/donaldgifford/proxmox-go-sdk/cmd/pvelab@" + pvelab_pin }
 
 # Prepare the auto-install ISO on the outer host (assistant over SSH)
 dogfood-iso *args:
-    go run ./cmd/pvelab iso {{args}}
+    go run {{pvelab_pkg}} iso {{args}}
 
 # Provision the nested node VMs, wait ready, write .pvelab-state.json + .pvelab.env
 dogfood-up *args:
-    go run ./cmd/pvelab up {{args}}
+    go run {{pvelab_pkg}} up {{args}}
 
 # Tear the lab down (add -force / -purge-isos / -no-state as needed)
 dogfood-down *args:
-    go run ./cmd/pvelab down {{args}}
+    go run {{pvelab_pkg}} down {{args}}
 
 # Run the inner suite against the nested lab: sources .pvelab.env (written by
 # dogfood-up) and records cassettes (PVE_RECORD=1). Default -run targets the
@@ -101,8 +108,10 @@ fmt:
     yamlfmt .
     prettier --write '**/*.md'
 
-# Tag + push a release (triggers goreleaser via CI on tag push)
-# Example: just release v0.1.0
+# NOTE: releases are AUTOMATIC — release.yml runs on every merge to main,
+# mints the next tag from the merged PR's semver label (pr-semver-bump), and
+# runs goreleaser. Do NOT tag manually in normal flow; a manual tag desyncs
+# the label-driven bump. This recipe is kept for exceptional recovery only.
 release version:
     git tag -a {{version}} -m "release {{version}}"
     git push origin {{version}}
