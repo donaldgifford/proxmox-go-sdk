@@ -54,6 +54,13 @@ build/
 # Goreleaser snapshot output (created by `make release-local`)
 dist/
 
+# pvelab dogfood lab (IMPL-0002): the real config names env vars and site
+# topology; the state/env files carry runtime handoff (env holds a password).
+# Only pvelab.example.yaml is committed.
+pvelab.yaml
+.pvelab-state.json
+.pvelab.env
+
 # donald-loop runtime state
 .claude/donald-loop.local.md
 

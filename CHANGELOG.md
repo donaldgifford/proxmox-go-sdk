@@ -4,6 +4,34 @@ All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [unreleased]
+
+### Features
+
+- *(pvelab)* CLI dispatch skeleton — iso/up/down/status/env (IMPL-0002 P1)
+- *(pvelab)* Lab config schema + validation; promote yaml/v4 to direct
+- *(pvelab)* ISO preparation over the ssh side-channel; wire cmdISO
+- *(pvelab)* Per-node answer rendering + embedded answer server
+- *(pvelab)* Node-VM provisioning + readiness poll
+- *(pvelab)* Blast-radius-guarded teardown; wire cmdDown
+- *(pvelab)* State file + env handoff; wire up/status/env
+- *(pvelab)* Dogfood just recipes, gitignore entries, example config
+
+### Bug Fixes
+
+- *(mockpve)* Persist create-form keys into guest config
+- *(pvelab)* Quote installer-supplied log values; static env-write error
+- *(pvelab)* Use the modeled newline-strip sanitizer for installer log values
+
+### Refactor
+
+- *(pvelab)* Address style-review findings
+
+### Documentation
+
+- Pvelab layout + workflow notes; mockpve is the only SHIPPED binary
+- *(impl)* Check the Phase 1 lint/test/changelog gate
+
 ## [0.2.0] - 2026-07-11
 
 ### Documentation

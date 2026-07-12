@@ -24,7 +24,7 @@ func (s *Server) AddContainer(node string, vmid int, name, status string) {
 	if s.st.lxc.cts[node] == nil {
 		s.st.lxc.cts[node] = make(map[int]*vmRecord)
 	}
-	s.st.lxc.cts[node][vmid] = &vmRecord{
+	rec := &vmRecord{
 		VMID:      vmid,
 		Node:      node,
 		Name:      name,
@@ -32,6 +32,11 @@ func (s *Server) AddContainer(node string, vmid int, name, status string) {
 		Config:    make(map[string]any),
 		Snapshots: make(map[string]*snapRecord),
 	}
+	// Real PVE reports the hostname in container config reads too.
+	if name != "" {
+		rec.Config["hostname"] = name
+	}
+	s.st.lxc.cts[node][vmid] = rec
 }
 
 // SetCTConfig merges fields into a seeded container's config. It is a no-op if
@@ -210,6 +215,15 @@ func (s *Server) handleLXCCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.AddContainer(node, id, r.PostForm.Get("hostname"), vmStatusStopped)
+	// Real PVE persists every create key into the container config (a later
+	// GET /config returns them), so mirror that for create-then-read
+	// consumers. vmid addresses the record; it is not a config key.
+	r.PostForm.Del("vmid")
+	s.st.mu.Lock()
+	if rec := s.lookupCT(node, id); rec != nil {
+		applyConfigForm(rec, r.PostForm)
+	}
+	s.st.mu.Unlock()
 	s.writeData(w, s.finishedTask(node, "vzcreate", strconv.Itoa(id)))
 }
 

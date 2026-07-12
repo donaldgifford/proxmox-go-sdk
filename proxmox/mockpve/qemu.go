@@ -142,7 +142,7 @@ func (s *Server) AddVM(node string, vmid int, name, status string) {
 	if s.st.qemu.vms[node] == nil {
 		s.st.qemu.vms[node] = make(map[int]*vmRecord)
 	}
-	s.st.qemu.vms[node][vmid] = &vmRecord{
+	rec := &vmRecord{
 		VMID:      vmid,
 		Node:      node,
 		Name:      name,
@@ -150,6 +150,11 @@ func (s *Server) AddVM(node string, vmid int, name, status string) {
 		Config:    make(map[string]any),
 		Snapshots: make(map[string]*snapRecord),
 	}
+	// Real PVE reports the name in config reads too.
+	if name != "" {
+		rec.Config["name"] = name
+	}
+	s.st.qemu.vms[node][vmid] = rec
 }
 
 // SetVMConfig merges fields into a seeded VM's config. Values should use the Go
@@ -349,6 +354,15 @@ func (s *Server) handleQEMUCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.AddVM(node, id, r.PostForm.Get("name"), vmStatusStopped)
+	// Real PVE persists every create key into the VM config (a later GET
+	// /config returns them), so mirror that for create-then-read consumers.
+	// vmid addresses the record; it is not a config key.
+	r.PostForm.Del("vmid")
+	s.st.mu.Lock()
+	if rec := s.lookupVM(node, id); rec != nil {
+		applyConfigForm(rec, r.PostForm)
+	}
+	s.st.mu.Unlock()
 	s.writeData(w, s.finishedTask(node, "qmcreate", vmid))
 }
 

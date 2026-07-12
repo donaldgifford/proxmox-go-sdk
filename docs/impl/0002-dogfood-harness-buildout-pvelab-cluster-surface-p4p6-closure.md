@@ -43,6 +43,7 @@ created: 2026-07-09
 - [Dependencies](#dependencies)
 - [Open Questions](#open-questions)
 - [References](#references)
+
 <!--toc:end-->
 
 ## Objective
@@ -208,25 +209,54 @@ state). Cluster formation is deliberately absent until Phase 2.
 
 #### Tasks
 
-- [ ] `go.mod`: YAML dependency (IQ-1 = a): promote `go.yaml.in/yaml/v4` —
+- [x] `go.mod`: YAML dependency (IQ-1 = a): promote `go.yaml.in/yaml/v4` —
       already in the module graph via go-vcr — to a direct dependency; zero new
-      modules
-- [ ] `cmd/pvelab/main.go`: stdlib-`flag` subcommand dispatch (`iso`, `up`,
+      modules — _2026-07-10: `go mod tidy` moved it to the direct require block
+      when `lab/config.go`'s import landed; no version change (v4.0.0-rc.6, the
+      go-vcr pin), zero new modules._
+- [x] `cmd/pvelab/main.go`: stdlib-`flag` subcommand dispatch (`iso`, `up`,
       `down`, `status`, `env`), `slog` to stderr, version via
       `runtime/debug.ReadBuildInfo` (no ldflags — pvelab is `go run`-only per
-      design OQ-2)
-- [ ] `cmd/pvelab/lab/config.go`: YAML schema (DESIGN-0002 shape, plus the IQ-3
+      design OQ-2) — _2026-07-11: dispatch + per-command FlagSets (`-config`,
+      down's `-force`/`-no-state`/`-purge-isos`), `PVELAB_DEBUG` log level, exit
+      codes 0/1/2; subcommands return a documented not-implemented error until
+      their lab tasks land (each later task wires its own)._
+- [x] `cmd/pvelab/lab/config.go`: YAML schema (DESIGN-0002 shape, plus the IQ-3
       = a auth fields `outer.ssh.key_file` / `outer.ssh.password_env` — at least
       one required, key preferred) + strict fail-fast validation (≥3 nodes,
-      unique VMIDs/names/IPs, referenced env vars set); table-driven tests
-- [ ] `cmd/pvelab/lab/iso.go` (design amended 2026-07-10: **one http-mode ISO
+      unique VMIDs/names/IPs, referenced env vars set); table-driven tests —
+      _2026-07-10: `lab.LoadConfig` = strict decode (`KnownFields`, unknown keys
+      error) → defaults (cores 4 / 8192 MB / 32 GB / answer listen `:8442`, the
+      Phase 0 spike values) → `errors.Join` validation: required fields, ≥3
+      unique nodes inside the reserved 9200–9399 VMID block (the front-door
+      blast-radius guard), `netip` parsing for CIDRs/gateway/DNS, and every
+      referenced env var present. Schema carries the 2026-07-10 amendments:
+      `nested.domain` (fqdn = `<name>.<domain>`), `nested.answer_url` (explicit
+      routable URL baked into the http-mode ISO) plus `nested.answer_listen`
+      (server bind address). Table-driven tests cover every refusal path._
+- [x] `cmd/pvelab/lab/iso.go` (design amended 2026-07-10: **one http-mode ISO
       per PVE version + embedded answer server**, not per-node baked ISOs):
       connect with `proxmox/ssh` (known-hosts mandatory; auth per IQ-3 = a);
       verify/install the assistant + xorriso (Phase 0 found them absent —
       apt-install or error with instructions); run
       `prepare-iso <base_iso> --fetch-from http` once per version via `Exec`;
       verify the prepared volid via `Storage().ListContent` — unit-tested
-      against the ssh package's in-process SSH/SFTP server + mockpve
+      against the ssh package's in-process SSH/SFTP server + mockpve —
+      _2026-07-10: `PrepareISO` is idempotent (skips when `PreparedISOVolid` =
+      `<iso_storage>:iso/pvelab-<version>-auto-http.iso` already lists) →
+      `ensureAssistant` (check-first `command -v`, apt-install on miss,
+      manual-install guidance on failure — the one mutation outside the VMID
+      blast radius, logged before mutating) →
+      `prepare-iso     --fetch-from http --url <answer_url> --output <beside base_iso>`
+      → re-verify via `ListContent` (catches base_iso outside the storage's iso
+      dir). `cmdISO` wired: signal-cancelled ctx, `LoadConfig` → outer client →
+      `Client.SSH(cfg.SSHOptions()...)` + `Connect(cfg.OuterHost())`. **Two
+      documented deviations:** (1) config gained `outer.node` — the outer PVE
+      node name every node-scoped SDK call needs; a gap in DESIGN-0002's YAML
+      sample (the spike hardcoded it). (2) SSH tests use an `execer` seam
+      (scripted fake; `var _ execer =
+      (\*ssh.Client)(nil)`pins the contract)     rather than duplicating ~100 lines of the ssh package's unexported     in-process server — the client's exec plumbing is already covered by     `proxmox/ssh`'s own tests; lab's tests cover lab's logic (command lines,     idempotence, install/verify failure paths) against mockpve. The     `--fetch-from
+      http` flag shape is live-verified at the acceptance run.\_
 - [ ] `cmd/pvelab/lab/answers.go`: render per-node `answer.toml` from a
       `go:embed`ed `text/template` (IQ-2 = a) and serve the answers from an
       embedded HTTP server that `up` runs for the duration of the installs,
@@ -235,32 +265,99 @@ state). Cluster formation is deliberately absent until Phase 2.
       serial field name), plain HTTP vs HTTPS + `--cert-fingerprint` (persistent
       self-signed cert in the state dir if required), and nested-VM →
       workstation reachability; the baked `--fetch-from iso` mode stays as the
-      documented fallback; unit tests with `httptest`
-- [ ] `cmd/pvelab/lab/provision.go`: prepared-ISO presence check (error message
+      documented fallback; unit tests with `httptest` — _2026-07-10:
+      `RenderAnswer` renders the `go:embed`ed `answer.toml.tmpl` (mirror of the
+      validated spike template); `AnswerServer` implements `http.Handler` —
+      `Start` binds `nested.answer_listen` (bind errors synchronous), `Shutdown`
+      graceful, `Served()` reports first-answer times (debug only; readiness
+      stays the `/version` poll). Matching is **shape-agnostic by design** (the
+      POST payload shape is the live-verify unknown): the bounded body is
+      substring-scanned for each node's serial — raw and base64 forms,
+      longest-name-first so prefix names can't misroute — with a `?serial=` GET
+      fallback; every request body logs at Debug as the live-verification
+      instrument. httptest covers JSON/form/garbage/base64 bodies, no-match 404,
+      longest-match, and the real Start/Shutdown listener path. The three
+      live-verify items stay open for the acceptance run; HTTPS +
+      `--cert-fingerprint` is deliberately unimplemented until live evidence
+      says plain HTTP fails._
+- [x] `cmd/pvelab/lab/provision.go`: prepared-ISO presence check (error message
       points at `pvelab iso`), VMID-collision check, node-VM create (CPU `host`,
       sizing from config, `smbios1: serial=<node>` for answer-server matching),
       start, per-node `/version` readiness poll (interval + ceiling from Phase 0
-      measurements); unit tests against mockpve
-- [ ] `cmd/pvelab/lab/teardown.go`: stop + delete with bounded per-op contexts
+      measurements); unit tests against mockpve — _2026-07-11:
+      `EnsureISOPrepared` (points at `pvelab iso`) + `EnsureVMIDsFree` (up never
+      adopts leftovers, OQ-7) + `CreateNodeVMs`/`StartNodeVMs` (the spike's VM
+      spec: CPU `host`, ostype l26, scsi0 on `outer.storage`, virtio NIC, boot
+      `order=scsi0;ide2`, prepared ISO on ide2, plus
+      `smbios1 serial=<base64 name>,base64=1` — the answer-server match key;
+      parallel per node via a shared `errors.Join` helper, every task awaited) +
+      `WaitReady` (per-node parallel `/version` poll with root@pam password
+      creds + insecure TLS; Phase 0 cadence: 15 s interval, 15 min ceiling, 10 s
+      per-attempt timeout; `readyProbe` seam keeps the loop testable and
+      `versionProbe` is itself tested against mockpve's ticket flow).
+      `ownedNamePrefix` (`pvelab-`) lands here as the VM-name guard teardown
+      enforces. **Drove a mockpve fidelity fix** (separate commit): the qemu/lxc
+      create handlers dropped every create-form key except vmid/name, so
+      create-then-Config-read returned empty — they now persist the form via
+      `applyConfigForm` like real PVE._
+- [x] `cmd/pvelab/lab/teardown.go`: stop + delete with bounded per-op contexts
       (the `cleanupCtx` pattern); `--force` tolerates missing/half-created
       objects; optional `--purge-isos`; unit tests. **Blast-radius guards**
       (Phase 0 spike precedent, Donald-requested 2026-07-10): refuse any VMID
       outside the reserved 9200–9399 block, and refuse to delete a VM whose name
       lacks the harness's `pvelab-` prefix — teardown only deletes what the
-      harness created (both guards unit-tested, including the refusal paths)
-- [ ] `cmd/pvelab/lab/state.go`: `.pvelab-state.json` (schema-versioned)
+      harness created (both guards unit-tested, including the refusal paths) —
+      _2026-07-11: `Teardown` fans out per node (errors joined; one stuck node
+      hides nothing): `checkOwnership` (VMID-range + live-name-prefix via
+      `Config` read; refusals surface `ErrNotOurs` and are **never** skippable
+      by `Force` — Force forgives "already gone", never "not ours") →
+      best-effort stop → delete, every op on a 3-min bounded context; `purgeISO`
+      frees the `pvelab-`-prefixed volid (harness-owned by construction).
+      `cmdDown` wired (deletes what the CONFIG says — VMIDs declared, not
+      discovered; documented in its help). Refusal-path tests: foreign-named VM
+      survives while owned VMs still get deleted; out-of-range VMID refused even
+      when harness-named; missing VMs error without `-force`, no-op with it;
+      purge-missing-ISO likewise. Also seeder-side mockpve fidelity fix:
+      `AddVM`/`AddContainer` now seed `name`/`hostname` into config reads like
+      real PVE._
+- [x] `cmd/pvelab/lab/state.go`: `.pvelab-state.json` (schema-versioned)
       write/read + `.pvelab.env` emission
       (`PVE_ENDPOINT`/`PVE_USERNAME`/`PVE_PASSWORD`/`PVE_INSECURE_TLS`/
       `PVE_NODE` + test-gate vars); `down --no-state` recovery path from config
-      alone; round-trip tests
-- [ ] `justfile`: `dogfood-iso` / `dogfood-up` / `dogfood-down` recipes
+      alone; round-trip tests — _2026-07-11: schema-versioned `State`
+      (`LoadState` surfaces `ErrNoState` for a missing file — normal before the
+      first up — and rejects a newer `schema_version`; older/unknown keys
+      tolerated by `encoding/json`); `UpdateState` load-or-init + mutate + 0600
+      write, called after **every** up stage (seed → created → started →
+      readiness) so a mid-up failure leaves evidence (OQ-7). `.pvelab.env` emits
+      the design vars plus the IQ-6 = a gates (`PVE_TEST_PLACEMENT_VMID_1/2` =
+      9301/9302, `PVE_TEST_CONSOLE_VMID` = 9303, `PVE_TEST_STORAGE` = local-lvm
+      — the ext4 install's default), all values shell-quoted, 0600.
+      `cmdUp`/`cmdStatus`/`cmdEnv` wired (all five subcommands now real): up =
+      preflight → answer server → staged provision → env write; status = outer
+      VM view + state readiness; env = re-derive to stdout. `down` removes the
+      two handoff files on success unless `-no-state` (deletion itself is always
+      config-driven, so a lost state file never strands VMs). Round-trip +
+      newer-schema + perms + env content tests._
+- [x] `justfile`: `dogfood-iso` / `dogfood-up` / `dogfood-down` recipes
       (branch-run `go run ./cmd/pvelab` — the designed Phase 0/buildout state);
       `.gitignore`: `pvelab.yaml`, `.pvelab-state.json`, `.pvelab.env`; commit
-      `pvelab.example.yaml` (design OQ-4)
-- [ ] Docs: CLAUDE.md layout + workflow notes; amend the "mockpve is the only
+      `pvelab.example.yaml` (design OQ-4) — _2026-07-11: three pass-through
+      recipes (`*args` forwards `-force`/`-purge-isos`/etc.), the three
+      git-ignore entries, and the example config (placeholder domain/IPs per the
+      topology-scrub rule; every schema field represented).
+      `TestExampleConfigValid` pins the committed example to the schema — a
+      config-field change now fails tests until the example is updated._
+- [x] Docs: CLAUDE.md layout + workflow notes; amend the "mockpve is the only
       binary" statements (CLAUDE.md, README) to "only _shipped_ binary — pvelab
-      is a `go run` dev tool"
-- [ ] `just lint` + `just test` green; changelog regenerated
+      is a `go run` dev tool" — _2026-07-11: both amendments made; CLAUDE.md
+      layout now shows `cmd/pvelab` (+ `cmd/pve-schemadiff`,
+      `hack/pvelab-spike`) and a new "Dogfood lab (pvelab)" workflow section
+      covers the recipes, config/secrets rules, blast-radius guards, state/env
+      handoff, and the http-mode install flow with its live-verify items._
+- [x] `just lint` + `just test` green; changelog regenerated — _2026-07-11: both
+      green locally (race + coverage; the full linter set);
+      `git-cliff -o CHANGELOG.md` regenerated in the phase's changelog commit._
 - [ ] **(live)** Acceptance run: `just dogfood-iso && just dogfood-up` → 3
       nested nodes answering `/version` → `just dogfood-down` → r740a clean;
       repeat back-to-back to prove repeatability

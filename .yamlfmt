@@ -27,5 +27,9 @@ formatter:
 # (4-space nav-sequence indentation) that yamlfmt would otherwise rewrite,
 # producing churn on every `just fmt`. Keep `just fmt` and `just lint` agreed
 # on leaving it alone.
+#
+# The go-vcr cassettes are committed exactly as the recorder writes them
+# (4-space indentation); reformatting would re-diff on every re-recording.
 exclude:
   - mkdocs.yml
+  - proxmox/integration/testdata/cassettes

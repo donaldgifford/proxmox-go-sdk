@@ -1,0 +1,45 @@
+---
+# pvelab example config (IMPL-0002 / DESIGN-0002). Copy to pvelab.yaml
+# (git-ignored) and fill in your site's values.
+#
+# SECRETS ARE NEVER VALUES IN THIS FILE: every *_env key names an environment
+# variable pvelab resolves at runtime, and config load fails fast if any named
+# variable is unset. Site topology (real domain, IPs) belongs only in your
+# local copy.
+
+outer:
+  # The physical PVE host the lab runs on.
+  endpoint: https://pve.example:8006
+  node: pve  # its PVE node name (node-scoped API calls need it)
+  token_id_env: PVE_TOKEN_ID  # env var NAMES, not values
+  token_secret_env: PVE_TOKEN_SECRET
+  insecure_tls: true
+  storage: local-zfs  # nested node VM disks
+  iso_storage: local  # base + prepared installer ISOs
+  bridge: vmbr0
+  ssh:  # for `pvelab iso` (proxmox/ssh side-channel)
+    user: root
+    known_hosts: ~/.ssh/known_hosts  # host-key verification is mandatory
+    key_file: ~/.ssh/id_ed25519  # key and/or password_env (key preferred)
+    # password_env: PVELAB_SSH_PW
+
+nested:
+  pve_version: "9.2"  # names the prepared ISO (one per version)
+  base_iso: /var/lib/vz/template/iso/proxmox-ve_9.2-1.iso  # on the outer host, inside iso_storage
+  cluster_name: dogfood
+  domain: lab.example  # node fqdn = <name>.<domain>; the name IS the PVE node name
+  root_password_env: PVELAB_ROOT_PW  # nested root@pam password (answer files + readiness)
+  gateway: 192.0.2.1
+  dns: 192.0.2.1
+  # answer_url is baked into the http-mode ISO at `pvelab iso` time and must
+  # reach the workstation running `pvelab up` FROM the nested VMs (the
+  # embedded answer server binds answer_listen, default ":8442").
+  answer_url: http://192.0.2.10:8442
+  # answer_listen: ":8442"
+  # cores: 4 # sizing defaults (Phase 0 spike values)
+  # memory_mb: 8192
+  # disk_gb: 32
+  nodes:  # >=3 for quorum; VMIDs must sit in the reserved 9200-9399 block
+    - {name: pve1-dogfood, vmid: 9201, cidr: 192.0.2.201/24}
+    - {name: pve2-dogfood, vmid: 9202, cidr: 192.0.2.202/24}
+    - {name: pve3-dogfood, vmid: 9203, cidr: 192.0.2.203/24}
