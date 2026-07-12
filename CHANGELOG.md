@@ -65,6 +65,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(integration)* TestResourceAffinityPlacement (scheduler-observed P4)
 - *(integration)* Retire TestResourceAffinityRule + PVE_TEST_HA_SIDS
 - *(integration)* TestConsoleRFB (live RFB greeting over console.Connect)
+- *(integration)* Land the live P4 placement cassette; close P4+P6 in the ledgers
 
 ### Miscellaneous Tasks
 
