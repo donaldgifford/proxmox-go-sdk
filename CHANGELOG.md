@@ -55,6 +55,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(testing)* Template/linked-clone walkthrough + Phase 5 task 2 ledger note
 - *(testing)* Certification runbook (drift -> dogfood -> refresh -> re-certify)
 - *(inv)* Park INV-0003 — reusable answer-server package idea
+- *(pvelab)* Record the first live formation — P2 live boxes closed
 
 ### Testing
 
