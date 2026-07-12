@@ -134,6 +134,56 @@ func TestConnectEcho(t *testing.T) {
 	}
 }
 
+// TestConnectNodeShell pins the node-shell dial: a MintNodeVNC ticket connects
+// at /nodes/{node}/vncwebsocket (guest tickets dial their guest's own path —
+// TestConnectEcho — and the mock enforces the binding like real PVE).
+func TestConnectNodeShell(t *testing.T) {
+	t.Parallel()
+	svc := newService(t, mockpve.New())
+	ctx := context.Background()
+
+	tk, err := svc.MintNodeVNC(ctx, testNode)
+	if err != nil {
+		t.Fatalf("MintNodeVNC: %v", err)
+	}
+	stream, err := svc.Connect(ctx, testNode, tk)
+	if err != nil {
+		t.Fatalf("Connect(node shell): %v", err)
+	}
+	defer stream.Close()
+
+	want := []byte("shell\n")
+	if _, err := stream.Write(want); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	got := make([]byte, len(want))
+	if _, err := io.ReadFull(stream, got); err != nil {
+		t.Fatalf("read echo: %v", err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("node shell echo = %q, want %q", got, want)
+	}
+}
+
+// TestConnectGuestTicketBoundToGuestPath pins the live 2026-07-12 finding: a
+// guest-minted ticket VALUE presented at the node-shell path (which is where a
+// hand-constructed ticket dials — it carries no guest provenance) must be
+// rejected, exactly like real PVE's 401 "invalid PVEVNC ticket".
+func TestConnectGuestTicketBoundToGuestPath(t *testing.T) {
+	t.Parallel()
+	svc := newService(t, mockpve.New())
+	ctx := context.Background()
+
+	tk, err := svc.MintVNCTicket(ctx, testNode, console.KindQEMU, types.VMID(100))
+	if err != nil {
+		t.Fatalf("MintVNCTicket: %v", err)
+	}
+	stray := &console.VNCTicket{Ticket: tk.Ticket, Port: tk.Port}
+	if _, err := svc.Connect(ctx, testNode, stray); err == nil {
+		t.Error("Connect(guest ticket at node-shell path) error = nil, want 401")
+	}
+}
+
 func TestConnectRejectsUnknownTicket(t *testing.T) {
 	t.Parallel()
 	svc := newService(t, mockpve.New())

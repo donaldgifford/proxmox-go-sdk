@@ -9,10 +9,13 @@ import (
 )
 
 // Connect opens the VNC console byte stream for a ticket minted by MintVNCTicket
-// or MintNodeVNC. It dials /nodes/{node}/vncwebsocket?port=…&vncticket=… over a
-// WebSocket upgrade and returns the raw post-handshake duplex stream; PVE
-// verifies the one-time ticket during the upgrade, so an invalid or expired
-// ticket surfaces here as an error.
+// or MintNodeVNC. It dials the vncwebsocket endpoint the ticket is bound to —
+// /nodes/{node}/{qemu|lxc}/{vmid}/vncwebsocket for a guest ticket,
+// /nodes/{node}/vncwebsocket for a node-shell one; PVE enforces the binding
+// (a hand-constructed ticket dials the node-shell path) — over a WebSocket
+// upgrade and returns the raw post-handshake duplex stream. PVE verifies the
+// one-time ticket during the upgrade, so an invalid or expired ticket surfaces
+// here as an error.
 //
 // The bytes on the returned stream are the live PVE VNC console protocol
 // (WebSocket-framed RFB). The SDK carries them verbatim and does not de-frame or
@@ -30,7 +33,7 @@ func (s *Service) Connect(ctx context.Context, node string, ticket *VNCTicket) (
 	case ticket.Port == "":
 		return nil, fmt.Errorf("console.Connect: port: %w", svcutil.ErrMissingField)
 	}
-	stream, err := s.c.DoWebSocket(ctx, vncWebSocketPath(node, ticket.Port, ticket.Ticket))
+	stream, err := s.c.DoWebSocket(ctx, vncWebSocketPath(node, ticket))
 	if err != nil {
 		return nil, fmt.Errorf("console.Connect: %w", err)
 	}

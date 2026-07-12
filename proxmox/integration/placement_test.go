@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -76,15 +77,13 @@ func TestResourceAffinityPlacement(t *testing.T) {
 	}
 
 	// NEGATIVE affinity: the scheduler must separate them.
-	if err := h.CreateRule(testCtx(t), &ha.HARuleSpec{
+	createRuleSettled(t, h, &ha.HARuleSpec{
 		Rule:      rule,
 		Type:      ha.RuleTypeResourceAffinity,
 		Resources: []string{sid(vmid1), sid(vmid2)},
 		Affinity:  "negative",
 		Comment:   "created by the SDK integration suite",
-	}); err != nil {
-		t.Fatalf("CreateRule(negative): %v", err)
-	}
+	})
 	n1, n2 := waitPlacement(t, c, vmid1, vmid2, func(a, b string) bool { return a != b })
 	t.Logf("negative affinity honoured: vm:%d on %s, vm:%d on %s", vmid1, n1, vmid2, n2)
 
@@ -94,6 +93,39 @@ func TestResourceAffinityPlacement(t *testing.T) {
 	}
 	n1, _ = waitPlacement(t, c, vmid1, vmid2, func(a, b string) bool { return a == b })
 	t.Logf("positive affinity honoured: vm:%d and vm:%d co-located on %s", vmid1, vmid2, n1)
+}
+
+// createRuleSettled issues CreateRule, retrying while the HA stack is still
+// activating. On a cluster whose FIRST HA resources were just added (the
+// fresh pvelab lab), the rule feasibility check counts HA-ACTIVE nodes — the
+// LRMs, which take a few 10 s cycles to come up after AddResource — not
+// cluster members, so an immediate create fails with "rule defines more
+// resources than available nodes" (observed live 2026-07-12, 3.9 s into a
+// quorate 3-node cluster). Any other error is fatal immediately.
+func createRuleSettled(t *testing.T, h ha.API, spec *ha.HARuleSpec) {
+	t.Helper()
+	interval := placementPollLive
+	if os.Getenv(envReplay) == "1" {
+		interval = placementPollReplay
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), placementPollCeiling)
+	defer cancel()
+	for {
+		err := h.CreateRule(testCtx(t), spec)
+		if err == nil {
+			return
+		}
+		if !strings.Contains(err.Error(), "more resources than available nodes") {
+			t.Fatalf("CreateRule(%s): %v", spec.Rule, err)
+		}
+		t.Logf("HA stack still activating (LRMs not up yet) — retrying rule create: %v", err)
+		select {
+		case <-ctx.Done():
+			t.Fatalf("CreateRule(%s): HA stack never settled within %s (last: %v)",
+				spec.Rule, placementPollCeiling, err)
+		case <-time.After(interval):
+		}
+	}
 }
 
 // placementVMID reads and parses one placement-VM gate, skipping the test when

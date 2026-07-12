@@ -566,7 +566,23 @@ regression-guards it in CI forever after.
       when the suite fails (cassettes + state survive for review)._
 - [ ] **(live)** Full `just dogfood` run: capture the P4 cassette (+ refresh any
       suite cassettes worth re-recording against the nested cluster); review
-      every cassette for leaks (secrets + topology) before force-adding
+      every cassette for leaks (secrets + topology) before force-adding —
+      _2026-07-12, first inner-suite run against the live pvelab cluster: **both
+      tests failed, each a genuine live-only finding** (the harness doing its
+      job). (1) `TestConsoleRFB` → 401 "invalid PVEVNC ticket":
+      `console.Connect` dialled the node-shell `/nodes/{n}/vncwebsocket` for
+      every ticket, but real PVE binds a guest ticket to the guest's own
+      `/nodes/{n}/{qemu|lxc}/{vmid}/vncwebsocket`. **SDK fixed** (VNCTicket
+      carries unexported mint provenance; Connect routes on it) and **mockpve
+      fidelity fixed** — the mock accepted any minted ticket at the node path,
+      which is exactly how the bug passed unit tests; it now binds each ticket
+      to its dial path (`TestConnectGuestTicketBoundToGuestPath`). (2)
+      `TestResourceAffinityPlacement` → 500 "rule defines more resources than
+      available nodes" 3.9 s in: PVE's rule feasibility counts **HA-active
+      nodes** (LRMs, which lag AddResource by a few 10 s cycles on a
+      first-ever-HA cluster), not members; the test now retries rule creation on
+      that specific error (`createRuleSettled`) until the stack settles. Re-run
+      pending._
 - [ ] Wire the P4 cassette into `just test-replay` (`-run` list + recorded gate
       values) and confirm the `Test Replay (cassettes)` CI job replays it green
 - [ ] Check **both** IMPL-0001 Outstanding-live-verification boxes with dated

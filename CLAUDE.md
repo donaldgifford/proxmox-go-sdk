@@ -576,14 +576,21 @@ mock-verified — guest
 `MintVNCTicket`/`MintSPICETicket`/`MintTermProxy(node, kind, vmid)` and
 node-shell `MintNodeVNC`/`MintNodeTerm(node)` (VNC/term tickets
 
-- SPICE params all lossless); **`Connect(ctx, node, *VNCTicket)`** dials
-  `/nodes/{n}/vncwebsocket` and returns the raw duplex byte stream. That needed
-  a new **`api.Client.DoWebSocket(ctx, path) (io.ReadWriteCloser, error)`** —
+- SPICE params all lossless); **`Connect(ctx, node, *VNCTicket)`** dials the
+  vncwebsocket path the ticket is BOUND to — a guest ticket dials
+  `/nodes/{n}/{qemu|lxc}/{vmid}/vncwebsocket` (provenance carried in unexported
+  `VNCTicket` fields set at mint), a node-shell or hand-built ticket
+  `/nodes/{n}/vncwebsocket`. PVE enforces that binding: presenting a guest
+  ticket at the node path is a 401 — found live 2026-07-12 on the pvelab
+  cluster; mockpve now binds each minted ticket to its dial path so the
+  misrouting can never pass unit tests again. Connect returns the raw duplex
+  byte stream. That needed a new
+  **`api.Client.DoWebSocket(ctx, path) (io.ReadWriteCloser, error)`** —
   implemented in `api/websocket.go` using Go's **native 101 upgrade** (GET with
   `Connection: Upgrade`/`Upgrade: websocket`/`Sec-WebSocket-*`; on
   `101 Switching Protocols` the `http.Transport` hands back a body that is also
   writable — `resp.Body.(io.ReadWriteCloser)` is the stream). The mock's
-  `/vncwebsocket` route does a real `http.Hijacker` 101 handshake + echo, so
+  vncwebsocket routes do a real `http.Hijacker` 101 handshake + echo, so
   `Connect` is tested end-to-end through the real transport. The RFB wire
   payload is REST-with-caveat (unverified without a live node);
   `VerifyVNCTicket` returns ErrUnsupported (no standalone verify endpoint — a
