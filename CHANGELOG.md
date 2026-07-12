@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-07-12
+
+### Features
+
+- *(cluster)* Cluster create/join config surface
+- *(mockpve)* Cluster-config emulation (create/join-info/join/nodes)
+- *(pvelab)* Cluster formation wired into up (lab/cluster.go)
+
+### Documentation
+
+- *(cluster)* Promote package overview to cover the config ops
+- *(impl)* Check off IMPL-0002 Phase 2 tasks 1-5 with dated notes
+- *(claude)* Dogfood section covers Phase 2 cluster formation
+- *(impl)* Phase 2 task 8 + success-criteria status notes
+
+### Testing
+
+- *(cluster)* Create/join-info/join/membership unit tests
+
 ## [0.3.0] - 2026-07-12
 
 ### Features
@@ -16,9 +35,6 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(pvelab)* Blast-radius-guarded teardown; wire cmdDown
 - *(pvelab)* State file + env handoff; wire up/status/env
 - *(pvelab)* Dogfood just recipes, gitignore entries, example config
-- *(cluster)* Cluster create/join config surface
-- *(mockpve)* Cluster-config emulation (create/join-info/join/nodes)
-- *(pvelab)* Cluster formation wired into up (lab/cluster.go)
 
 ### Bug Fixes
 
@@ -34,14 +50,6 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Pvelab layout + workflow notes; mockpve is the only SHIPPED binary
 - *(impl)* Check the Phase 1 lint/test/changelog gate
-- *(cluster)* Promote package overview to cover the config ops
-- *(impl)* Check off IMPL-0002 Phase 2 tasks 1-5 with dated notes
-- *(claude)* Dogfood section covers Phase 2 cluster formation
-- *(impl)* Phase 2 task 8 + success-criteria status notes
-
-### Testing
-
-- *(cluster)* Create/join-info/join/membership unit tests
 
 ## [0.2.0] - 2026-07-11
 
