@@ -87,8 +87,15 @@ func TestResourceAffinityPlacement(t *testing.T) {
 	n1, n2 := waitPlacement(t, c, vmid1, vmid2, func(a, b string) bool { return a != b })
 	t.Logf("negative affinity honoured: vm:%d on %s, vm:%d on %s", vmid1, n1, vmid2, n2)
 
-	// Flip to POSITIVE: the scheduler must co-locate them.
-	if err := h.UpdateRule(testCtx(t), rule, &ha.HARuleUpdate{Affinity: "positive"}); err != nil {
+	// Flip to POSITIVE: the scheduler must co-locate them. The update carries
+	// the type and the type's required properties — PVE's plugin schema keeps
+	// them required on update, and a bare affinity-only PUT was rejected with
+	// "Parameter verification failed." live (2026-07-12).
+	if err := h.UpdateRule(testCtx(t), rule, &ha.HARuleUpdate{
+		Type:      ha.RuleTypeResourceAffinity,
+		Resources: []string{sid(vmid1), sid(vmid2)},
+		Affinity:  "positive",
+	}); err != nil {
 		t.Fatalf("UpdateRule(positive): %v", err)
 	}
 	n1, _ = waitPlacement(t, c, vmid1, vmid2, func(a, b string) bool { return a == b })
@@ -207,8 +214,25 @@ func placementCleanup(t *testing.T, c *proxmox.Client, rule string, vmids ...int
 			t.Logf("cleanup RemoveResource(%s): %v", sid(vmid), err)
 		}
 	}
-	ts := c.Tasks()
 	for _, vmid := range vmids {
+		deleteSettled(ctx, t, c, vmid)
+	}
+}
+
+// deleteSettled stops (best-effort) then deletes one VM, retrying the round
+// while an in-flight HA action holds the guest — found live 2026-07-12: the
+// manager was still migrating when cleanup ran, the stop task failed with
+// "VM is locked (migrate)" and the delete with "VM 9301 is running". Each
+// retry re-resolves the node (the blocking action may BE a migration).
+// Bounded by ctx (the cleanup context).
+func deleteSettled(ctx context.Context, t *testing.T, c *proxmox.Client, vmid int) {
+	t.Helper()
+	ts := c.Tasks()
+	interval := placementPollLive
+	if os.Getenv(envReplay) == "1" {
+		interval = placementPollReplay
+	}
+	for {
 		q := c.QEMU(currentNode(ctx, c, vmid))
 		// HA started them; stop before delete (best-effort — HA removal can
 		// already have stopped them).
@@ -218,12 +242,23 @@ func placementCleanup(t *testing.T, c *proxmox.Client, rule string, vmids ...int
 			t.Logf("cleanup Wait(stop %d): %v", vmid, werr)
 		}
 		dref, derr := q.Delete(ctx, vmid)
-		if derr != nil {
-			t.Logf("cleanup Delete(%d): %v", vmid, derr)
-			continue
+		if derr == nil {
+			if _, werr := ts.Wait(ctx, dref); werr != nil {
+				t.Logf("cleanup Wait(delete %d): %v", vmid, werr)
+			}
+			return
 		}
-		if _, werr := ts.Wait(ctx, dref); werr != nil {
-			t.Logf("cleanup Wait(delete %d): %v", vmid, werr)
+		msg := derr.Error()
+		if !strings.Contains(msg, "is running") && !strings.Contains(msg, "lock") {
+			t.Logf("cleanup Delete(%d): %v", vmid, derr)
+			return
+		}
+		t.Logf("cleanup Delete(%d) blocked by an in-flight HA action — retrying: %v", vmid, derr)
+		select {
+		case <-ctx.Done():
+			t.Logf("cleanup Delete(%d): gave up: %v", vmid, ctx.Err())
+			return
+		case <-time.After(interval):
 		}
 	}
 }

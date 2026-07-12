@@ -582,7 +582,21 @@ regression-guards it in CI forever after.
       nodes** (LRMs, which lag AddResource by a few 10 s cycles on a
       first-ever-HA cluster), not members; the test now retries rule creation on
       that specific error (`createRuleSettled`) until the stack settles. Re-run
-      pending._
+      pending._ — _2026-07-12, second inner-suite run: **negative
+      resource-affinity placement OBSERVED LIVE** (the retry worked, the rule
+      landed, and the scheduler separated vm:9301 → pve2 / vm:9302 → pve3), and
+      the **live RFB greeting bytes arrived** (`0x82 0x0c` + "RFB 003.008\n" —
+      WebSocket-framed, exactly Connect's documented contract; the test now
+      de-frames instead of expecting raw bytes). Two more fixes fell out: (1)
+      the positive-flip `UpdateRule` got 400 "Parameter verification failed."
+      with the failing fields invisible — `pverr.Error` now renders the `Params`
+      map, `HARuleUpdate` gained `Type`, and the flip sends the type + its
+      required properties (PVE's plugin schema keeps resource-affinity's
+      `affinity`+`resources` required on update); (2) cleanup raced an in-flight
+      HA migration ("VM is locked (migrate)" → "destroy failed") —
+      `deleteSettled` now retries the stop+delete round, re-resolving the node,
+      until the guest unlocks. Third run pending: the positive flip + full green
+      pass + P4 cassette capture._
 - [ ] Wire the P4 cassette into `just test-replay` (`-run` list + recorded gate
       values) and confirm the `Test Replay (cassettes)` CI job replays it green
 - [ ] Check **both** IMPL-0001 Outstanding-live-verification boxes with dated

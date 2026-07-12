@@ -144,3 +144,18 @@ func TestHelperPredicates(t *testing.T) {
 		t.Error("IsNotFound(409) = true")
 	}
 }
+
+func TestErrorMessageFormatParams(t *testing.T) {
+	e := &Error{
+		Op:      "ha.UpdateRule",
+		Status:  400,
+		Message: "Parameter verification failed.",
+		Params:  map[string]string{"resources": "missing", "affinity": "bad value"},
+		Path:    "/api2/json/cluster/ha/rules/r1",
+	}
+	want := "ha.UpdateRule: HTTP 400: Parameter verification failed. " +
+		"[affinity: bad value; resources: missing] (/api2/json/cluster/ha/rules/r1)"
+	if got := e.Error(); got != want {
+		t.Errorf("Error() = %q, want %q", got, want)
+	}
+}
