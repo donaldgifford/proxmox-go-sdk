@@ -437,7 +437,20 @@ The one new SDK surface this design needs: PVE cluster-config REST ops, plus
       dialer against the mock's password-ticket flow._
 - [ ] **(live)** Verify REST create/join end-to-end on the nested nodes; record
       the actual return shapes (UPID vs null) in a dated status note here +
-      INV-0002, and tighten the SDK docs if warranted
+      INV-0002, and tighten the SDK docs if warranted — _2026-07-12, first live
+      formation run (pvelab binary ON r740a): REST create succeeded and the
+      first join (pve2) was accepted and converged in 13s; the second join
+      (pve3) was accepted (2xx — no request error logged) but never converged.
+      Root cause found in the lab logic, not the SDK ops: convergence polled the
+      corosync **config** nodelist, and config presence precedes runtime health
+      — pve2 was in corosync.conf (expected votes already 2) while its corosync
+      was still starting, so the cluster was momentarily non-quorate and pve3's
+      join task failed server-side (pmxcfs read-only). Fixed by a per-join
+      `/cluster/status` quorum gate (quorate + members-so-far online) before the
+      next join; the last gate doubles as the final quorum check. Pinned by
+      `TestFormClusterGatesNextJoinOnQuorum` (scripted settle window). Return
+      shapes (UPID vs null) still unobserved — needs `PVE_DEBUG=1` on the
+      re-run; box stays open on that + a full converged formation._
 - [ ] Fallback posture: an `ssh.Exec pvecm` path behind a config flag **only
       if** the live run shows REST unreliable; otherwise a doc note recording
       why no fallback exists

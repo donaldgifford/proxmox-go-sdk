@@ -112,12 +112,15 @@ when the repos split (DESIGN-0001). New public packages are admitted under
   **fire-and-poll** (response body ignored beyond error status; upstream return
   shapes unverified). Joins run **serialized**; each join's request error is
   swallowed by design (the join restarts the joining node's API daemons
-  mid-call) and convergence is decided by polling the first node's corosync
-  nodelist, then a final `/cluster/status` quorum check. The lab dials a fresh
-  root@pam-password SDK client per poll (tokens don't survive a join). mockpve
-  emulates formation with one wire-forced seam: the joining node's identity is
-  implicit on real PVE, so tests seed it via `QueueClusterJoin` (plus
-  `SetClusterSelfNode`); join-info issues the exported
+  mid-call) and convergence is decided in two stages per join: the corosync
+  nodelist poll, then a `/cluster/status` quorum gate (quorate + members-so-far
+  online) before the next join fires — config presence precedes runtime health,
+  and a join issued into that settling window fails server-side (found live
+  2026-07-12); the last gate doubles as the final quorum check. The lab dials a
+  fresh root@pam-password SDK client per poll (tokens don't survive a join).
+  mockpve emulates formation with one wire-forced seam: the joining node's
+  identity is implicit on real PVE, so tests seed it via `QueueClusterJoin`
+  (plus `SetClusterSelfNode`); join-info issues the exported
   `mockpve.ClusterFingerprint`, which the join handler requires.
 - **Templates + linked clones (Phase 5)**: `pvelab template build` installs once
   and converts to an outer-host template (`pvelab-tmpl-<version>`, dots dashed;
