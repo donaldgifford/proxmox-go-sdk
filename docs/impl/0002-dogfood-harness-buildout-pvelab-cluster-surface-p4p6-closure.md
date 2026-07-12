@@ -564,7 +564,7 @@ regression-guards it in CI forever after.
       _2026-07-11: `dogfood-test` -runs placement+RFB with `-timeout 30m` and
       passes extra flags via args; the composite tears down via bash trap even
       when the suite fails (cassettes + state survive for review)._
-- [ ] **(live)** Full `just dogfood` run: capture the P4 cassette (+ refresh any
+- [x] **(live)** Full `just dogfood` run: capture the P4 cassette (+ refresh any
       suite cassettes worth re-recording against the nested cluster); review
       every cassette for leaks (secrets + topology) before force-adding —
       _2026-07-12, first inner-suite run against the live pvelab cluster: **both
