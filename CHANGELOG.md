@@ -53,6 +53,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(impl)* Check off IMPL-0002 Phase 5 task 1 with dated note
 - *(testing)* Template/linked-clone walkthrough + Phase 5 task 2 ledger note
 - *(testing)* Certification runbook (drift -> dogfood -> refresh -> re-certify)
+- *(inv)* Park INV-0003 — reusable answer-server package idea
 
 ### Testing
 
