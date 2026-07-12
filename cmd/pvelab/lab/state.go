@@ -43,6 +43,7 @@ type State struct {
 	ClusterName   string      `json:"cluster_name,omitempty"`
 	PVEVersion    string      `json:"pve_version,omitempty"`
 	ISOVolid      string      `json:"iso_volid,omitempty"`
+	Clustered     bool        `json:"clustered,omitempty"` // formation completed quorate.
 	Nodes         []NodeState `json:"nodes,omitempty"`
 }
 

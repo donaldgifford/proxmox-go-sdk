@@ -106,6 +106,19 @@ when the repos split (DESIGN-0001). New public packages are admitted under
   `smbios1: serial=<node>` stamped at VM create. The POST payload shape,
   HTTP-vs-HTTPS, and nested→workstation reachability are live-verify items for
   the Phase 1 acceptance run.
+- **Cluster formation (Phase 2)**: after readiness, `up` forms a quorate cluster
+  via the new `cluster` config surface —
+  `CreateCluster`/`JoinInfo`/`JoinCluster`/`ListConfigNodes`, both writes
+  **fire-and-poll** (response body ignored beyond error status; upstream return
+  shapes unverified). Joins run **serialized**; each join's request error is
+  swallowed by design (the join restarts the joining node's API daemons
+  mid-call) and convergence is decided by polling the first node's corosync
+  nodelist, then a final `/cluster/status` quorum check. The lab dials a fresh
+  root@pam-password SDK client per poll (tokens don't survive a join). mockpve
+  emulates formation with one wire-forced seam: the joining node's identity is
+  implicit on real PVE, so tests seed it via `QueueClusterJoin` (plus
+  `SetClusterSelfNode`); join-info issues the exported
+  `mockpve.ClusterFingerprint`, which the join handler requires.
 
 ### Release
 

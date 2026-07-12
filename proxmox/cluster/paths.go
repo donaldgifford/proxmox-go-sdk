@@ -2,6 +2,9 @@ package cluster
 
 // Cluster REST paths, all under /cluster.
 
-func clusterResourcesPath() string { return "/cluster/resources" }
-func clusterStatusPath() string    { return "/cluster/status" }
-func clusterOptionsPath() string   { return "/cluster/options" }
+func clusterResourcesPath() string   { return "/cluster/resources" }
+func clusterStatusPath() string      { return "/cluster/status" }
+func clusterOptionsPath() string     { return "/cluster/options" }
+func clusterConfigPath() string      { return "/cluster/config" }
+func clusterConfigJoinPath() string  { return "/cluster/config/join" }
+func clusterConfigNodesPath() string { return "/cluster/config/nodes" }
