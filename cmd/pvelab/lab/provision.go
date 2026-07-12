@@ -121,6 +121,36 @@ func CreateNodeVMs(ctx context.Context, c *proxmox.Client, cfg *Config, isoVolid
 	return parallel(fns...)
 }
 
+// CloneNodeVMs creates every configured node's VM as a clone of the version's
+// template (Full unset — PVE's default against a template is a linked clone),
+// in parallel, awaiting each clone task. The clones are left STOPPED: a clone
+// boots the template's baked-in IP, so starting is serialized with the
+// re-identify pass (ReidentifyClones), never done in bulk.
+func CloneNodeVMs(ctx context.Context, c *proxmox.Client, cfg *Config, templateVMID int, logger *slog.Logger) error {
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+	svc := c.QEMU(cfg.Outer.Node)
+	fns := make([]func() error, 0, len(cfg.Nested.Nodes))
+	for _, n := range cfg.Nested.Nodes {
+		fns = append(fns, func() error {
+			logger.Info("cloning node VM from template", "node", n.Name, "vmid", n.VMID, "template", templateVMID)
+			ref, err := svc.Clone(ctx, templateVMID, &qemu.CloneSpec{
+				NewID: types.VMID(n.VMID),
+				Name:  vmName(n),
+			})
+			if err != nil {
+				return fmt.Errorf("clone vm %d (%s) from template %d: %w", n.VMID, n.Name, templateVMID, err)
+			}
+			if _, err := c.Tasks().Wait(ctx, ref); err != nil {
+				return fmt.Errorf("wait clone vm %d (%s): %w", n.VMID, n.Name, err)
+			}
+			return nil
+		})
+	}
+	return parallel(fns...)
+}
+
 // StartNodeVMs starts every configured node's VM in parallel, awaiting each
 // start task. Starting boots the prepared ISO — the unattended installs (and
 // the answer-server requests) begin here.

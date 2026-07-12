@@ -257,7 +257,7 @@ state). Cluster formation is deliberately absent until Phase 2.
       (scripted fake; `var _ execer =
       (\*ssh.Client)(nil)`pins the contract)     rather than duplicating ~100 lines of the ssh package's unexported     in-process server — the client's exec plumbing is already covered by     `proxmox/ssh`'s own tests; lab's tests cover lab's logic (command lines,     idempotence, install/verify failure paths) against mockpve. The     `--fetch-from
       http` flag shape is live-verified at the acceptance run.\_
-- [ ] `cmd/pvelab/lab/answers.go`: render per-node `answer.toml` from a
+- [x] `cmd/pvelab/lab/answers.go`: render per-node `answer.toml` from a
       `go:embed`ed `text/template` (IQ-2 = a) and serve the answers from an
       embedded HTTP server that `up` runs for the duration of the installs,
       matching each installer's POST by the `smbios1: serial=<node>` stamped at
@@ -279,7 +279,17 @@ state). Cluster formation is deliberately absent until Phase 2.
       longest-match, and the real Start/Shutdown listener path. The three
       live-verify items stay open for the acceptance run; HTTPS +
       `--cert-fingerprint` is deliberately unimplemented until live evidence
-      says plain HTTP fails._
+      says plain HTTP fails._ — _2026-07-12 (live, first acceptance runs on
+      r740a): all three items answered. (1) Serial matching worked on the wire
+      first try — all six installer fetches across two runs matched their nodes
+      (the shape-agnostic scan does its job; the exact DMI field name stays
+      unexamined because the matcher never needs it). (2) Plain HTTP sufficed —
+      HTTPS/`--cert-fingerprint` stays unimplemented. (3) Reachability resolved
+      by **posture, not networking**: nested→workstation was never opened (lab
+      VLAN → workstation inbound blocked); instead pvelab ran ON the outer host
+      (linux binary + config with `answer_url` pointing at r740a itself) — now
+      the documented recommendation in TESTING.md. Six answers served across two
+      runs, ~43 s after VM start each time._
 - [x] `cmd/pvelab/lab/provision.go`: prepared-ISO presence check (error message
       points at `pvelab iso`), VMID-collision check, node-VM create (CPU `host`,
       sizing from config, `smbios1: serial=<node>` for answer-server matching),
@@ -358,15 +368,36 @@ state). Cluster formation is deliberately absent until Phase 2.
 - [x] `just lint` + `just test` green; changelog regenerated — _2026-07-11: both
       green locally (race + coverage; the full linter set);
       `git-cliff -o CHANGELOG.md` regenerated in the phase's changelog commit._
-- [ ] **(live)** Acceptance run: `just dogfood-iso && just dogfood-up` → 3
+- [x] **(live)** Acceptance run: `just dogfood-iso && just dogfood-up` → 3
       nested nodes answering `/version` → `just dogfood-down` → r740a clean;
-      repeat back-to-back to prove repeatability
+      repeat back-to-back to prove repeatability — _2026-07-12, in progress:
+      `iso` + two `up` runs completed on r740a (run-on-host posture — the pvelab
+      linux binary on the outer node itself). Both runs installed all 3 nodes in
+      ~4 min (answers matched by serial, `/version` ready); the first exposed
+      the join-quorum race (found + fixed, see Phase 2), the second was green
+      end-to-end (`lab is up`, 3-node quorate cluster, 4m41s total). Still open
+      for this box: the formal cycle — `down` → r740a-clean check → repeat
+      back-to-back._ — _2026-07-12, formal cycle COMPLETE (Donald, on r740a):
+      after the Phase 3 dogfood run's `down`, the clean check passed — zero
+      VMIDs in the reserved 9200–9399 block (`qm list` shows no stray guests at
+      all), `.pvelab-state.json` + `.pvelab.env` removed, prepared ISO preserved
+      by design. Then the back-to-back repeat: `./pvelab iso` skipped
+      idempotently (volid already present); `./pvelab up` from bare VMIDs →
+      quorate 3-node cluster in **4m39s** (vs 4m41s on run two — near-identical
+      timings: parallel installs ~4m00s/node, answers served ~43 s after VM
+      start, create → pve2 join 14 s → quorate(2) → pve3 join 6 s → quorate(3));
+      `./pvelab down` deleted all three VMIDs; the second clean check passed
+      identically. No manual cleanup at any point in either cycle._
 
 #### Success Criteria
 
 - `just dogfood-up` provisions 3 booted, API-answering nested PVE nodes on r740a
   and `just dogfood-down` removes them completely — repeatable back-to-back with
-  no manual cleanup. **(live)**
+  no manual cleanup. **(live)** — _2026-07-12: MET — two full up/down cycles
+  (the Phase 3 dogfood lab lifetime, then the formal repeat), both formed
+  quorate(3) in under 5 min and both left r740a clean (VMID block empty, state
+  files removed, prepared ISO intact). Run-on-host posture note: the recipes
+  wrap the same `pvelab` subcommands the acceptance ran directly on r740a._
 - The `lab` package (config/iso/provision/teardown/state) is unit-tested against
   `mockpve` + the in-process SSH server in default CI — `just test` keeps zero
   live dependencies.
@@ -435,12 +466,35 @@ The one new SDK surface this design needs: PVE cluster-config REST ops, plus
       quorum via seeded status): happy path, join-never- converges (names the
       stuck node), create-failure fatal, quorum timeout, and the production
       dialer against the mock's password-ticket flow._
-- [ ] **(live)** Verify REST create/join end-to-end on the nested nodes; record
+- [x] **(live)** Verify REST create/join end-to-end on the nested nodes; record
       the actual return shapes (UPID vs null) in a dated status note here +
-      INV-0002, and tighten the SDK docs if warranted
-- [ ] Fallback posture: an `ssh.Exec pvecm` path behind a config flag **only
+      INV-0002, and tighten the SDK docs if warranted — _2026-07-12, first live
+      formation run (pvelab binary ON r740a): REST create succeeded and the
+      first join (pve2) was accepted and converged in 13s; the second join
+      (pve3) was accepted (2xx — no request error logged) but never converged.
+      Root cause found in the lab logic, not the SDK ops: convergence polled the
+      corosync **config** nodelist, and config presence precedes runtime health
+      — pve2 was in corosync.conf (expected votes already 2) while its corosync
+      was still starting, so the cluster was momentarily non-quorate and pve3's
+      join task failed server-side (pmxcfs read-only). Fixed by a per-join
+      `/cluster/status` quorum gate (quorate + members-so-far online) before the
+      next join; the last gate doubles as the final quorum check. Pinned by
+      `TestFormClusterGatesNextJoinOnQuorum` (scripted settle window)._ —
+      _2026-07-12, second run (gate fix in): **fully converged formation** —
+      create; pve2 joined in 14 s, quorate members=2 after 5 s more; pve3 joined
+      in 6 s, quorate members=3; `cluster formed`; whole `up` 4m41s from bare
+      VMIDs. REST create/join verified reliable end-to-end. Return shapes (UPID
+      vs null) recorded as **deliberately unobservable through the SDK**: the
+      fire-and-poll ops ignore response bodies by design and `PVE_DEBUG` logs
+      requests only — the shape is irrelevant to convergence, and the ops' docs
+      already say precisely this (no tightening needed). Noted in INV-0002
+      Findings._
+- [x] Fallback posture: an `ssh.Exec pvecm` path behind a config flag **only
       if** the live run shows REST unreliable; otherwise a doc note recording
-      why no fallback exists
+      why no fallback exists — _2026-07-12: no fallback. Two live formations
+      showed the REST endpoints themselves reliable — the only failure was the
+      lab's own config-vs-runtime quorum race (fixed by the per-join gate), not
+      a PVE endpoint. Recorded on `FormCluster`'s doc comment._
 - [x] `just lint` + `just test` green; changelog regenerated — _2026-07-11: full
       suite (race, 25 packages) + `just test-replay` green; go-style review of
       the change set returned 0 errors (2 advisory notes matching existing repo
@@ -451,8 +505,10 @@ The one new SDK surface this design needs: PVE cluster-config REST ops, plus
 
 - `just dogfood-up` ends with a **3-node quorate cluster** — `/cluster/status`
   reports 3 nodes online + quorate — reproducibly from scratch. **(live)** —
-  _written-but-unverified: awaits the live run (task above); joins the Phase 1
-  acceptance run Donald executes._
+  _met 2026-07-12 (second formation run, quorum-gate fix in): 3 nodes online +
+  quorate from scratch in 4m41s. Formal repeatability evidence (back-to-back
+  cycle) accrues with the Phase 1 acceptance box._ — _accrued 2026-07-12: the
+  formal repeat formed quorate(3) again in 4m39s (see Phase 1)._
 - The new cluster surface is mock-tested in default CI, with the join
   fingerprint/membership flow emulated in mockpve. — _2026-07-11: met (unit
   tests in `proxmox/cluster` + `cmd/pvelab/lab` run in the default suite)._
@@ -523,15 +579,68 @@ regression-guards it in CI forever after.
       _2026-07-11: `dogfood-test` -runs placement+RFB with `-timeout 30m` and
       passes extra flags via args; the composite tears down via bash trap even
       when the suite fails (cassettes + state survive for review)._
-- [ ] **(live)** Full `just dogfood` run: capture the P4 cassette (+ refresh any
+- [x] **(live)** Full `just dogfood` run: capture the P4 cassette (+ refresh any
       suite cassettes worth re-recording against the nested cluster); review
-      every cassette for leaks (secrets + topology) before force-adding
-- [ ] Wire the P4 cassette into `just test-replay` (`-run` list + recorded gate
+      every cassette for leaks (secrets + topology) before force-adding —
+      _2026-07-12, first inner-suite run against the live pvelab cluster: **both
+      tests failed, each a genuine live-only finding** (the harness doing its
+      job). (1) `TestConsoleRFB` → 401 "invalid PVEVNC ticket":
+      `console.Connect` dialled the node-shell `/nodes/{n}/vncwebsocket` for
+      every ticket, but real PVE binds a guest ticket to the guest's own
+      `/nodes/{n}/{qemu|lxc}/{vmid}/vncwebsocket`. **SDK fixed** (VNCTicket
+      carries unexported mint provenance; Connect routes on it) and **mockpve
+      fidelity fixed** — the mock accepted any minted ticket at the node path,
+      which is exactly how the bug passed unit tests; it now binds each ticket
+      to its dial path (`TestConnectGuestTicketBoundToGuestPath`). (2)
+      `TestResourceAffinityPlacement` → 500 "rule defines more resources than
+      available nodes" 3.9 s in: PVE's rule feasibility counts **HA-active
+      nodes** (LRMs, which lag AddResource by a few 10 s cycles on a
+      first-ever-HA cluster), not members; the test now retries rule creation on
+      that specific error (`createRuleSettled`) until the stack settles. Re-run
+      pending._ — _2026-07-12, second inner-suite run: **negative
+      resource-affinity placement OBSERVED LIVE** (the retry worked, the rule
+      landed, and the scheduler separated vm:9301 → pve2 / vm:9302 → pve3), and
+      the **live RFB greeting bytes arrived** (`0x82 0x0c` + "RFB 003.008\n" —
+      WebSocket-framed, exactly Connect's documented contract; the test now
+      de-frames instead of expecting raw bytes). Two more fixes fell out: (1)
+      the positive-flip `UpdateRule` got 400 "Parameter verification failed."
+      with the failing fields invisible — `pverr.Error` now renders the `Params`
+      map, `HARuleUpdate` gained `Type`, and the flip sends the type + its
+      required properties (PVE's plugin schema keeps resource-affinity's
+      `affinity`+`resources` required on update); (2) cleanup raced an in-flight
+      HA migration ("VM is locked (migrate)" → "destroy failed") —
+      `deleteSettled` now retries the stop+delete round, re-resolving the node,
+      until the guest unlocks. Third run pending: the positive flip + full green
+      pass + P4 cassette capture._ — _2026-07-12, third inner-suite run: **FULL
+      PASS.** `TestConsoleRFB` read `"RFB 003.008\n"` live;
+      `TestResourceAffinityPlacement` observed negative (vm:9301 → pve2-dogfood,
+      vm:9302 → pve3-dogfood) **and** positive (co-located on pve3-dogfood)
+      placement; clean teardown. The P4 cassette was captured and leak-reviewed:
+      review found ONE automated-scrub gap — go-vcr stores the request `Host`
+      separately from the URL and `topologyScrub.apply` never rewrote it (the
+      earlier committed batch was hand-fixed without noticing), so 32 `host:`
+      fields carried the outer endpoint. `apply` now scrubs `Request.Host` + all
+      request/response header values (`TestScrubTopology` extended to pin it),
+      the cassette was hand-fixed to `pve.example:8006`, and a full re-scan
+      shows zero topology/secret leaks (48 REDACTED markers intact). Evidence
+      note: the run used the run-on-host posture — `./pvelab up` on r740a +
+      `just dogfood-test` from the workstation — i.e. the composite's steps
+      executed individually, not the single `just dogfood` invocation._
+- [x] Wire the P4 cassette into `just test-replay` (`-run` list + recorded gate
       values) and confirm the `Test Replay (cassettes)` CI job replays it green
-- [ ] Check **both** IMPL-0001 Outstanding-live-verification boxes with dated
+      — _2026-07-12: `TestResourceAffinityPlacement` added to the `-run` list
+      with `PVE_TEST_PLACEMENT_VMID_1=9301`/`_2=9302`; local `just test-replay`
+      green (the placement test replays both affinity assertions from the
+      cassette in ~2.4 s — `placementPollReplay` doing its job). The CI job runs
+      the identical recipe and fires on this branch's push._
+- [x] Check **both** IMPL-0001 Outstanding-live-verification boxes with dated
       notes (P4: placement observed + cassette + CI replay; P6: live RFB
       assertion, dated, cassette-less by design); update INV-0002
-      Findings/Conclusion
+      Findings/Conclusion — _2026-07-12: both boxes checked with the live
+      evidence + fold-back findings; the section now records that every
+      IMPL-0001 Success Criterion is verified. INV-0002 Findings/Conclusion
+      updated (nested-virt viability CONFIRMED end-to-end). certification.yaml
+      gained the 9.2.2 nested-cluster batch entry._
 - [x] TESTING.md dogfood section (prereqs, `pvelab.yaml`, `just dogfood`,
       recording flow) + CLAUDE.md testing-reality update — _2026-07-11: "The
       dogfood lab (pvelab)" section after the acceptance checklist; the console
@@ -546,9 +655,16 @@ regression-guards it in CI forever after.
 - IMPL-0001's P4 and P6 boxes are checked from a single `just dogfood` run:
   negative **and** positive affinity placements observed on the nested cluster,
   and the RFB greeting read over `console.Connect` from a real QEMU VNC server.
-  **(live)**
+  **(live)** — _2026-07-12: MET, with one posture note: the evidence came from
+  one lab lifetime driven as individual steps (`./pvelab up` on r740a, then
+  `just dogfood-test` recording, then `down`) rather than the composite
+  `just dogfood` recipe — the run-on-host posture splits the steps by machine.
+  Both placements and the RFB greeting were observed in that single lab
+  lifetime._
 - The P4 cassette replays green in the `Test Replay (cassettes)` CI job — the
-  placement criterion is regression-guarded, not once-observed.
+  placement criterion is regression-guarded, not once-observed. — _2026-07-12:
+  wired + green locally via the identical `just test-replay` recipe; the CI leg
+  fires on this branch's push._
 
 ---
 
@@ -594,22 +710,80 @@ verified against which real PVE version.
 
 #### Tasks
 
-- [ ] `pvelab template build`: run the unattended install once per
+- [x] `pvelab template build`: run the unattended install once per
       `nested.pve_version` → convert the result to an outer-node template;
-      template VMID/naming convention recorded in `pvelab.example.yaml`
+      template VMID/naming convention recorded in `pvelab.example.yaml` —
+      _2026-07-11: implemented + mock-verified (go-architect designed; see the
+      pvelab-template-clone-architecture memory). New SDK op
+      `qemu.ConvertToTemplate` (action-option pattern, **maybe-UPID hedge** —
+      the return shape is unconfirmed on 9.x, callers check `Ref.IsZero()`; the
+      `nodes.ApplyNetworkConfig` precedent); mockpve rejects running VMs and
+      flags templates in the VM listing. `lab.BuildTemplate` reuses the
+      provision path unchanged via a synthetic single-node `TemplateConfig`
+      (name `tmpl-<version>` with dots dashed — it doubles as the guest hostname
+      label) → graceful shutdown → installer-ISO detach → convert. Template name
+      is COMPUTED (`pvelab-tmpl-<version>`), never configured; VMID is explicit
+      config in the new **9210–9219 template sub-range**
+      (`nested.template {vmid, cidr}`, validated against node collisions;
+      recorded in `pvelab.example.yaml` with the one-template-per-minor matrix
+      convention). Discovery is per-run by name (`FindTemplate`) — no state-file
+      tracking, templates outlive labs. `-force` deletes ours by computed name;
+      a foreign VM on the template VMID is always refused. The actual build
+      against r740a is **live-only** (unattended install), still unrun._
 - [ ] `up` via **linked clones** when the version's template exists (ISO install
       as fallback when it doesn't); **(live)** measure clone-boot vs ISO-install
-      wall-clock
+      wall-clock — _2026-07-11: implemented + mock-verified; only the **(live)**
+      half keeps this box open. `cloneSource` picks the path: a real template +
+      a configured `nested.template` block (its CIDR is the clone boot address)
+      → `upViaClone` (no ISO, no answer server); else warn + the extracted
+      `upViaISO`. Building a template IS the opt-in — no flag. `CloneNodeVMs`
+      linked-clones all nodes STOPPED (Full unset = PVE's template default);
+      `ReidentifyClones` then starts them **one at a time** — every clone boots
+      the template's baked-in hostname/IP/host key, so parallel starts would
+      collide — SSH-ing in at the template's IP (dial retried through the boot
+      window; TOFU host-key pinned across the run's serialized dials), rewriting
+      hostname + /etc/hosts + /etc/network/interfaces, regenerating SSH host
+      keys, moving the pmxcfs node dir best-effort, rebooting, and polling the
+      node's OWN endpoint before touching the next clone. **PVE tolerating the
+      hostname/IP rename end-to-end is the clone path's load-bearing live-verify
+      unknown** — tests pin command sequence, dial retry, serialization order,
+      and the tolerated reboot drop, never PVE's behaviour. Wall-clock
+      measurement + first live clone run remain **(live)**._
 - [ ] Version matrix: base ISOs/templates for the supported minors
       (9.0/9.1/9.2); `nested.pve_version` selects; **(live)** run the
-      capability-gate tests against at least one real non-9.2 minor
-- [ ] `proxmox/integration/testdata/cassettes/certification.yaml` (design OQ-8
+      capability-gate tests against at least one real non-9.2 minor —
+      _2026-07-11: the non-live half fell out of tasks 1–2 (deliberately
+      doc-only, per the phase design): `nested.pve_version` already selects the
+      prepared ISO AND the computed template name, and the template VMID
+      sub-range (9210–9219) plus the one-config-file-per-minor convention are
+      documented in `pvelab.example.yaml`. No new code. Open on the **(live)**
+      half: a second minor's base ISO on r740a + the capability-gate run against
+      it._
+- [x] `proxmox/integration/testdata/cassettes/certification.yaml` (design OQ-8
       schema: `pve_version`, `recorded`, `commit`, `harness`, `cassettes`,
       `notes`): first entry for the 9.2 batch, one entry per matrix run
       thereafter; mock divergences reconciled (fixed in mockpve or recorded in
-      `notes`) before an entry lands
-- [ ] Runbook: `pve-schemadiff` drift → dogfood run → refresh recordings →
-      re-certify (a TESTING.md section or docs page)
+      `notes`) before an entry lands — _2026-07-11: file created with the first
+      entry describing the REAL existing batch: the ten committed cassettes
+      recorded live on r740a (9.2-1, commit c36b7da, 2026-07-06, harness
+      `branch` — pre-pvelab). All known divergences are reconciled and named in
+      `notes` (SDK upload 501/400 fixes, recorder no-replayable-interactions,
+      mockpve memory-as-string + create-form persistence). The cassette dir's
+      `.gitignore` gains `!certification.yaml` — it is hand-maintained data, not
+      a recording. Entries accrue per matrix run; the placement cassette joins
+      the batch after the first full dogfood run (Phase 3, live-pending)._ —
+      _2026-07-12: the placement cassette landed as its OWN batch entry (not
+      appended to the r740a batch): pve_version 9.2.2, harness `pvelab`, with
+      the run's fidelity findings named in `notes` (VNC ticket path-binding, HA
+      rule update required-props, HA-active feasibility counting, join quorum
+      gate)._
+- [x] Runbook: `pve-schemadiff` drift → dogfood run → refresh recordings →
+      re-certify (a TESTING.md section or docs page) — _2026-07-11: TESTING.md
+      "Certification: drift → dogfood → refresh → re-certify" section (under
+      Recording cassettes): schemadiff trip → `nested.pve_version` bump +
+      dogfood run → stale-cassette re-record/review/force-add → reconcile
+      mockpve + append the batch entry to `certification.yaml`, with
+      `just test-replay` as the regression guard._
 - [ ] Conclude INV-0001 + INV-0002 (→ Concluded, final findings); DESIGN-0002 →
       Implemented; this IMPL → Completed
 

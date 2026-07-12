@@ -2,13 +2,16 @@ package lab
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/cluster"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/mockpve"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/types"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/version"
 )
 
@@ -137,6 +140,141 @@ func TestFormClusterQuorumTimeout(t *testing.T) {
 		time.Millisecond, time.Second, 50*time.Millisecond, slog.New(slog.DiscardHandler))
 	if err == nil || !strings.Contains(err.Error(), "quorate") {
 		t.Errorf("formCluster = %v, want a quorum-timeout error", err)
+	}
+}
+
+// quorumWorld scripts the real-PVE settling window the per-join quorum gate
+// exists for (found live 2026-07-12): a join puts the member in the config
+// nodelist immediately, but the member only reports online — and the cluster
+// quorate — two status polls later. The event journal proves the next join
+// waits for quorum instead of firing on config presence.
+type quorumWorld struct {
+	mu         sync.Mutex
+	events     []string
+	members    []string
+	lag        map[string]int    // status polls left before a member is online.
+	byEndpoint map[string]string // endpoint → node name (who a dial reaches).
+}
+
+// quorumView is quorumWorld seen through one endpoint's dial. The embedded
+// nil API panics on any call the formation flow is not expected to make.
+type quorumView struct {
+	cluster.API
+
+	w        *quorumWorld
+	endpoint string
+}
+
+func (v *quorumView) CreateCluster(_ context.Context, _ *cluster.ClusterCreateSpec) error {
+	v.w.mu.Lock()
+	defer v.w.mu.Unlock()
+	v.w.members = []string{v.w.byEndpoint[v.endpoint]}
+	return nil
+}
+
+func (*quorumView) JoinInfo(_ context.Context) (*cluster.JoinInfo, error) {
+	return &cluster.JoinInfo{
+		PreferredNode: "pve1-dogfood",
+		Nodelist:      []cluster.JoinNode{{Name: "pve1-dogfood", PVEFingerprint: "AA:BB"}},
+	}, nil
+}
+
+// JoinCluster is served by the JOINING node: the view's endpoint says who
+// joins. Config membership grows now; runtime health lags two polls.
+func (v *quorumView) JoinCluster(_ context.Context, _ *cluster.JoinSpec) error {
+	v.w.mu.Lock()
+	defer v.w.mu.Unlock()
+	name := v.w.byEndpoint[v.endpoint]
+	v.w.members = append(v.w.members, name)
+	v.w.lag[name] = 2
+	v.w.events = append(v.w.events, "join:"+name)
+	return nil
+}
+
+func (v *quorumView) ListConfigNodes(_ context.Context) ([]cluster.ConfigNode, error) {
+	v.w.mu.Lock()
+	defer v.w.mu.Unlock()
+	out := make([]cluster.ConfigNode, 0, len(v.w.members))
+	for _, m := range v.w.members {
+		out = append(out, cluster.ConfigNode{Name: m})
+	}
+	return out, nil
+}
+
+// GetStatus ages the world one poll: lagging members come online only after
+// their countdown, and the cluster is quorate only once nobody lags.
+func (v *quorumView) GetStatus(_ context.Context) ([]cluster.StatusEntry, error) {
+	v.w.mu.Lock()
+	defer v.w.mu.Unlock()
+	quorumOK := true
+	entries := make([]cluster.StatusEntry, 0, len(v.w.members)+1)
+	for _, m := range v.w.members {
+		online := v.w.lag[m] == 0
+		if !online {
+			quorumOK = false
+			v.w.lag[m]--
+		}
+		entries = append(entries, cluster.StatusEntry{
+			Type: "node", Name: m, Online: types.PVEBool(online),
+		})
+	}
+	entries = append(entries, cluster.StatusEntry{
+		Type: "cluster", Name: "pvelab",
+		Nodes: len(v.w.members), Quorate: types.PVEBool(quorumOK),
+	})
+	v.w.events = append(v.w.events,
+		fmt.Sprintf("status:n=%d,q=%t", len(v.w.members), quorumOK))
+	return entries, nil
+}
+
+// TestFormClusterGatesNextJoinOnQuorum pins the fix for the live 2026-07-12
+// failure: pve3's join must not be issued while the cluster is still settling
+// from pve2's — the gate has to observe non-quorate status for the 2-member
+// cluster, then quorate, before join:pve3 appears.
+func TestFormClusterGatesNextJoinOnQuorum(t *testing.T) {
+	t.Parallel()
+	cfg := clusterTestConfig()
+	w := &quorumWorld{lag: map[string]int{}, byEndpoint: map[string]string{}}
+	for _, n := range cfg.Nested.Nodes {
+		endpoint, err := nodeEndpoint(n)
+		if err != nil {
+			t.Fatalf("nodeEndpoint(%s): %v", n.Name, err)
+		}
+		w.byEndpoint[endpoint] = n.Name
+	}
+	dial := func(_ context.Context, endpoint string) (cluster.API, error) {
+		return &quorumView{w: w, endpoint: endpoint}, nil
+	}
+
+	err := formCluster(context.Background(), cfg, "hunter2", dial,
+		time.Millisecond, time.Second, time.Second, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatalf("formCluster: %v", err)
+	}
+
+	join3 := -1
+	for i, e := range w.events {
+		if e == "join:pve3-dogfood" {
+			join3 = i
+			break
+		}
+	}
+	if join3 == -1 {
+		t.Fatalf("join:pve3-dogfood never happened; events = %v", w.events)
+	}
+	sawSettling, sawQuorate := false, false
+	for _, e := range w.events[:join3] {
+		switch e {
+		case "status:n=2,q=false":
+			sawSettling = true
+		case "status:n=2,q=true":
+			sawQuorate = true
+		}
+	}
+	if !sawSettling || !sawQuorate {
+		t.Errorf("join:pve3 fired without the gate observing the 2-member settle "+
+			"(saw non-quorate=%t, quorate=%t); events before it = %v",
+			sawSettling, sawQuorate, w.events[:join3])
 	}
 }
 

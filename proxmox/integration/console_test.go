@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"regexp"
@@ -196,31 +197,69 @@ func TestConsoleRFB(t *testing.T) {
 	// RFC 6143 §7.1.1: exactly "RFB xxx.yyy\n" — QEMU sends RFB 003.008 (or a
 	// close 003.00x); assert the shape rather than pin one minor.
 	if !rfbGreetingRe.Match(greeting) {
-		t.Fatalf("first %d bytes = %q, want an RFB ProtocolVersion greeting", rfbGreetingLen, greeting)
+		t.Fatalf("greeting = %q, want an RFB ProtocolVersion greeting", greeting)
 	}
 	t.Logf("RFB greeting from live QEMU VNC server: %q", greeting)
 }
 
 var rfbGreetingRe = regexp.MustCompile(`^RFB \d{3}\.\d{3}\n$`)
 
-// readGreeting reads the fixed-length RFB greeting off the stream, bounded so
-// a silent server cannot hang the suite (the stream has no deadline API).
+// readGreeting reads the RFB ProtocolVersion greeting off the stream, bounded
+// so a silent server cannot hang the suite (the stream has no deadline API).
 func readGreeting(t *testing.T, stream io.Reader) []byte {
 	t.Helper()
-	buf := make([]byte, rfbGreetingLen)
-	done := make(chan error, 1)
+	type result struct {
+		greeting []byte
+		err      error
+	}
+	done := make(chan result, 1)
 	go func() {
-		_, err := io.ReadFull(stream, buf)
-		done <- err
+		g, err := deframeGreeting(stream)
+		done <- result{g, err}
 	}()
 	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatalf("read RFB greeting: %v", err)
+	case r := <-done:
+		if r.err != nil {
+			t.Fatalf("read RFB greeting: %v", r.err)
 		}
-		return buf
+		return r.greeting
 	case <-time.After(30 * time.Second):
 		t.Fatal("no RFB greeting within 30s")
 		return nil
 	}
+}
+
+// deframeGreeting extracts the greeting from the raw console stream. Live PVE
+// delivers the stream WebSocket-FRAMED — Connect's documented contract; found
+// live 2026-07-12: the first bytes are 0x82 0x0c (a FIN|binary RFC 6455 frame
+// of length 12) wrapping "RFB 003.008\n" — so a single leading data-frame
+// header is parsed and stripped. An unframed greeting is accepted too, in
+// case a PVE version proxies the raw TCP stream.
+func deframeGreeting(stream io.Reader) ([]byte, error) {
+	head := make([]byte, 2)
+	if _, err := io.ReadFull(stream, head); err != nil {
+		return nil, fmt.Errorf("read stream head: %w", err)
+	}
+	if head[0] == 'R' { // unframed: head already holds the greeting's start.
+		rest := make([]byte, rfbGreetingLen-len(head))
+		if _, err := io.ReadFull(stream, rest); err != nil {
+			return nil, fmt.Errorf("read raw greeting: %w", err)
+		}
+		return append(head, rest...), nil
+	}
+	if op := head[0] & 0x0f; head[0]&0x80 == 0 || (op != 1 && op != 2) {
+		return nil, fmt.Errorf("stream starts with % x, want an RFB greeting or a FIN text/binary WebSocket frame", head)
+	}
+	if head[1]&0x80 != 0 {
+		return nil, fmt.Errorf("server WebSocket frame is masked (head % x)", head)
+	}
+	payloadLen := int(head[1] & 0x7f)
+	if payloadLen < rfbGreetingLen || payloadLen >= 126 {
+		return nil, fmt.Errorf("WebSocket frame payload is %d bytes, want >= the %d-byte greeting", payloadLen, rfbGreetingLen)
+	}
+	payload := make([]byte, payloadLen)
+	if _, err := io.ReadFull(stream, payload); err != nil {
+		return nil, fmt.Errorf("read framed greeting: %w", err)
+	}
+	return payload[:rfbGreetingLen], nil
 }

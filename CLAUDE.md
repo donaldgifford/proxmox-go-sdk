@@ -112,13 +112,29 @@ when the repos split (DESIGN-0001). New public packages are admitted under
   **fire-and-poll** (response body ignored beyond error status; upstream return
   shapes unverified). Joins run **serialized**; each join's request error is
   swallowed by design (the join restarts the joining node's API daemons
-  mid-call) and convergence is decided by polling the first node's corosync
-  nodelist, then a final `/cluster/status` quorum check. The lab dials a fresh
-  root@pam-password SDK client per poll (tokens don't survive a join). mockpve
-  emulates formation with one wire-forced seam: the joining node's identity is
-  implicit on real PVE, so tests seed it via `QueueClusterJoin` (plus
-  `SetClusterSelfNode`); join-info issues the exported
+  mid-call) and convergence is decided in two stages per join: the corosync
+  nodelist poll, then a `/cluster/status` quorum gate (quorate + members-so-far
+  online) before the next join fires — config presence precedes runtime health,
+  and a join issued into that settling window fails server-side (found live
+  2026-07-12); the last gate doubles as the final quorum check. The lab dials a
+  fresh root@pam-password SDK client per poll (tokens don't survive a join).
+  mockpve emulates formation with one wire-forced seam: the joining node's
+  identity is implicit on real PVE, so tests seed it via `QueueClusterJoin`
+  (plus `SetClusterSelfNode`); join-info issues the exported
   `mockpve.ClusterFingerprint`, which the join handler requires.
+- **Templates + linked clones (Phase 5)**: `pvelab template build` installs once
+  and converts to an outer-host template (`pvelab-tmpl-<version>`, dots dashed;
+  VMID from `nested.template`, reserved sub-range 9210–9219 — the new SDK op
+  `qemu.ConvertToTemplate` is a maybe-UPID hedge). When the template exists,
+  `up` clones instead of ISO-installing (building it IS the opt-in; discovery is
+  per-run by name, never state-tracked — templates outlive labs). Clones boot
+  the template's baked-in identity, so `up` starts them ONE at a time and
+  re-identifies each over SSH at the template's IP (TOFU-pinned for the run; new
+  hostname/IP, `ssh-keygen -A`, best-effort pmxcfs node-dir move, reboot) before
+  the next. **PVE tolerating that rename is the clone path's load-bearing
+  live-verify unknown** — tests pin command sequence and serialization only.
+  Teardown safety is structural: `down` only enumerates `cfg.Nested.Nodes`,
+  which never contains the template VMID.
 
 ### Release
 
@@ -560,14 +576,21 @@ mock-verified — guest
 `MintVNCTicket`/`MintSPICETicket`/`MintTermProxy(node, kind, vmid)` and
 node-shell `MintNodeVNC`/`MintNodeTerm(node)` (VNC/term tickets
 
-- SPICE params all lossless); **`Connect(ctx, node, *VNCTicket)`** dials
-  `/nodes/{n}/vncwebsocket` and returns the raw duplex byte stream. That needed
-  a new **`api.Client.DoWebSocket(ctx, path) (io.ReadWriteCloser, error)`** —
+- SPICE params all lossless); **`Connect(ctx, node, *VNCTicket)`** dials the
+  vncwebsocket path the ticket is BOUND to — a guest ticket dials
+  `/nodes/{n}/{qemu|lxc}/{vmid}/vncwebsocket` (provenance carried in unexported
+  `VNCTicket` fields set at mint), a node-shell or hand-built ticket
+  `/nodes/{n}/vncwebsocket`. PVE enforces that binding: presenting a guest
+  ticket at the node path is a 401 — found live 2026-07-12 on the pvelab
+  cluster; mockpve now binds each minted ticket to its dial path so the
+  misrouting can never pass unit tests again. Connect returns the raw duplex
+  byte stream. That needed a new
+  **`api.Client.DoWebSocket(ctx, path) (io.ReadWriteCloser, error)`** —
   implemented in `api/websocket.go` using Go's **native 101 upgrade** (GET with
   `Connection: Upgrade`/`Upgrade: websocket`/`Sec-WebSocket-*`; on
   `101 Switching Protocols` the `http.Transport` hands back a body that is also
   writable — `resp.Body.(io.ReadWriteCloser)` is the stream). The mock's
-  `/vncwebsocket` route does a real `http.Hijacker` 101 handshake + echo, so
+  vncwebsocket routes do a real `http.Hijacker` 101 handshake + echo, so
   `Connect` is tested end-to-end through the real transport. The RFB wire
   payload is REST-with-caveat (unverified without a live node);
   `VerifyVNCTicket` returns ErrUnsupported (no standalone verify endpoint — a

@@ -17,10 +17,12 @@ import (
 const wsHandshakeMagic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 // consoleState is the console slice of the mock model, embedded in state and
-// guarded by state.mu. It records the VNC tickets minted so far so the
-// vncwebsocket upgrade can reject an unknown ticket.
+// guarded by state.mu. It records the VNC tickets minted so far — each bound
+// to the vncwebsocket path allowed to present it, mirroring real PVE (a guest
+// ticket at the node-shell path is a 401; found live 2026-07-12) — so the
+// upgrade rejects unknown AND misrouted tickets.
 type consoleState struct {
-	vncTickets map[string]bool // set of valid vncticket values.
+	vncTickets map[string]string // vncticket value → required dial path.
 }
 
 func (s *Server) registerConsoleRoutes() {
@@ -36,23 +38,27 @@ func (s *Server) registerConsoleRoutes() {
 		s.mux.HandleFunc("POST "+base+"termproxy", func(w http.ResponseWriter, r *http.Request) {
 			s.handleGuestTermProxy(w, r, kind)
 		})
+		// The guest dial — a guest ticket must be presented HERE, not at the
+		// node-shell path (real PVE binds the ticket to its mint surface).
+		s.mux.HandleFunc("GET "+base+"vncwebsocket", s.handleVNCWebSocket)
 	}
 	// Node shell consoles.
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/vncshell", s.handleNodeVNCShell)
 	s.mux.HandleFunc("POST /api2/json/nodes/{node}/termproxy", s.handleNodeTermProxy)
-	// The dial.
+	// The node-shell dial.
 	s.mux.HandleFunc("GET /api2/json/nodes/{node}/vncwebsocket", s.handleVNCWebSocket)
 }
 
-// mintVNCTicket records a deterministic VNC ticket for node/id and returns the
-// wire payload (ticket, proxy port, user, cert, and the proxy worker UPID).
-func (s *Server) mintVNCTicket(node, id string) map[string]any {
+// mintVNCTicket records a deterministic VNC ticket for node/id, bound to the
+// vncwebsocket path allowed to present it, and returns the wire payload
+// (ticket, proxy port, user, cert, and the proxy worker UPID).
+func (s *Server) mintVNCTicket(node, id, dialPath string) map[string]any {
 	ticket := "mock-vncticket-" + node + "-" + id
 	s.st.mu.Lock()
 	if s.st.console.vncTickets == nil {
-		s.st.console.vncTickets = make(map[string]bool)
+		s.st.console.vncTickets = make(map[string]string)
 	}
-	s.st.console.vncTickets[ticket] = true
+	s.st.console.vncTickets[ticket] = dialPath
 	s.st.mu.Unlock()
 	return map[string]any{
 		"ticket": ticket,
@@ -68,15 +74,17 @@ func (s *Server) handleGuestVNCProxy(w http.ResponseWriter, r *http.Request, kin
 		return
 	}
 	node := r.PathValue("node")
-	id := kind + "-" + r.PathValue("vmid")
-	s.writeData(w, s.mintVNCTicket(node, id))
+	vmid := r.PathValue("vmid")
+	dial := "/api2/json/nodes/" + node + "/" + kind + "/" + vmid + "/vncwebsocket"
+	s.writeData(w, s.mintVNCTicket(node, kind+"-"+vmid, dial))
 }
 
 func (s *Server) handleNodeVNCShell(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
 	}
-	s.writeData(w, s.mintVNCTicket(r.PathValue("node"), "shell"))
+	node := r.PathValue("node")
+	s.writeData(w, s.mintVNCTicket(node, "shell", "/api2/json/nodes/"+node+"/vncwebsocket"))
 }
 
 func (s *Server) handleGuestTermProxy(w http.ResponseWriter, r *http.Request, kind string) {
@@ -122,17 +130,19 @@ func (s *Server) handleGuestSpiceProxy(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleVNCWebSocket verifies the vncticket, performs a 101 WebSocket upgrade by
-// hijacking the connection, and then echoes every byte the client writes.
+// handleVNCWebSocket verifies the vncticket — including that it is presented
+// at the path it was minted for, like real PVE — performs a 101 WebSocket
+// upgrade by hijacking the connection, and then echoes every byte the client
+// writes.
 func (s *Server) handleVNCWebSocket(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
 	}
 	ticket := r.URL.Query().Get("vncticket")
 	s.st.mu.Lock()
-	ok := s.st.console.vncTickets[ticket]
+	dialPath, ok := s.st.console.vncTickets[ticket]
 	s.st.mu.Unlock()
-	if !ok {
+	if !ok || dialPath != r.URL.Path {
 		s.writeError(w, http.StatusUnauthorized, msgBadVNCTicket)
 		return
 	}

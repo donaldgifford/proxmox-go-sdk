@@ -76,6 +76,29 @@ func TestLoadValid(t *testing.T) {
 	}
 }
 
+// TestLoadTemplateBlock accepts a well-formed optional template block and
+// leaves it nil when absent.
+func TestLoadTemplateBlock(t *testing.T) {
+	setTestEnv(t)
+	cfg, err := loadYAML(t, validYAML)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Nested.Template != nil {
+		t.Errorf("Template = %+v, want nil when absent", cfg.Nested.Template)
+	}
+
+	doc := strings.Replace(validYAML, "  nodes:",
+		"  template: { vmid: 9210, cidr: 192.0.2.210/24 }\n  nodes:", 1)
+	cfg, err = loadYAML(t, doc)
+	if err != nil {
+		t.Fatalf("Load with template: %v", err)
+	}
+	if cfg.Nested.Template == nil || cfg.Nested.Template.VMID != 9210 || cfg.Nested.Template.CIDR != "192.0.2.210/24" {
+		t.Errorf("Template = %+v, want vmid 9210 cidr 192.0.2.210/24", cfg.Nested.Template)
+	}
+}
+
 func TestNodeHelpers(t *testing.T) {
 	n := Node{Name: "pve1-dogfood", VMID: 9201, CIDR: "192.0.2.201/24"}
 	if got := n.FQDN("lab.example"); got != "pve1-dogfood.lab.example" {
@@ -164,6 +187,27 @@ func TestLoadRejects(t *testing.T) {
 			name:    "missing domain",
 			mutate:  func(d string) string { return strings.Replace(d, "domain: lab.example", "", 1) },
 			wantErr: "nested.domain is required",
+		},
+		{
+			name: "template vmid outside sub-range",
+			mutate: func(d string) string {
+				return strings.Replace(d, "  nodes:", "  template: { vmid: 9299, cidr: 192.0.2.210/24 }\n  nodes:", 1)
+			},
+			wantErr: "outside the reserved template sub-range 9210-9219",
+		},
+		{
+			name: "template cidr collides with node",
+			mutate: func(d string) string {
+				return strings.Replace(d, "  nodes:", "  template: { vmid: 9210, cidr: 192.0.2.201/24 }\n  nodes:", 1)
+			},
+			wantErr: `nested.template.cidr "192.0.2.201/24" collides with node pve1-dogfood`,
+		},
+		{
+			name: "template cidr unparseable",
+			mutate: func(d string) string {
+				return strings.Replace(d, "  nodes:", "  template: { vmid: 9210, cidr: banana }\n  nodes:", 1)
+			},
+			wantErr: "nested.template.cidr",
 		},
 	}
 

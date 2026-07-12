@@ -40,6 +40,11 @@ type API interface {
 	Clone(ctx context.Context, vmid int, spec *CloneSpec) (tasks.Ref, error)
 	Delete(ctx context.Context, vmid int) (tasks.Ref, error)
 
+	// ConvertToTemplate marks a stopped VM as a template (one-way). The
+	// returned Ref may be zero (synchronous conversion) — check IsZero
+	// before awaiting.
+	ConvertToTemplate(ctx context.Context, vmid int, opts ...ConvertOption) (tasks.Ref, error)
+
 	// Power transitions.
 	Start(ctx context.Context, vmid int) (tasks.Ref, error)
 	Stop(ctx context.Context, vmid int, opts ...StopOption) (tasks.Ref, error)

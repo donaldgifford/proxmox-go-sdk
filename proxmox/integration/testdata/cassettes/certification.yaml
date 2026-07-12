@@ -1,0 +1,51 @@
+---
+# mockpve certification record (DESIGN-0002 OQ-8 = b): one entry per recording
+# batch. An entry means "mockpve's envelope matches what PVE <pve_version>
+# actually returned for the recorded surface" — divergences found while
+# comparing mockpve to fresh cassettes are fixed in mockpve (or documented in
+# notes) before the entry lands. The committed cassettes replay in CI
+# (`just test-replay`), so each batch is regression-guarded, not
+# once-observed.
+- pve_version: 9.2-1
+  recorded: 2026-07-06 # live run on the r740a lab node
+  commit: c36b7da # commit that introduced the batch
+  harness: branch # pre-v0.2.0 buildout (pvelab did not exist yet)
+  cassettes:
+    - TestVersionRoundTrip
+    - TestComputeReads
+    - TestStorageReads
+    - TestClusterAndHAReads
+    - TestNetworkReads
+    - TestAccessReads
+    - TestQEMULifecycle
+    - TestLXCLifecycle
+    - TestISOUpload
+    - TestConsoleMint
+  notes: >-
+    Batch predates the dogfood lab; recorded directly against r740a.
+    Divergences reconciled into the SDK/mock from this run and the later
+    live spikes: transport chunked-body 501 + redundant-multipart-field 400
+    (SDK upload fixes), recorder must not use replayable interactions (task
+    polls), and two mockpve fidelity fixes found by the Phase 0/1 pvelab work
+    — config reads serialize memory as a quoted string (9.2.4), and the
+    qemu/lxc create handlers persist every create-form key like real PVE.
+- pve_version: 9.2.2
+  recorded: 2026-07-12 # first full pvelab nested-cluster dogfood run
+  commit: f6e75ef # code state of the recording run (feat/pvelab-phase5)
+  harness: pvelab # 3-node nested cluster on r740a, run-on-host posture
+  cassettes:
+    - TestResourceAffinityPlacement
+  notes: >-
+    First batch recorded against the pvelab nested cluster (quorate 3-node,
+    PVE 9.2.2) instead of r740a directly — the IMPL-0001 P4 scheduler-observed
+    placement criterion needs multiple nodes. Fidelity/API findings reconciled
+    before this entry: guest VNC tickets are BOUND to their mint path (mockpve
+    now records each ticket's dial path and rejects presentation elsewhere,
+    matching live PVE's 401); HA rule updates must re-send the rule type's
+    required properties (a bare affinity-only PUT fails parameter
+    verification — HARuleUpdate grew Type); HA rule feasibility counts
+    HA-ACTIVE nodes, which lag AddResource by LRM cycles (the suite retries
+    rule create); and cluster joins need a per-join quorum gate because the
+    corosync CONFIG nodelist precedes runtime health (pvelab cluster.go).
+    TestConsoleRFB ran in the same batch and verified the WebSocket-framed
+    RFB greeting live ("RFB 003.008\n") but has no cassette by design.

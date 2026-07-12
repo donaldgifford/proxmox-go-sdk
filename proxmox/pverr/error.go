@@ -3,6 +3,7 @@ package pverr
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -71,6 +72,25 @@ func (e *Error) Error() string {
 	if e.Message != "" {
 		b.WriteString(": ")
 		b.WriteString(e.Message)
+	}
+	if len(e.Params) > 0 {
+		// PVE's per-parameter validation errors are the actionable half of a
+		// "Parameter verification failed." response — render them (sorted for
+		// stable output) instead of leaving them silently in Params (a bare
+		// message hid the failing field on live 9.2, 2026-07-12).
+		names := make([]string, 0, len(e.Params))
+		for name := range e.Params {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		b.WriteString(" [")
+		for i, name := range names {
+			if i > 0 {
+				b.WriteString("; ")
+			}
+			fmt.Fprintf(&b, "%s: %s", name, strings.TrimSpace(e.Params[name]))
+		}
+		b.WriteString("]")
 	}
 	if e.Path != "" {
 		fmt.Fprintf(&b, " (%s)", e.Path)

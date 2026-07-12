@@ -39,6 +39,15 @@ nested:
   # cores: 4 # sizing defaults (Phase 0 spike values)
   # memory_mb: 8192
   # disk_gb: 32
+  # template reserves the VMID/CIDR `pvelab template build` installs into for
+  # THIS pve_version. The template's name is always pvelab-tmpl-<pve_version>
+  # (computed, never configured). VMIDs 9210-9219 are the template sub-range —
+  # one template per PVE minor can coexist on the outer host; a version-matrix
+  # setup keeps one config file per minor, each picking a distinct VMID here.
+  # Optional: without this block `up` always ISO-installs.
+  # template:
+  #   vmid: 9210
+  #   cidr: 192.0.2.210/24
   nodes:  # >=3 for quorum; VMIDs must sit in the reserved 9200-9399 block
     - {name: pve1-dogfood, vmid: 9201, cidr: 192.0.2.201/24}
     - {name: pve2-dogfood, vmid: 9202, cidr: 192.0.2.202/24}

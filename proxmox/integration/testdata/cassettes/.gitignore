@@ -7,3 +7,6 @@
 *.yml
 !.gitignore
 !README.md
+# The certification record is hand-maintained data, not a recording — always
+# tracked (DESIGN-0002 OQ-8).
+!certification.yaml

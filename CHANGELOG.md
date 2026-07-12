@@ -21,16 +21,27 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(pvelab)* Cluster formation wired into up (lab/cluster.go)
 - *(integration)* Password-credential support (PVE_USERNAME/PVE_PASSWORD)
 - *(integration)* Multi-pair topology scrub (PVE_SCRUB_EXTRA)
+- *(qemu)* ConvertToTemplate with maybe-UPID hedge
+- *(pvelab)* Nested.template config block (VMID sub-range 9210-9219)
+- *(pvelab)* Lab.BuildTemplate/FindTemplate — template build core
+- *(pvelab)* Template build subcommand
+- *(pvelab)* CloneNodeVMs + serialized clone re-identify pass
+- *(pvelab)* Up provisions via linked clones when the template exists
+- *(integration)* Certification.yaml — first mockpve certification entry
 
 ### Bug Fixes
 
 - *(mockpve)* Persist create-form keys into guest config
 - *(pvelab)* Quote installer-supplied log values; static env-write error
 - *(pvelab)* Use the modeled newline-strip sanitizer for installer log values
+- *(pvelab)* Gate each cluster join on runtime quorum, not config presence
+- *(console)* Dial the vncwebsocket path the ticket is bound to
+- *(ha,pverr,integration)* Act on the second live inner-suite run
 
 ### Refactor
 
 - *(pvelab)* Address style-review findings
+- *(pvelab)* Apply go-style review findings on the Phase 5 surface
 
 ### Documentation
 
@@ -42,6 +53,13 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(impl)* Phase 2 task 8 + success-criteria status notes
 - *(testing)* Dogfood-lab walkthrough + testing-reality refresh
 - *(impl)* Check off IMPL-0002 Phase 3 non-live tasks with dated notes
+- *(impl)* Check off IMPL-0002 Phase 5 task 1 with dated note
+- *(testing)* Template/linked-clone walkthrough + Phase 5 task 2 ledger note
+- *(testing)* Certification runbook (drift -> dogfood -> refresh -> re-certify)
+- *(inv)* Park INV-0003 — reusable answer-server package idea
+- *(pvelab)* Record the first live formation — P2 live boxes closed
+- *(impl)* Flip the Phase 3 dogfood-run box its pass note already recorded
+- *(impl)* Phase 1 acceptance cycle complete — box + criteria checked
 
 ### Testing
 
@@ -49,6 +67,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(integration)* TestResourceAffinityPlacement (scheduler-observed P4)
 - *(integration)* Retire TestResourceAffinityRule + PVE_TEST_HA_SIDS
 - *(integration)* TestConsoleRFB (live RFB greeting over console.Connect)
+- *(integration)* Land the live P4 placement cassette; close P4+P6 in the ledgers
 
 ### Miscellaneous Tasks
 

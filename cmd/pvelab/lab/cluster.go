@@ -12,9 +12,11 @@ import (
 )
 
 // Cluster-formation cadence (DESIGN-0002): joins are serialized (corosync
-// membership changes must not race) and each converges by polling the first
-// node's corosync nodelist, bounded at ~3 min per join; quorum gets the same
-// bound after the last join.
+// membership changes must not race) and each converges in two stages, both
+// bounded at ~3 min: the node appears in the first node's corosync nodelist,
+// then the cluster reports quorate with every member so far online. The
+// second stage exists because config presence precedes runtime health — see
+// the gate note in formCluster.
 const (
 	memberPollInterval  = 5 * time.Second
 	joinConvergeCeiling = 3 * time.Minute
@@ -28,8 +30,13 @@ type clusterDialer func(ctx context.Context, endpoint string) (cluster.API, erro
 
 // FormCluster turns the freshly installed standalone nodes into one quorate
 // cluster: create on the first node → JoinInfo → serialized joins for the
-// rest (each tolerating the mid-join connection drop and converging via the
-// first node's corosync nodelist) → final quorum check via /cluster/status.
+// rest, each tolerating the mid-join connection drop and converging via the
+// first node's corosync nodelist AND a /cluster/status quorum gate before the
+// next join is issued (the last gate doubles as the final quorum check).
+//
+// There is deliberately no `pvecm` ssh fallback (IMPL-0002 Phase 2): two live
+// formations (2026-07-12) showed the REST endpoints reliable — the only
+// failure was this file's own config-vs-runtime race, fixed by the gate.
 func FormCluster(ctx context.Context, cfg *Config, rootPassword string, logger *slog.Logger) error {
 	return formCluster(ctx, cfg, rootPassword, nestedClusterDialer(rootPassword),
 		memberPollInterval, joinConvergeCeiling, quorumCeiling, logger)
@@ -96,16 +103,28 @@ func formCluster(ctx context.Context, cfg *Config, rootPassword string, dial clu
 	}
 
 	// Serialized joins: corosync membership changes must not race.
-	for _, n := range nodes[1:] {
+	for i, n := range nodes[1:] {
 		if err := joinNode(ctx, dial, n, firstEndpoint, firstIP, rootPassword,
 			fingerprint, interval, joinCeiling, logger); err != nil {
 			return err
 		}
+		// Config presence is not runtime health: the joined node lands in
+		// corosync.conf (raising expected votes) BEFORE its corosync comes
+		// online, and in that window the cluster is not quorate — pmxcfs is
+		// read-only, so a join fired into it is accepted by the joining
+		// node's API yet fails server-side, surfacing only as the next
+		// membership timeout. Found live 2026-07-12: pve3's join issued ~1s
+		// after pve2 entered the nodelist, and pve3 never converged. Gate on
+		// the cluster actually being quorate with every member so far online
+		// before touching the next node; the last iteration's gate is the
+		// final quorum check.
+		if err := waitForQuorum(ctx, dial, firstEndpoint, i+2,
+			interval, quorumBound, logger); err != nil {
+			return err
+		}
+		logger.Info("cluster quorate", "members", i+2)
 	}
 
-	if err := waitForQuorum(ctx, dial, firstEndpoint, len(nodes), interval, quorumBound, logger); err != nil {
-		return err
-	}
 	logger.Info("cluster formed", "name", cfg.Nested.ClusterName, "nodes", len(nodes))
 	return nil
 }
@@ -218,11 +237,13 @@ func quorate(ctx context.Context, dial clusterDialer, endpoint string, want int)
 		return false, err
 	}
 	var clusterOK bool
-	online := 0
+	var online int
 	for i := range entries {
 		switch entries[i].Type {
 		case "cluster":
-			clusterOK = entries[i].Quorate.Bool() && entries[i].Nodes == want
+			// >= not ==: the per-join gates ask for the members joined SO
+			// FAR, and status may already know more configured nodes.
+			clusterOK = entries[i].Quorate.Bool() && entries[i].Nodes >= want
 		case "node":
 			if entries[i].Online.Bool() {
 				online++

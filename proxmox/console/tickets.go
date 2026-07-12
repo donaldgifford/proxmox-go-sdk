@@ -22,6 +22,9 @@ func (s *Service) MintVNCTicket(ctx context.Context, node string, kind GuestKind
 	if err := s.c.DoRequest(ctx, http.MethodPost, guestConsolePath(node, kind, vmid, "vncproxy"), body, &t); err != nil {
 		return nil, fmt.Errorf("console.MintVNCTicket: %w", err)
 	}
+	// Remember the guest: Connect must dial the guest's own vncwebsocket —
+	// PVE rejects a guest ticket presented at the node-shell path.
+	t.kind, t.vmid = kind, vmid
 	return &t, nil
 }
 

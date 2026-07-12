@@ -15,10 +15,11 @@ test:
 # integration suite against the recorded fixtures in
 # proxmox/integration/testdata/cassettes, exercising every phase's SDK request
 # paths without a cluster. The gate values below match what each cassette was
-# recorded with (node pve; QEMU 9101, LXC/console 9102; ISO storage local); the
-# host-agnostic replay matcher makes the endpoint a placeholder. Only the tests
-# that have a cassette are run — TestConsoleRFB has none by design (a raw
-# websocket byte stream cannot replay) and is excluded.
+# recorded with (node pve; QEMU 9101, LXC/console 9102; ISO storage local;
+# placement VMs 9301/9302 from the pvelab nested cluster); the host-agnostic
+# replay matcher makes the endpoint a placeholder. Only the tests that have a
+# cassette are run — TestConsoleRFB has none by design (a raw websocket byte
+# stream cannot replay) and is excluded.
 test-replay:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -30,8 +31,9 @@ test-replay:
       PVE_TEST_LXC_TEMPLATE=local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst \
       PVE_TEST_CONSOLE_VMID=9102 \
       PVE_TEST_ISO_STORAGE=local PVE_TEST_ISO_PATH="$iso" \
+      PVE_TEST_PLACEMENT_VMID_1=9301 PVE_TEST_PLACEMENT_VMID_2=9302 \
       go test -tags=integration ./proxmox/integration/ \
-      -run 'TestVersionRoundTrip|TestComputeReads|TestStorageReads|TestClusterAndHAReads|TestNetworkReads|TestAccessReads|TestQEMULifecycle|TestLXCLifecycle|TestISOUpload|TestConsoleMint'
+      -run 'TestVersionRoundTrip|TestComputeReads|TestStorageReads|TestClusterAndHAReads|TestNetworkReads|TestAccessReads|TestQEMULifecycle|TestLXCLifecycle|TestISOUpload|TestConsoleMint|TestResourceAffinityPlacement'
 
 # Run the mockpve test-helper server locally
 run *args:

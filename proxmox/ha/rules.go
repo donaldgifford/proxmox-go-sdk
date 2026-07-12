@@ -104,7 +104,15 @@ type HARuleSpec struct {
 // HARuleUpdate is the body of PUT /cluster/ha/rules/{rule}. All fields are
 // optional; only the set ones are sent. Use Delete to unset keys. Pass it by
 // pointer.
+//
+// PVE validates updates against the rule type's plugin schema, and the
+// type-scoped properties it marks required (a resource-affinity rule's
+// affinity + resources; a node-affinity rule's nodes) do not become optional
+// on update: a bare affinity-only update was rejected with "Parameter
+// verification failed." on live 9.2 (2026-07-12). When updating such a
+// property, send Type together with the rule's required properties.
 type HARuleUpdate struct {
+	Type      RuleType       `json:"type,omitempty"`
 	Nodes     []string       `json:"-"`
 	Resources []string       `json:"-"`
 	Affinity  string         `json:"affinity,omitempty"`

@@ -356,6 +356,48 @@ design. Review cassettes as described below before committing. The composite
 `dogfood` tears the lab down even when the suite fails; run the steps
 individually to keep it alive for debugging.
 
+### Running pvelab on the outer host
+
+The answer fetch is the only connection the flow initiates _toward_ the machine
+running `up` — the installing nodes POST to the baked `answer_url`; everything
+else is outbound from wherever pvelab runs. If your lab network cannot reach
+your workstation (typical inter-VLAN policy), run the CLI on the outer host
+itself — the first live formation (2026-07-12) used exactly this posture, and
+the answer server's default `:8442` bind needs no change:
+
+```sh
+GOOS=linux GOARCH=amd64 go build -o pvelab ./cmd/pvelab
+scp pvelab pvelab.yaml root@<outer-host>:
+# in pvelab.yaml on the host: answer_url points at the OUTER HOST's address;
+# outer.ssh.known_hosts/key_file must be valid paths THERE (the host SSHes to
+# itself for `iso`), then re-run `./pvelab iso` — the URL is baked into the ISO.
+# export the token + root-password env vars in that shell, never into files.
+./pvelab iso && ./pvelab up
+```
+
+`up` writes `.pvelab.env` into its working directory on the host — `scp` it back
+(or run `./pvelab env` and paste) so the inner suite, which runs from your
+checkout as usual, can source it. Run `./pvelab down` on the host too, so it
+also removes the state/env files it wrote there.
+
+### Faster spin-up via templates (Phase 5, live-verify pending)
+
+`pvelab template build` runs the unattended install **once**, then converts the
+result into an outer-host template named `pvelab-tmpl-<version>` (dots dashed;
+VMID from the `nested.template` block, reserved sub-range 9210–9219). Once it
+exists, `just dogfood-up` automatically provisions via **linked clones** instead
+of ISO installs — building the template is the opt-in; delete it (or rebuild
+with `pvelab template build -force`) to fall back.
+
+Every clone boots the template's baked-in identity, so `up` starts clones one at
+a time and re-identifies each over SSH at the template's address (new
+hostname/IP, regenerated SSH host keys, pmxcfs node-dir move) before starting
+the next. **PVE tolerating that rename end-to-end is written-but-unverified** —
+the unit tests pin the command sequence, not PVE's behaviour; the first live
+clone run (and the clone-vs-ISO wall-clock measurement) is the IMPL-0002 Phase 5
+live gate. One template per PVE minor can coexist: keep one config file per
+version, each with its own `nested.template.vmid`.
+
 ## Recording cassettes
 
 Add `PVE_RECORD=1` to any run and the harness records each HTTP exchange into a
@@ -432,6 +474,30 @@ exactly this recipe.
 A cassette that predates a code change replays as
 `requested interaction not found` — re-record it against a live node
 (`PVE_RECORD=1`).
+
+### Certification: drift → dogfood → refresh → re-certify
+
+`certification.yaml` (beside the cassettes) is the machine-readable record of
+**which PVE version mockpve's behaviour was verified against** — one entry per
+recording batch, with any mock divergences reconciled (fixed in mockpve, or
+named in `notes`) before the entry lands. The runbook when the PVE surface
+moves:
+
+1. **Drift trips.** `just schemadiff` (in CI) fails against the committed
+   baseline, or a new PVE minor lands on the lab host. Point `-apidoc` at the
+   node's real `apidoc.js` to see what changed; rebaseline with `-update` once
+   understood.
+2. **Dogfood run.** Set `nested.pve_version` to the new version (base ISO on the
+   outer host first — `just dogfood-iso`), then `just dogfood`. The inner suite
+   records fresh cassettes as it verifies the live criteria.
+3. **Refresh recordings.** Re-record any stale cassettes
+   (`requested interaction not found` on replay) with `PVE_RECORD=1`, review the
+   diff for leaks (see above), force-add.
+4. **Re-certify.** Compare mockpve against the fresh cassettes: fix genuine
+   envelope divergences in mockpve (or record them in `notes` when deliberate),
+   then append the batch's entry to `certification.yaml` — `pve_version`,
+   `recorded`, `commit`, `harness`, the cassette list, notes. `just test-replay`
+   green on the new batch is the regression guard.
 
 ## Troubleshooting
 

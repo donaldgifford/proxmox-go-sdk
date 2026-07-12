@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/internal/svcutil"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/types"
 )
 
 // GuestKind selects the guest type for a guest console ticket: QEMU virtual
@@ -27,6 +28,14 @@ type VNCTicket struct {
 	UPID   string `json:"upid,omitempty"` // the proxy worker, informational.
 	// Extra carries ticket keys the SDK does not model.
 	Extra map[string]string `json:"-"`
+
+	// kind/vmid record which guest the ticket was minted for — zero for a
+	// node-shell ticket — so Connect dials the vncwebsocket path the ticket
+	// is bound to (real PVE enforces the binding; found live 2026-07-12).
+	// Set by MintVNCTicket; a hand-constructed ticket dials the node-shell
+	// path.
+	kind GuestKind
+	vmid types.VMID
 }
 
 var vncTicketKnownFields = map[string]bool{

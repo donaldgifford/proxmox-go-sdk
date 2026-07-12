@@ -22,6 +22,7 @@ nav:
       - Overview: investigation/README.md
       - "INV-0001: Nested Proxmox nodes for automated live SDK testing": investigation/0001-nested-proxmox-nodes-for-automated-live-sdk-testing.md
       - "INV-0002: Dogfood harness: SDK-provisioned nested PVE clusters for P4/P6 live verification": investigation/0002-dogfood-harness-sdk-provisioned-nested-pve-clusters-for-p4p6.md
+      - "INV-0003: Reusable answer-server package for PVE automated installs": investigation/0003-reusable-answer-server-package-for-pve-automated-installs.md
   - Plans:
       - Overview: plan/README.md
   - RFCs:
