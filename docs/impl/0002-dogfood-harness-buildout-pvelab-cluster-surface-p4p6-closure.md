@@ -467,31 +467,62 @@ regression-guards it in CI forever after.
 
 #### Tasks
 
-- [ ] Harness: `PVE_USERNAME`/`PVE_PASSWORD` support in the integration
+- [x] Harness: `PVE_USERNAME`/`PVE_PASSWORD` support in the integration
       `newClient` (`api.UserCredentials`, used when `PVE_TOKEN_*` is absent);
       TESTING.md env-table rows; redaction already covers `password=` form
       fields + `ticket` bodies — re-verify against a recorded password-auth
-      exchange before committing any cassette
-- [ ] `topologyScrub` → multi-pair (outer endpoint + the three nested IPs +
+      exchange before committing any cassette — _2026-07-11: `envCredentials`
+      selects token (wins) or user/pass; the dotenv autoload accepts either
+      complete pair. The re-verification is a STANDING guard, not a one-off:
+      `TestRecorderPasswordAuthRedaction` (non-tagged, default CI) records a
+      real password-auth exchange through the recorder against mockpve and
+      asserts the password and the actual minted ticket/CSRF values
+      (mock-ticket-/mock-csrf- material — not a pattern that could pass
+      vacuously) never reach disk._
+- [x] `topologyScrub` → multi-pair (outer endpoint + the three nested IPs +
       **the site DNS domain**: Phase 0 set real fqdns like
       `pve<n>-dogfood.<site-domain>`, so the domain must scrub to a placeholder
       — the original "hostnames are placeholder-safe by construction" assumption
       no longer holds; the `pve<n>-dogfood` hostname part and cluster name
-      `dogfood` remain safe); extend `TestScrubTopology`
-- [ ] `TestResourceAffinityPlacement` (IQ-6 = a: gated on
+      `dogfood` remain safe); extend `TestScrubTopology` — _2026-07-11:
+      `topologyScrub` is now an ordered live=placeholder pair list; extra pairs
+      ride `PVE_SCRUB_EXTRA` (CSV of `live=placeholder`; malformed entries error
+      rather than silently leak). pvelab derives the value into `.pvelab.env`:
+      the other nodes' IPs → TEST-NET stand-ins, the domain → `lab.example`, the
+      outer host (defensive) → `outer.example`; the first node's IP is already
+      scrubbed via `PVE_ENDPOINT`. New `TestScrubTopologyMultiPair` covers the
+      corosync-ring/fqdn shape._
+- [x] `TestResourceAffinityPlacement` (IQ-6 = a: gated on
       `PVE_TEST_PLACEMENT_VMID_1/2`, e.g. 9301/9302): two diskless dummy VMs →
       HA resources (`state=started`) → **negative** resource-affinity rule →
       poll `Cluster().ListResources` until the VMs land on different nodes (~5
       min bound) → flip to the **positive** variant → observe co-location →
-      cleanup rule → resources → VMs with `cleanupCtx`
-- [ ] Retire `TestResourceAffinityRule` + the `PVE_TEST_HA_SIDS` gate (harness
-      const, TESTING.md, IMPL-0001 references) per design OQ-9
-- [ ] `TestConsoleRFB`: scratch VM (the console-mint pattern) → `MintVNCTicket`
+      cleanup rule → resources → VMs with `cleanupCtx` — _2026-07-11: as
+      specified, plus two hardenings: cleanup resolves each VM's CURRENT node
+      before the node-scoped stop/delete (the scheduler may have migrated it),
+      and the poll interval shrinks under `PVE_REPLAY=1` so the future cassette
+      replays fast. Compile-verified + skip-gated; execution is the (live) task
+      below._
+- [x] Retire `TestResourceAffinityRule` + the `PVE_TEST_HA_SIDS` gate (harness
+      const, TESTING.md, IMPL-0001 references) per design OQ-9 — _2026-07-11:
+      test file deleted, gate const removed, TESTING.md
+      runbook/table/cheat-sheet updated, IMPL-0001 annotated with dated notes
+      (history kept, not rewritten)._
+- [x] `TestConsoleRFB`: scratch VM (the console-mint pattern) → `MintVNCTicket`
       → `console.Connect` → read exactly 12 bytes → assert the `"RFB 003.00x\n"`
       greeting; skipped under `PVE_REPLAY=1` (no cassette possible — design
-      OQ-6)
-- [ ] `justfile`: `dogfood-test` (sources `.pvelab.env`, sets `PVE_RECORD=1`,
-      `-run`s the targeted tests) + composite `dogfood` (up → test → down)
+      OQ-6) — _2026-07-11: asserts the RFC 6143 greeting shape
+      (`RFB \d{3}.\d{3}\n`) rather than pinning one minor; the read is bounded
+      (30 s) since the stream has no deadline API. One consequence the ledger
+      task didn't spell out: under `PVE_RECORD=1` the test uses the new
+      `newStreamClient` (record-bypassing live client) because the hijacked
+      101-upgrade stream cannot ride go-vcr — the dogfood run records placement
+      while RFB stays deliberately cassette-less._
+- [x] `justfile`: `dogfood-test` (sources `.pvelab.env`, sets `PVE_RECORD=1`,
+      `-run`s the targeted tests) + composite `dogfood` (up → test → down) —
+      _2026-07-11: `dogfood-test` -runs placement+RFB with `-timeout 30m` and
+      passes extra flags via args; the composite tears down via bash trap even
+      when the suite fails (cassettes + state survive for review)._
 - [ ] **(live)** Full `just dogfood` run: capture the P4 cassette (+ refresh any
       suite cassettes worth re-recording against the nested cluster); review
       every cassette for leaks (secrets + topology) before force-adding
@@ -501,10 +532,14 @@ regression-guards it in CI forever after.
       notes (P4: placement observed + cassette + CI replay; P6: live RFB
       assertion, dated, cassette-less by design); update INV-0002
       Findings/Conclusion
-- [ ] TESTING.md dogfood section (prereqs, `pvelab.yaml`, `just dogfood`,
-      recording flow) + CLAUDE.md testing-reality update
-- [ ] `just lint` + `just test` + `just test-replay` green; changelog
-      regenerated
+- [x] TESTING.md dogfood section (prereqs, `pvelab.yaml`, `just dogfood`,
+      recording flow) + CLAUDE.md testing-reality update — _2026-07-11: "The
+      dogfood lab (pvelab)" section after the acceptance checklist; the console
+      runbook covers the RFB test; CLAUDE.md testing-reality names the new
+      tests, the credential pairs, and `PVE_SCRUB_EXTRA`._
+- [x] `just lint` + `just test` + `just test-replay` green; changelog
+      regenerated — _2026-07-11: all three green locally (replay unchanged — the
+      P4 cassette wiring is the live-gated task above)._
 
 #### Success Criteria
 

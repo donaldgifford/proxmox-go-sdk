@@ -17,8 +17,8 @@ test:
 # paths without a cluster. The gate values below match what each cassette was
 # recorded with (node pve; QEMU 9101, LXC/console 9102; ISO storage local); the
 # host-agnostic replay matcher makes the endpoint a placeholder. Only the tests
-# that have a cassette are run — TestResourceAffinityRule has none (needs a
-# 2-node HA cluster) and is excluded.
+# that have a cassette are run — TestConsoleRFB has none by design (a raw
+# websocket byte stream cannot replay) and is excluded.
 test-replay:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -53,6 +53,27 @@ dogfood-up *args:
 # Tear the lab down (add -force / -purge-isos / -no-state as needed)
 dogfood-down *args:
     go run ./cmd/pvelab down {{args}}
+
+# Run the inner suite against the nested lab: sources .pvelab.env (written by
+# dogfood-up) and records cassettes (PVE_RECORD=1). Default -run targets the
+# two IMPL-0001 live-only criteria; pass extra `go test` flags via args.
+dogfood-test *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ -f .pvelab.env ] || { echo "no .pvelab.env — run 'just dogfood-up' first" >&2; exit 1; }
+    source .pvelab.env
+    PVE_RECORD=1 go test -tags=integration ./proxmox/integration/ -v -timeout 30m \
+      -run 'TestResourceAffinityPlacement|TestConsoleRFB' {{args}}
+
+# Full dogfood cycle: up -> inner suite -> down. Tears down even when the
+# suite fails (recorded cassettes + .pvelab-state.json survive for review);
+# run the three steps individually to keep the lab alive for debugging.
+dogfood:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just dogfood-up
+    trap 'just dogfood-down' EXIT
+    just dogfood-test
 
 # Guard the API schema against drift (OQ-7). Runs against the committed synthetic
 # fixture by default; point --apidoc at a real Proxmox apidoc.js (from a live 9.x

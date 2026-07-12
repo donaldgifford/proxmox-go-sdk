@@ -496,7 +496,10 @@ file. This table maps the real code to phases. Column widths are re-aligned by
     volume-chain snapshot criterion is retired — PVE has no storage-level
     snapshot endpoint (confirmed on `r740a`), so those ops are
     `pverr.ErrUnsupported`;
-  - **P4** define a resource-affinity HA rule + read-back (`PVE_TEST_HA_SIDS`);
+  - **P4** define a resource-affinity HA rule + read-back (`PVE_TEST_HA_SIDS`;
+    retired 2026-07-11 per DESIGN-0002 OQ-9 — superseded by the
+    scheduler-observed `TestResourceAffinityPlacement`, gated on
+    `PVE_TEST_PLACEMENT_VMID_1/2`);
   - **P5** enumerate zones/VNets/fabrics;
   - **P6** access user/token reads + VNC ticket mint (`PVE_TEST_CONSOLE_VMID`;
     the console test spins up its own scratch VM).
@@ -539,8 +542,11 @@ suitable cluster is reachable:
 - [ ] **P4 — resource-affinity placement honored.** The rule is defined and read
       back (mock-verified + the `ha` `Example`), but observing the scheduler
       _act_ on it needs a **real ≥2-node 9.2 HA cluster**. Only one 9.2 node
-      (`r740a`) is available, so `TestResourceAffinityRule` has no cassette and
-      is excluded from `just test-replay`.
+      (`r740a`) is available. _2026-07-11: the rule-only
+      `TestResourceAffinityRule` (+ its `PVE_TEST_HA_SIDS` gate) is retired per
+      DESIGN-0002 OQ-9; the scheduler-observed `TestResourceAffinityPlacement`
+      supersedes it and runs against the pvelab nested cluster (IMPL-0002 Phase
+      3), which also captures the P4 cassette for `just test-replay`._
 - [ ] **P6 — VNC (RFB) wire payload.** Ticket mint is live-verified
       (`TestConsoleMint`) and `Connect` is exercised against a `mockpve`
       hijack+echo upgrade, but the **live RFB byte stream** a real node returns

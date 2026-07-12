@@ -623,12 +623,14 @@ environment.** This shapes how we test and what "done" means:
   `Test Replay (cassettes)` CI job) runs the 10 cassette-backed tests with no
   live node. Recording collapses two identical `/version` fetches into one
   interaction, so `TestVersionRoundTrip` asserts on `NewClient`'s cached caps
-  rather than re-fetching (else replay 404s on the second).
-  `TestResourceAffinityRule` has **no** cassette (needs a 2-node HA cluster) and
-  is excluded from the replay run. **`TESTING.md`** is the thorough manual
-  walkthrough (token creation → env → per-phase lifecycle runs → recording);
-  `DEVELOPMENT.md`'s live-node section now points at it. **The recorder must NOT
-  set `WithReplayableInteractions(true)`** — a task-status poll loop makes many
+  rather than re-fetching (else replay 404s on the second). `TestConsoleRFB` has
+  **no** cassette by design (a raw websocket byte stream cannot replay) and is
+  excluded from the replay run; the retired `TestResourceAffinityRule` was
+  superseded by `TestResourceAffinityPlacement` (IMPL-0002 Phase 3).
+  **`TESTING.md`** is the thorough manual walkthrough (token creation → env →
+  per-phase lifecycle runs → recording); `DEVELOPMENT.md`'s live-node section
+  now points at it. **The recorder must NOT set
+  `WithReplayableInteractions(true)`** — a task-status poll loop makes many
   identical GETs to `/tasks/{upid}/status`, and that flag serves the first
   recording ("running") for all of them, so in record mode the task never
   reaches "stopped" and `tasks.Wait` spins to its deadline (found live; guarded
@@ -645,13 +647,15 @@ environment.** This shapes how we test and what "done" means:
   → delete) **and P2 LXC** lifecycle; P3 **ISO upload** (drove out the
   chunked-body 501 + redundant-multipart-field 400 bugs); and P6 **VNC ticket
   mint** (`TestConsoleMint`, spins up its own scratch VM). **Still
-  written-but-unverified (genuinely live-only here):** P4 resource-affinity HA
-  rule (`TestResourceAffinityRule` — needs a second 9.2 node for a real HA
-  cluster; no cassette) and the P6 **VNC (RFB) wire payload** carried by
-  `console.Connect` (the ticket mint is verified; the live RFB byte stream is
-  not). Volume-chain snapshots are **not** a gap — confirmed via `r740a`'s own
-  `apidoc.js` that PVE has no storage-level snapshot endpoint, so they were
-  honestly reclassified to `pverr.ErrUnsupported`.
+  written-but-unverified (genuinely live-only here):** P4 scheduler-observed
+  resource-affinity placement (`TestResourceAffinityPlacement`, which superseded
+  the retired rule-only `TestResourceAffinityRule` per DESIGN-0002 OQ-9 — needs
+  the quorate pvelab nested cluster) and the P6 **VNC (RFB) wire payload**
+  (`TestConsoleRFB` reads the greeting over `console.Connect`; the ticket mint
+  is verified, the live RFB byte stream is not). Both run from `just dogfood`
+  (IMPL-0002 Phase 3). Volume-chain snapshots are **not** a gap — confirmed via
+  `r740a`'s own `apidoc.js` that PVE has no storage-level snapshot endpoint, so
+  they were honestly reclassified to `pverr.ErrUnsupported`.
 - **Task exit status `WARNINGS: N` is success, not failure.** PVE finishes some
   tasks (routinely an LXC create on a modern-systemd template — e.g. debian-13's
   "Systemd 257 detected. You may need to enable nesting.") with exit status
@@ -662,20 +666,23 @@ environment.** This shapes how we test and what "done" means:
   naive `if err != nil` fail a benign result). Found live on debian-13 LXC
   create; unit-guarded by `TestWaitWarningsIsSuccess`.
 - Integration tests live in `proxmox/integration/` behind
-  `//go:build integration`, read the node from `PVE_ENDPOINT` / `PVE_TOKEN_ID` /
-  `PVE_TOKEN_SECRET` (optional `PVE_NODE` / `PVE_INSECURE_TLS` / `PVE_RECORD`).
-  Read-only tests cover every phase; destructive tests are env-gated: QEMU
-  lifecycle (`PVE_TEST_STORAGE` + `PVE_TEST_VMID`), LXC lifecycle
-  (`+PVE_TEST_LXC_VMID` + `PVE_TEST_LXC_TEMPLATE`), ISO upload
-  (`PVE_TEST_ISO_STORAGE` + `PVE_TEST_ISO_PATH`), console mint
-  (`PVE_TEST_STORAGE` + `PVE_TEST_CONSOLE_VMID`, spins up its own scratch VM),
-  HA resource-affinity rule (`PVE_TEST_HA_SIDS`). They are **not runnable here**
-  — they `t.Skip` without a node. The harness is compile-verified
-  (`go vet -tags=integration ./proxmox/integration/`) but its execution + the
-  go-vcr cassette capture are live-only. The package keeps an untagged `doc.go`
-  so the default `go build ./...` sees a non-empty package. Never claim a
-  phase's live-only Success Criteria pass when they cannot be verified — mark
-  them written-but-unverified instead.
+  `//go:build integration`, read the node from `PVE_ENDPOINT` plus one
+  credential pair — `PVE_TOKEN_ID`/`PVE_TOKEN_SECRET` (wins) or
+  `PVE_USERNAME`/`PVE_PASSWORD` (what `.pvelab.env` uses; tokens don't survive a
+  cluster join) — with optional `PVE_NODE` / `PVE_INSECURE_TLS` / `PVE_RECORD` /
+  `PVE_SCRUB_EXTRA` (extra live=placeholder recording-scrub pairs). Read-only
+  tests cover every phase; destructive tests are env-gated: QEMU lifecycle
+  (`PVE_TEST_STORAGE` + `PVE_TEST_VMID`), LXC lifecycle (`+PVE_TEST_LXC_VMID` +
+  `PVE_TEST_LXC_TEMPLATE`), ISO upload (`PVE_TEST_ISO_STORAGE` +
+  `PVE_TEST_ISO_PATH`), console mint + RFB read (`PVE_TEST_STORAGE` +
+  `PVE_TEST_CONSOLE_VMID`, each spins up its own scratch VM), HA placement
+  (`PVE_TEST_PLACEMENT_VMID_1/2`, needs the quorate pvelab cluster). They are
+  **not runnable here** — they `t.Skip` without a node. The harness is
+  compile-verified (`go vet -tags=integration ./proxmox/integration/`) but its
+  execution + the go-vcr cassette capture are live-only. The package keeps an
+  untagged `doc.go` so the default `go build ./...` sees a non-empty package.
+  Never claim a phase's live-only Success Criteria pass when they cannot be
+  verified — mark them written-but-unverified instead.
 - Working definition of "done" for a task in this environment: typed op exists,
   `go build ./...` is clean, it is unit-tested against `mockpve`, and
   `just lint`

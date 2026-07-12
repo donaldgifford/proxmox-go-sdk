@@ -24,8 +24,8 @@ import (
 // TestMain autoloads PVE_* credentials from a .env (or .env.local) at the module
 // root before the live suite runs, so a contributor can keep their token in a
 // file instead of exporting it into every shell. Precedence is the important
-// part: if the three required vars are already set in the environment, no file is
-// read at all — explicit `export`s, CI-injected secrets, and
+// part: if the endpoint plus a complete credential pair are already set in the
+// environment, no file is read at all — explicit `export`s, CI-injected secrets, and
 // `op run --env-file=… -- go test …` all take priority. A 1Password-mounted .env
 // works too, but because it is typically a single-use FIFO, the loader only opens
 // it when the creds are otherwise unset (opening a pipe twice would block or
@@ -70,9 +70,25 @@ func loadDotEnv() {
 	}
 }
 
-// credsSet reports whether the three required credential vars are all present.
+// credsSet reports whether the endpoint plus one complete credential pair
+// (API token, or username+password) is present.
 func credsSet() bool {
-	return os.Getenv(envEndpoint) != "" && os.Getenv(envTokenID) != "" && os.Getenv(envTokenSecret) != ""
+	return os.Getenv(envEndpoint) != "" && envCredentials() != nil
+}
+
+// envCredentials returns the credential strategy the environment selects: an
+// API token when PVE_TOKEN_ID/PVE_TOKEN_SECRET are set, otherwise root-style
+// password credentials when PVE_USERNAME/PVE_PASSWORD are set (the pvelab
+// nested cluster only has root@pam — API tokens do not survive a cluster
+// join), otherwise nil. Token wins when both are configured.
+func envCredentials() api.Credentials {
+	if id, secret := os.Getenv(envTokenID), os.Getenv(envTokenSecret); id != "" && secret != "" {
+		return api.TokenCredentials(id, secret)
+	}
+	if user, pass := os.Getenv(envUsername), os.Getenv(envPassword); user != "" && pass != "" {
+		return api.UserCredentials(user, pass, "")
+	}
+	return nil
 }
 
 // moduleRoot returns the nearest ancestor of the working directory that contains
@@ -101,11 +117,14 @@ const (
 	envEndpoint    = "PVE_ENDPOINT"     // e.g. https://pve.example:8006
 	envTokenID     = "PVE_TOKEN_ID"     // e.g. root@pam!sdk
 	envTokenSecret = "PVE_TOKEN_SECRET" // the token's secret UUID
+	envUsername    = "PVE_USERNAME"     // password auth, e.g. root@pam (used when PVE_TOKEN_* is absent)
+	envPassword    = "PVE_PASSWORD"     // password auth; pairs with PVE_USERNAME
 	envNode        = "PVE_NODE"         // node under test, default "pve"
 	envInsecureTLS = "PVE_INSECURE_TLS" // "1" to skip TLS verify (self-signed)
 	envRecord      = "PVE_RECORD"       // "1" to record go-vcr cassettes while running
 	envReplay      = "PVE_REPLAY"       // "1" to replay committed cassettes (no live node; CI)
 	envDebug       = "PVE_DEBUG"        // "1" to stream a debug line per SDK request to stderr
+	envScrubExtra  = "PVE_SCRUB_EXTRA"  // CSV of extra live=placeholder scrub pairs for recording (pvelab writes it)
 
 	// Destructive-test gates. Absent -> the corresponding test skips.
 	envTestStorage     = "PVE_TEST_STORAGE"      // target storage for a scratch guest disk / uploads
@@ -115,7 +134,10 @@ const (
 	envTestLXCVMID     = "PVE_TEST_LXC_VMID"     // scratch LXC VMID the suite may create/destroy
 	envTestLXCTemplate = "PVE_TEST_LXC_TEMPLATE" // OS template volid, e.g. local:vztmpl/debian-12-...tar.zst
 	envTestISOPath     = "PVE_TEST_ISO_PATH"     // local path to a (small) ISO to upload (Phase 3)
-	envTestHASIDs      = "PVE_TEST_HA_SIDS"      // CSV of >=2 HA-managed SIDs for a resource-affinity rule (Phase 4)
+	// PVE_TEST_PLACEMENT_VMID_1/2 gate TestResourceAffinityPlacement; they are
+	// read by name there (placementVMID) since each is a one-shot gate.
+	// PVE_TEST_HA_SIDS was retired with TestResourceAffinityRule (design OQ-9:
+	// the placement test supersedes the rule-only read-back).
 )
 
 // newClient builds a client for a test. In replay mode (PVE_REPLAY=1) it is
@@ -127,18 +149,35 @@ func newClient(t *testing.T) *proxmox.Client {
 	if os.Getenv(envReplay) == "1" {
 		return newReplayClient(t)
 	}
+	return newLiveClient(t, true)
+}
+
+// newStreamClient builds a live client that BYPASSES record mode even when
+// PVE_RECORD=1: a websocket upgrade (console.Connect) hijacks the connection
+// and the raw duplex stream cannot ride go-vcr's request/response model, so a
+// stream-carrying test runs live-only and deliberately leaves no cassette
+// (design OQ-6). Callers must skip under PVE_REPLAY themselves.
+func newStreamClient(t *testing.T) *proxmox.Client {
+	t.Helper()
+	return newLiveClient(t, false)
+}
+
+// newLiveClient builds a client against the configured live node, recording to
+// the running test's cassette when record is true and PVE_RECORD=1.
+func newLiveClient(t *testing.T, record bool) *proxmox.Client {
+	t.Helper()
 	endpoint := os.Getenv(envEndpoint)
-	tokenID := os.Getenv(envTokenID)
-	secret := os.Getenv(envTokenSecret)
-	if endpoint == "" || tokenID == "" || secret == "" {
-		t.Skipf("live PVE node not configured (set %s, %s, %s)", envEndpoint, envTokenID, envTokenSecret)
+	creds := envCredentials()
+	if endpoint == "" || creds == nil {
+		t.Skipf("live PVE node not configured (set %s plus %s/%s or %s/%s)",
+			envEndpoint, envTokenID, envTokenSecret, envUsername, envPassword)
 	}
 
 	insecure := os.Getenv(envInsecureTLS) == "1"
 
 	var opts []proxmox.Option
 	switch {
-	case os.Getenv(envRecord) == "1":
+	case record && os.Getenv(envRecord) == "1":
 		// Recording: the SDK must use the go-vcr client, which bypasses the
 		// SDK's own TLS options, so the insecure choice is applied to the
 		// recorder's real transport instead.
@@ -146,9 +185,14 @@ func newClient(t *testing.T) *proxmox.Client {
 		if insecure {
 			rt = insecureTransport()
 		}
-		// Scrub the live endpoint host and node name from the cassette so a
-		// committed fixture does not expose lab topology.
-		scrub := newTopologyScrub(endpoint, testNode())
+		// Scrub the live endpoint host and node name — plus any extra
+		// live=placeholder pairs (the other cluster members' IPs and the site
+		// DNS domain, via PVE_SCRUB_EXTRA) — from the cassette so a committed
+		// fixture does not expose lab topology.
+		scrub, serr := newTopologyScrub(endpoint, testNode()).withExtraPairs(os.Getenv(envScrubExtra))
+		if serr != nil {
+			t.Fatalf("%s: %v", envScrubExtra, serr)
+		}
 		client := newRecorderClient(t, cassetteName(t), recorder.ModeRecordOnly, rt, scrub)
 		opts = append(opts, proxmox.WithHTTPClient(client))
 	case insecure:
@@ -164,7 +208,7 @@ func newClient(t *testing.T) *proxmox.Client {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	t.Cleanup(cancel)
-	c, err := proxmox.NewClient(ctx, endpoint, api.TokenCredentials(tokenID, secret), opts...)
+	c, err := proxmox.NewClient(ctx, endpoint, creds, opts...)
 	if err != nil {
 		t.Fatalf("NewClient(%s): %v", endpoint, err)
 	}

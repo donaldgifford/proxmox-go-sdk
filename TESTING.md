@@ -108,10 +108,12 @@ The harness reads everything from the environment. Put this in a file you can
 into your shell history:
 
 ```sh
-# --- required ---
+# --- required: endpoint + ONE credential pair ---
 export PVE_ENDPOINT="https://pve.example:8006"
-export PVE_TOKEN_ID="root@pam!sdk"
+export PVE_TOKEN_ID="root@pam!sdk"      # API-token auth (preferred for a real node)
 export PVE_TOKEN_SECRET="3fb7…-…-…"
+# export PVE_USERNAME="root@pam"        # password auth instead (what .pvelab.env
+# export PVE_PASSWORD="…"               # uses — tokens don't survive a cluster join)
 
 # --- common ---
 export PVE_NODE="pve"          # default "pve"
@@ -125,29 +127,37 @@ export PVE_TEST_CONSOLE_VMID=9103    # console-mint scratch VM; distinct so it r
 export PVE_TEST_LXC_VMID=9102
 export PVE_TEST_LXC_TEMPLATE="local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
 export PVE_TEST_ISO_PATH="/path/to/tiny.iso"
-export PVE_TEST_HA_SIDS="vm:9101,vm:9102"
+export PVE_TEST_PLACEMENT_VMID_1=9301   # HA placement pair (needs a quorate
+export PVE_TEST_PLACEMENT_VMID_2=9302   # multi-node cluster, e.g. the pvelab lab)
 ```
 
 Every variable:
 
-| Variable                | Required | Purpose                                                    |
-| ----------------------- | -------- | ---------------------------------------------------------- |
-| `PVE_ENDPOINT`          | yes      | base URL, e.g. `https://pve.example:8006`                  |
-| `PVE_TOKEN_ID`          | yes      | e.g. `root@pam!sdk`                                        |
-| `PVE_TOKEN_SECRET`      | yes      | the token's secret                                         |
-| `PVE_NODE`              | no       | node under test (default `pve`)                            |
-| `PVE_INSECURE_TLS`      | no       | `1` to skip TLS verify (self-signed)                       |
-| `PVE_RECORD`            | no       | `1` to record cassettes while running                      |
-| `PVE_REPLAY`            | no       | `1` to replay committed cassettes (no node; see below)     |
-| `PVE_DEBUG`             | no       | `1` to stream a line per SDK request                       |
-| `PVE_TEST_STORAGE`      | gate     | storage for scratch disks / uploads                        |
-| `PVE_TEST_ISO_STORAGE`  | gate     | ISO-upload storage (allows `iso`); else `PVE_TEST_STORAGE` |
-| `PVE_TEST_VMID`         | gate     | scratch QEMU VMID (created + destroyed)                    |
-| `PVE_TEST_CONSOLE_VMID` | gate     | scratch QEMU VMID for the console-mint test (own VMID)     |
-| `PVE_TEST_LXC_VMID`     | gate     | scratch LXC VMID (created + destroyed)                     |
-| `PVE_TEST_LXC_TEMPLATE` | gate     | OS template volid for the LXC lifecycle                    |
-| `PVE_TEST_ISO_PATH`     | gate     | local path to a small ISO to upload                        |
-| `PVE_TEST_HA_SIDS`      | gate     | CSV of ≥2 HA-managed SIDs                                  |
+| Variable                    | Required | Purpose                                                    |
+| --------------------------- | -------- | ---------------------------------------------------------- |
+| `PVE_ENDPOINT`              | yes      | base URL, e.g. `https://pve.example:8006`                  |
+| `PVE_TOKEN_ID`              | yes\*    | e.g. `root@pam!sdk`                                        |
+| `PVE_TOKEN_SECRET`          | yes\*    | the token's secret                                         |
+| `PVE_USERNAME`              | yes\*    | password auth, e.g. `root@pam` (when token vars absent)    |
+| `PVE_PASSWORD`              | yes\*    | password auth; pairs with `PVE_USERNAME`                   |
+| `PVE_NODE`                  | no       | node under test (default `pve`)                            |
+| `PVE_INSECURE_TLS`          | no       | `1` to skip TLS verify (self-signed)                       |
+| `PVE_RECORD`                | no       | `1` to record cassettes while running                      |
+| `PVE_REPLAY`                | no       | `1` to replay committed cassettes (no node; see below)     |
+| `PVE_DEBUG`                 | no       | `1` to stream a line per SDK request                       |
+| `PVE_TEST_STORAGE`          | gate     | storage for scratch disks / uploads                        |
+| `PVE_TEST_ISO_STORAGE`      | gate     | ISO-upload storage (allows `iso`); else `PVE_TEST_STORAGE` |
+| `PVE_TEST_VMID`             | gate     | scratch QEMU VMID (created + destroyed)                    |
+| `PVE_TEST_CONSOLE_VMID`     | gate     | scratch QEMU VMID for the console-mint test (own VMID)     |
+| `PVE_TEST_LXC_VMID`         | gate     | scratch LXC VMID (created + destroyed)                     |
+| `PVE_TEST_LXC_TEMPLATE`     | gate     | OS template volid for the LXC lifecycle                    |
+| `PVE_TEST_ISO_PATH`         | gate     | local path to a small ISO to upload                        |
+| `PVE_TEST_PLACEMENT_VMID_1` | gate     | scratch VMID for the HA placement pair (multi-node)        |
+| `PVE_TEST_PLACEMENT_VMID_2` | gate     | the pair's second scratch VMID                             |
+| `PVE_SCRUB_EXTRA`           | no       | extra `live=placeholder` recording-scrub pairs (CSV)       |
+
+\* one credential pair is required: `PVE_TOKEN_ID`+`PVE_TOKEN_SECRET` (wins when
+both pairs are set) or `PVE_USERNAME`+`PVE_PASSWORD`.
 
 ### How the harness finds these values
 
@@ -245,13 +255,16 @@ go test -tags=integration ./proxmox/integration/... -run TestISOUpload -v
 
 ### HA (Phase 4)
 
-Defines a resource-affinity rule and reads it back. Whether the scheduler
-actually _honors_ the placement is observed manually (the SDK just writes/reads
-the rule).
+Creates two diskless dummy VMs, places them under HA management, and observes
+the scheduler honor a **negative** resource-affinity rule (different nodes) then
+the **positive** flip (co-location). Needs a quorate multi-node cluster — the
+pvelab nested lab is the intended target (`.pvelab.env` sets the gates). This
+supersedes the retired rule-only `TestResourceAffinityRule` (`PVE_TEST_HA_SIDS`
+is gone with it).
 
 ```sh
-# needs: PVE_TEST_HA_SIDS (CSV of ≥2 HA-managed SIDs)
-go test -tags=integration ./proxmox/integration/... -run TestResourceAffinityRule -v
+# needs: PVE_TEST_PLACEMENT_VMID_1 + PVE_TEST_PLACEMENT_VMID_2 (scratch VMIDs)
+go test -tags=integration ./proxmox/integration/... -run TestResourceAffinityPlacement -v
 ```
 
 ### Network / SDN (Phase 5)
@@ -263,12 +276,15 @@ part of what you are confirming is whether a real endpoint exists on your node.
 ### Console / access (Phase 6)
 
 Lists users and tokens under the 9.x privilege model and mints a VNC ticket.
-Driving the raw RFB session is a manual step beyond the ticket mint.
+`TestConsoleRFB` goes one step further: it dials the vncwebsocket via
+`console.Connect` and asserts the live QEMU VNC server's RFB ProtocolVersion
+greeting — the raw byte stream cannot be recorded (no cassette by design), so it
+is live-only and skips under `PVE_REPLAY=1`.
 
 ```sh
 # needs: PVE_TEST_STORAGE, PVE_TEST_CONSOLE_VMID
-# (spins up its own scratch VM, mints against it, then tears it down)
-go test -tags=integration ./proxmox/integration/... -run TestConsoleMint -v
+# (each spins up its own scratch VM, works against it, then tears it down)
+go test -tags=integration ./proxmox/integration/... -run 'TestConsoleMint|TestConsoleRFB' -v
 ```
 
 ### Everything at once
@@ -294,18 +310,51 @@ Tick these off against your node. They map to the per-phase Success Criteria in
       (`TestISOUpload`). Storage-level volume snapshots are unsupported (no PVE
       REST endpoint); volume chains are exercised via guest snapshots in the
       Phase 2 lifecycles.
-- [ ] **Phase 4 — HA:** define a resource-affinity rule and read it back
-      (`TestResourceAffinityRule`); observe the scheduler honor placement
-      (manual).
+- [ ] **Phase 4 — HA:** observe the scheduler honor negative then positive
+      resource-affinity placement (`TestResourceAffinityPlacement`, on a quorate
+      multi-node cluster).
 - [ ] **Phase 5 — network/SDN:** enumerate zones / VNets / fabrics
       (`TestNetworkReads`); confirm whether a real SDN live-status endpoint
       exists.
 - [ ] **Phase 6 — cluster/access/console:** list users/tokens and mint a VNC
-      ticket (`TestAccessReads`, `TestConsoleMint`); drive a real RFB session
-      (manual).
+      ticket (`TestAccessReads`, `TestConsoleMint`); read the live RFB greeting
+      over `console.Connect` (`TestConsoleRFB`).
 - [ ] **9.2-gated ops:** on a 9.2 node, confirm the real endpoints (or absence)
       behind Dynamic Load Balancer, HA arm/disarm, SDN BGP fabrics, ZFS RAIDZ
       expansion, and token-secret rotation.
+
+## The dogfood lab (pvelab)
+
+Two criteria above need a **quorate multi-node cluster** — the HA placement pair
+and (conveniently, though one node suffices) the RFB read. `pvelab` (IMPL-0002)
+provisions an ephemeral 3-node nested-PVE cluster on a single outer host so
+those run without touching real guests.
+
+**Prereqs:** an outer PVE host with nested virtualization enabled
+(`kvm_intel nested=Y`), ~24 GiB RAM headroom, an API token for the outer host,
+SSH root access to it (for the ISO preparation step), and a reserved VMID block
+(9200–9399 — pvelab refuses anything else).
+
+```sh
+cp pvelab.example.yaml pvelab.yaml   # edit: outer endpoint/node, nested IPs, domain
+export PVE_TOKEN_ID=… PVE_TOKEN_SECRET=…   # outer-host token (names set in pvelab.yaml)
+export PVELAB_ROOT_PW=…                    # nested nodes' root password (never stored)
+
+just dogfood-iso    # one-time per PVE version: prepare the auto-install ISO
+just dogfood        # up -> inner suite (records cassettes) -> down
+```
+
+`dogfood-up` installs three nested nodes from the prepared ISO, forms a quorate
+cluster, and writes `.pvelab.env` — the inner suite's environment:
+`PVE_ENDPOINT` (first nested node), `PVE_USERNAME`/`PVE_PASSWORD` (root@pam —
+API tokens do not survive a cluster join), the placement/console gates, and
+`PVE_SCRUB_EXTRA` (the recording-scrub pairs for the other nodes' IPs, the site
+domain, and the outer host). `dogfood-test` sources that file, sets
+`PVE_RECORD=1`, and runs `TestResourceAffinityPlacement` + `TestConsoleRFB`;
+placement records a cassette for CI replay, the RFB read is cassette-less by
+design. Review cassettes as described below before committing. The composite
+`dogfood` tears the lab down even when the suite fails; run the steps
+individually to keep it alive for debugging.
 
 ## Recording cassettes
 
@@ -375,9 +424,10 @@ just test-replay
 
 The recipe supplies the `PVE_TEST_*` gate values each cassette was recorded with
 (node `pve`; QEMU `9101`, LXC/console `9102`; ISO storage `local`) and `-run`s
-only the tests that have a cassette. `TestResourceAffinityRule` has none (it
-needs a two-node HA cluster) and is excluded. The `.github/workflows/ci.yml`
-`Test Replay (cassettes)` job runs exactly this recipe.
+only the tests that have a cassette. `TestConsoleRFB` has none by design (a raw
+byte stream over a hijacked websocket cannot replay — design OQ-6) and is
+excluded. The `.github/workflows/ci.yml` `Test Replay (cassettes)` job runs
+exactly this recipe.
 
 A cassette that predates a code change replays as
 `requested interaction not found` — re-record it against a live node
@@ -411,19 +461,20 @@ A cassette that predates a code change replays as
 
 Test → phase → gates:
 
-| Test                       | Phase | Required gates                                        |
-| -------------------------- | ----- | ----------------------------------------------------- |
-| `TestVersionRoundTrip`     | 1     | (none beyond endpoint/token)                          |
-| `TestComputeReads`         | 2     | (none)                                                |
-| `TestStorageReads`         | 3     | (none)                                                |
-| `TestClusterAndHAReads`    | 4     | (none)                                                |
-| `TestNetworkReads`         | 5     | (none)                                                |
-| `TestAccessReads`          | 6     | (none)                                                |
-| `TestQEMULifecycle`        | 2     | `PVE_TEST_STORAGE`, `PVE_TEST_VMID`                   |
-| `TestLXCLifecycle`         | 2     | `PVE_TEST_STORAGE`, `PVE_TEST_LXC_VMID`, `…_TEMPLATE` |
-| `TestISOUpload`            | 3     | `PVE_TEST_ISO_STORAGE`, `PVE_TEST_ISO_PATH`           |
-| `TestResourceAffinityRule` | 4     | `PVE_TEST_HA_SIDS`                                    |
-| `TestConsoleMint`          | 6     | `PVE_TEST_STORAGE`, `PVE_TEST_CONSOLE_VMID`           |
+| Test                            | Phase | Required gates                                           |
+| ------------------------------- | ----- | -------------------------------------------------------- |
+| `TestVersionRoundTrip`          | 1     | (none beyond endpoint/token)                             |
+| `TestComputeReads`              | 2     | (none)                                                   |
+| `TestStorageReads`              | 3     | (none)                                                   |
+| `TestClusterAndHAReads`         | 4     | (none)                                                   |
+| `TestNetworkReads`              | 5     | (none)                                                   |
+| `TestAccessReads`               | 6     | (none)                                                   |
+| `TestQEMULifecycle`             | 2     | `PVE_TEST_STORAGE`, `PVE_TEST_VMID`                      |
+| `TestLXCLifecycle`              | 2     | `PVE_TEST_STORAGE`, `PVE_TEST_LXC_VMID`, `…_TEMPLATE`    |
+| `TestISOUpload`                 | 3     | `PVE_TEST_ISO_STORAGE`, `PVE_TEST_ISO_PATH`              |
+| `TestResourceAffinityPlacement` | 4     | `PVE_TEST_PLACEMENT_VMID_1`, `PVE_TEST_PLACEMENT_VMID_2` |
+| `TestConsoleMint`               | 6     | `PVE_TEST_STORAGE`, `PVE_TEST_CONSOLE_VMID`              |
+| `TestConsoleRFB`                | 6     | `PVE_TEST_STORAGE`, `PVE_TEST_CONSOLE_VMID`              |
 
 Command cheat-sheet:
 
