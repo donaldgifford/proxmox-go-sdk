@@ -36,6 +36,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(pvelab)* Use the modeled newline-strip sanitizer for installer log values
 - *(pvelab)* Gate each cluster join on runtime quorum, not config presence
 - *(console)* Dial the vncwebsocket path the ticket is bound to
+- *(ha,pverr,integration)* Act on the second live inner-suite run
 
 ### Refactor
 
