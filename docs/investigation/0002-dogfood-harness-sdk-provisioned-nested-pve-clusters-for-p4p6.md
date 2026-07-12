@@ -370,6 +370,33 @@ requirement entirely; see INV-0003 for the productization thread).
   never depends on the shape. Recorded here per the Phase 2 task; the ops' doc
   comments already state it.
 
+### P4 + P6 closed live (2026-07-12, IMPL-0002 Phase 3 inner-suite runs)
+
+Three `just dogfood-test` runs against the quorate 3-node nested cluster (PVE
+9.2.2), each of the first two surfacing a genuine live-only finding — the
+investigation's core premise ("the mock cannot tell you what real PVE does")
+demonstrated four times over:
+
+- **P6 VNC/RFB: CLOSED.** Live PVE binds a guest VNC ticket to the guest's own
+  `vncwebsocket` path (node-shell presentation → 401) — run 1's failure; the SDK
+  now routes on mint provenance and mockpve binds tickets to their dial path
+  (the fidelity gap that let the bug pass unit tests). Run 2 showed the stream
+  arrives **WebSocket-framed** (`0x82 0x0c` + payload), not raw. Run 3 read
+  `"RFB 003.008\n"` end-to-end over `console.Connect`.
+- **P4 placement: CLOSED.** Negative resource-affinity separated vm:9301 →
+  pve2-dogfood / vm:9302 → pve3-dogfood; the positive flip co-located both on
+  pve3-dogfood. Two HA-stack realities folded back: rule feasibility counts
+  **HA-active** nodes (LRMs lag `AddResource` by ~10 s cycles → the suite
+  retries create), and PVE's plugin schema keeps a rule type's required
+  properties required on UPDATE (`HARuleUpdate` grew `Type`; `pverr.Error` now
+  renders the `Params` map that diagnosis needed).
+- **The P4 cassette is committed + replaying in CI** (`just test-replay`, ~2.4
+  s). Its leak review caught one scrub gap — go-vcr's separate request `Host`
+  field — now auto-scrubbed by `topologyScrub` and pinned by test.
+- **Cleanup vs the scheduler**: HA can hold a guest mid-migration when teardown
+  starts ("VM is locked (migrate)"); the suite's delete now settles,
+  re-resolving the VM's current node per retry.
+
 ### Desk + web research (2026-07-08 — hardware-validated where noted above)
 
 > Facts below are sourced from the upstream PVE API schema
@@ -533,16 +560,21 @@ which each dogfood run feeds.
 
 ## Conclusion
 
-**Answer: pending the spike — desk-feasible with high confidence.** Every
-load-bearing claim checked out against upstream sources: cluster formation is
-REST (with a mid-join daemon-restart caveat), unattended install is first-class
-tooling with exactly the knobs needed (static IP, root password, first-boot), a
-3-node nested cluster meets PVE's documented quorum minimum, and the entire
-provisioning layer is SDK surface this repo has already live-verified against
-r740a — run as released code under the Phase 0 model. The novel risks are
-operational (join churn, install wall-clock), not architectural. This stays
-**Open** until the spike produces a green P4 cassette + P6 RFB assertion and
-real timings.
+**Answer: CONFIRMED (2026-07-12).** The full chain works end-to-end on real
+hardware: SDK-provisioned unattended installs (3 parallel nodes, ~4 min), REST
+cluster formation to quorate(3) in under 5 min total, and the nested cluster
+carrying the inner suite to a green P4 cassette (negative **and** positive
+resource-affinity placement observed, committed, replaying in CI) and a live P6
+RFB assertion (`"RFB 003.008\n"` over `console.Connect`). Both IMPL-0001
+Outstanding-live-verification boxes are checked. The desk analysis held —
+cluster formation is REST (the one surprise was the lab-side config-vs-runtime
+quorum race, fixed with a per-join quorum gate), and the operational risks (join
+churn, install wall-clock) landed well inside bounds. The dogfood premise paid
+out repeatedly: four live-only findings (PVEInt serialization drift, VNC ticket
+path-binding, HA rule update required-props, HA-active feasibility counting)
+were each folded back into the SDK + mockpve. This stays **Open** only for the
+steady-state tail (Recommendation steps 6–7: ship + pin, the multi-minor
+matrix + methodology DESIGN doc), concluding with IMPL-0002's final phase.
 
 ## Recommendation
 

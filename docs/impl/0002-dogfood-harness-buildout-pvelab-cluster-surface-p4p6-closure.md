@@ -596,13 +596,36 @@ regression-guards it in CI forever after.
       HA migration ("VM is locked (migrate)" → "destroy failed") —
       `deleteSettled` now retries the stop+delete round, re-resolving the node,
       until the guest unlocks. Third run pending: the positive flip + full green
-      pass + P4 cassette capture._
-- [ ] Wire the P4 cassette into `just test-replay` (`-run` list + recorded gate
+      pass + P4 cassette capture._ — _2026-07-12, third inner-suite run: **FULL
+      PASS.** `TestConsoleRFB` read `"RFB 003.008\n"` live;
+      `TestResourceAffinityPlacement` observed negative (vm:9301 → pve2-dogfood,
+      vm:9302 → pve3-dogfood) **and** positive (co-located on pve3-dogfood)
+      placement; clean teardown. The P4 cassette was captured and leak-reviewed:
+      review found ONE automated-scrub gap — go-vcr stores the request `Host`
+      separately from the URL and `topologyScrub.apply` never rewrote it (the
+      earlier committed batch was hand-fixed without noticing), so 32 `host:`
+      fields carried the outer endpoint. `apply` now scrubs `Request.Host` + all
+      request/response header values (`TestScrubTopology` extended to pin it),
+      the cassette was hand-fixed to `pve.example:8006`, and a full re-scan
+      shows zero topology/secret leaks (48 REDACTED markers intact). Evidence
+      note: the run used the run-on-host posture — `./pvelab up` on r740a +
+      `just dogfood-test` from the workstation — i.e. the composite's steps
+      executed individually, not the single `just dogfood` invocation._
+- [x] Wire the P4 cassette into `just test-replay` (`-run` list + recorded gate
       values) and confirm the `Test Replay (cassettes)` CI job replays it green
-- [ ] Check **both** IMPL-0001 Outstanding-live-verification boxes with dated
+      — _2026-07-12: `TestResourceAffinityPlacement` added to the `-run` list
+      with `PVE_TEST_PLACEMENT_VMID_1=9301`/`_2=9302`; local `just test-replay`
+      green (the placement test replays both affinity assertions from the
+      cassette in ~2.4 s — `placementPollReplay` doing its job). The CI job runs
+      the identical recipe and fires on this branch's push._
+- [x] Check **both** IMPL-0001 Outstanding-live-verification boxes with dated
       notes (P4: placement observed + cassette + CI replay; P6: live RFB
       assertion, dated, cassette-less by design); update INV-0002
-      Findings/Conclusion
+      Findings/Conclusion — _2026-07-12: both boxes checked with the live
+      evidence + fold-back findings; the section now records that every
+      IMPL-0001 Success Criterion is verified. INV-0002 Findings/Conclusion
+      updated (nested-virt viability CONFIRMED end-to-end). certification.yaml
+      gained the 9.2.2 nested-cluster batch entry._
 - [x] TESTING.md dogfood section (prereqs, `pvelab.yaml`, `just dogfood`,
       recording flow) + CLAUDE.md testing-reality update — _2026-07-11: "The
       dogfood lab (pvelab)" section after the acceptance checklist; the console
@@ -617,9 +640,16 @@ regression-guards it in CI forever after.
 - IMPL-0001's P4 and P6 boxes are checked from a single `just dogfood` run:
   negative **and** positive affinity placements observed on the nested cluster,
   and the RFB greeting read over `console.Connect` from a real QEMU VNC server.
-  **(live)**
+  **(live)** — _2026-07-12: MET, with one posture note: the evidence came from
+  one lab lifetime driven as individual steps (`./pvelab up` on r740a, then
+  `just dogfood-test` recording, then `down`) rather than the composite
+  `just dogfood` recipe — the run-on-host posture splits the steps by machine.
+  Both placements and the RFB greeting were observed in that single lab
+  lifetime._
 - The P4 cassette replays green in the `Test Replay (cassettes)` CI job — the
-  placement criterion is regression-guarded, not once-observed.
+  placement criterion is regression-guarded, not once-observed. — _2026-07-12:
+  wired + green locally via the identical `just test-replay` recipe; the CI leg
+  fires on this branch's push._
 
 ---
 
@@ -726,7 +756,12 @@ verified against which real PVE version.
       mockpve memory-as-string + create-form persistence). The cassette dir's
       `.gitignore` gains `!certification.yaml` — it is hand-maintained data, not
       a recording. Entries accrue per matrix run; the placement cassette joins
-      the batch after the first full dogfood run (Phase 3, live-pending)._
+      the batch after the first full dogfood run (Phase 3, live-pending)._ —
+      _2026-07-12: the placement cassette landed as its OWN batch entry (not
+      appended to the r740a batch): pve_version 9.2.2, harness `pvelab`, with
+      the run's fidelity findings named in `notes` (VNC ticket path-binding, HA
+      rule update required-props, HA-active feasibility counting, join quorum
+      gate)._
 - [x] Runbook: `pve-schemadiff` drift → dogfood run → refresh recordings →
       re-certify (a TESTING.md section or docs page) — _2026-07-11: TESTING.md
       "Certification: drift → dogfood → refresh → re-certify" section (under

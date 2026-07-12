@@ -535,27 +535,34 @@ file. This table maps the real code to phases. Column widths are re-aligned by
 
 Every implementation task is done and the suite has run end-to-end against a
 live 9.2-1 node (`r740a`), with the resulting cassettes committed and replaying
-in CI (`just test-replay`). **Two Success Criteria remain genuinely live-only**
-and cannot be verified in the current environment — track them here until a
-suitable cluster is reachable:
+in CI (`just test-replay`). The two Success Criteria that remained genuinely
+live-only were **closed on 2026-07-12** by the pvelab nested cluster (IMPL-0002
+Phase 3):
 
-- [ ] **P4 — resource-affinity placement honored.** The rule is defined and read
-      back (mock-verified + the `ha` `Example`), but observing the scheduler
-      _act_ on it needs a **real ≥2-node 9.2 HA cluster**. Only one 9.2 node
-      (`r740a`) is available. _2026-07-11: the rule-only
+- [x] **P4 — resource-affinity placement honored.** _2026-07-11: the rule-only
       `TestResourceAffinityRule` (+ its `PVE_TEST_HA_SIDS` gate) is retired per
       DESIGN-0002 OQ-9; the scheduler-observed `TestResourceAffinityPlacement`
-      supersedes it and runs against the pvelab nested cluster (IMPL-0002 Phase
-      3), which also captures the P4 cassette for `just test-replay`._
-- [ ] **P6 — VNC (RFB) wire payload.** Ticket mint is live-verified
-      (`TestConsoleMint`) and `Connect` is exercised against a `mockpve`
-      hijack+echo upgrade, but the **live RFB byte stream** a real node returns
-      over `console.Connect` is unverified (no live VNC session captured).
+      supersedes it._ **Verified live 2026-07-12** against the quorate 3-node
+      pvelab nested cluster (PVE 9.2.2 on `r740a`): the negative rule drove
+      `vm:9301` → `pve2-dogfood` and `vm:9302` → `pve3-dogfood`, and flipping it
+      to positive co-located both on `pve3-dogfood`. The run's cassette
+      (`TestResourceAffinityPlacement.yaml`) is committed and replays in
+      `just test-replay`. Live findings folded back: rule feasibility counts
+      HA-**active** nodes (LRMs lag `AddResource`; the suite retries create),
+      and rule updates must re-send the type's required properties
+      (`HARuleUpdate.Type`).
+- [x] **P6 — VNC (RFB) wire payload.** Ticket mint was already live-verified
+      (`TestConsoleMint`). **Verified live 2026-07-12** on the nested cluster:
+      `TestConsoleRFB` read QEMU's `"RFB 003.008\n"` ProtocolVersion greeting
+      over `console.Connect`. The stream arrives **WebSocket-framed** (first
+      bytes `0x82 0x0c`) — now Connect's documented contract — and live PVE
+      binds a guest ticket to its guest `vncwebsocket` path (presenting it at
+      the node-shell path 401s), which drove the ticket-provenance routing fix
+      in `console` + the mockpve path-binding fidelity fix. No cassette by
+      design (a raw duplex byte stream cannot replay).
 
-Neither blocks the MVP surface (both ops exist, are typed, and are mock-tested);
-they are verification gaps, not missing functionality. Do **not** mark either
-`[x]` — or emit the loop's completion promise — until each is confirmed against
-live hardware.
+With these two closed, **every IMPL-0001 Success Criterion is verified** —
+mock-verified in CI plus live evidence recorded above and in IMPL-0002.
 
 ## Dependencies
 

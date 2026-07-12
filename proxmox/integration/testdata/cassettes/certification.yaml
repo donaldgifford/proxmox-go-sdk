@@ -29,5 +29,23 @@
     polls), and two mockpve fidelity fixes found by the Phase 0/1 pvelab work
     — config reads serialize memory as a quoted string (9.2.4), and the
     qemu/lxc create handlers persist every create-form key like real PVE.
-    TestResourceAffinityPlacement joins the batch after the first full
-    dogfood run (IMPL-0002 Phase 3, live-pending).
+- pve_version: 9.2.2
+  recorded: 2026-07-12 # first full pvelab nested-cluster dogfood run
+  commit: f6e75ef # code state of the recording run (feat/pvelab-phase5)
+  harness: pvelab # 3-node nested cluster on r740a, run-on-host posture
+  cassettes:
+    - TestResourceAffinityPlacement
+  notes: >-
+    First batch recorded against the pvelab nested cluster (quorate 3-node,
+    PVE 9.2.2) instead of r740a directly — the IMPL-0001 P4 scheduler-observed
+    placement criterion needs multiple nodes. Fidelity/API findings reconciled
+    before this entry: guest VNC tickets are BOUND to their mint path (mockpve
+    now records each ticket's dial path and rejects presentation elsewhere,
+    matching live PVE's 401); HA rule updates must re-send the rule type's
+    required properties (a bare affinity-only PUT fails parameter
+    verification — HARuleUpdate grew Type); HA rule feasibility counts
+    HA-ACTIVE nodes, which lag AddResource by LRM cycles (the suite retries
+    rule create); and cluster joins need a per-join quorum gate because the
+    corosync CONFIG nodelist precedes runtime health (pvelab cluster.go).
+    TestConsoleRFB ran in the same batch and verified the WebSocket-framed
+    RFB greeting live ("RFB 003.008\n") but has no cassette by design.

@@ -174,6 +174,19 @@ func (s topologyScrub) apply(i *cassette.Interaction) {
 	i.Request.URL = rep(i.Request.URL)
 	i.Request.Body = rep(i.Request.Body)
 	i.Response.Body = rep(i.Response.Body)
+	// The Host header is stored separately from the URL and carries the live
+	// endpoint verbatim — found in review of the first nested-cluster cassette
+	// (2026-07-12; the earlier committed batch was hand-fixed without noticing
+	// the automated gap). Scrub it and every header value (Location and
+	// friends can carry the endpoint too).
+	i.Request.Host = rep(i.Request.Host)
+	for _, h := range []http.Header{i.Request.Headers, i.Response.Headers} {
+		for _, vals := range h {
+			for idx := range vals {
+				vals[idx] = rep(vals[idx])
+			}
+		}
+	}
 }
 
 // matchReplayRequest matches a replay request to a recorded interaction on method
@@ -331,11 +344,14 @@ func TestScrubTopology(t *testing.T) {
 	scrub := newTopologyScrub("https://10.10.11.20:8006", "r740a")
 	i := &cassette.Interaction{
 		Request: cassette.Request{
-			Method: http.MethodPost,
-			URL:    "https://10.10.11.20:8006/api2/json/nodes/r740a/qemu/100/status/start",
+			Method:  http.MethodPost,
+			URL:     "https://10.10.11.20:8006/api2/json/nodes/r740a/qemu/100/status/start",
+			Host:    "10.10.11.20:8006",
+			Headers: http.Header{"Referer": {"https://10.10.11.20:8006/"}},
 		},
 		Response: cassette.Response{
-			Body: `{"data":"UPID:r740a:0005:...:qmstart:100:root@pam!sdk:"}`,
+			Body:    `{"data":"UPID:r740a:0005:...:qmstart:100:root@pam!sdk:"}`,
+			Headers: http.Header{"Location": {"https://10.10.11.20:8006/next"}},
 		},
 	}
 	scrub.apply(i)
@@ -344,6 +360,14 @@ func TestScrubTopology(t *testing.T) {
 		if strings.Contains(i.Request.URL, leak) || strings.Contains(i.Response.Body, leak) {
 			t.Errorf("topology %q survived scrub: url=%q body=%q", leak, i.Request.URL, i.Response.Body)
 		}
+		if strings.Contains(i.Request.Host, leak) ||
+			strings.Contains(i.Request.Headers.Get("Referer"), leak) ||
+			strings.Contains(i.Response.Headers.Get("Location"), leak) {
+			t.Errorf("topology %q survived scrub in Host/headers: host=%q", leak, i.Request.Host)
+		}
+	}
+	if i.Request.Host != placeholderHost {
+		t.Errorf("scrubbed Host = %q, want %q", i.Request.Host, placeholderHost)
 	}
 	if !strings.Contains(i.Request.URL, "https://"+placeholderHost+"/api2/json/nodes/"+placeholderNode+"/") {
 		t.Errorf("scrubbed URL = %q, want placeholder host+node", i.Request.URL)
