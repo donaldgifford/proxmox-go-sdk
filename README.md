@@ -31,9 +31,9 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for the full workflow and
 
 ## Release
 
-```sh
-just release v0.1.0           # tags + pushes; CI runs goreleaser
-```
+Releases are **automatic**: merging a PR to main mints the next tag from the
+PR's semver label (`major`/`minor`/`patch`/`dont-release`) and CI runs
+goreleaser — no manual tagging.
 
 The **SDK is released by the git tag itself** — consumers pin
 `github.com/donaldgifford/proxmox-go-sdk/proxmox@vX.Y.Z`; there is no library

@@ -366,6 +366,10 @@ itself — the first live formation (2026-07-12) used exactly this posture, and
 the answer server's default `:8442` bind needs no change:
 
 ```sh
+# stable pin (the steady state — match the justfile's pvelab_pin):
+GOOS=linux GOARCH=amd64 go install github.com/donaldgifford/proxmox-go-sdk/cmd/pvelab@v0.6.0
+# (binary lands in $(go env GOPATH)/bin/linux_amd64/pvelab)
+# or, when developing the harness itself (the PVELAB_DEV=1 analogue):
 GOOS=linux GOARCH=amd64 go build -o pvelab ./cmd/pvelab
 scp pvelab pvelab.yaml root@<outer-host>:
 # in pvelab.yaml on the host: answer_url points at the OUTER HOST's address;

@@ -40,7 +40,7 @@ Everything is driven by [`just`](https://github.com/casey/just):
 | `just fmt`            | `go fmt` + yamlfmt + prettier `--write`               |
 | `just run -- <args>`  | run the `mockpve` server via `go run ./cmd/mockpve`   |
 | `just schemadiff`     | guard the API schema against drift (see below)        |
-| `just release vX.Y.Z` | tag + push (CI runs goreleaser)                       |
+| `just release vX.Y.Z` | manual tag (recovery only — releases are automatic)   |
 
 Run `just fmt` and `just lint` before every commit; run `just test` (race)
 before every push.
@@ -99,10 +99,13 @@ guard the live REST surface.
 ## Changelog and releases
 
 `CHANGELOG.md` is **generated** from Conventional Commit messages by `git-cliff`
-(`cliff.toml`) and guarded by a drift check — do not edit it by hand. Releases
-are cut by tagging (`just release vX.Y.Z`); CI runs `goreleaser`, which builds
-and publishes the `mockpve` helper binary. The SDK itself is "released" by the
-tag — consumers pin `github.com/donaldgifford/proxmox-go-sdk@vX.Y.Z`.
+(`cliff.toml`) and guarded by a drift check — do not edit it by hand. **Releases
+are automatic**: on every merge to main, `release.yml` reads the merged PR's
+semver label (`major`/`minor`/`patch`/`dont-release`), mints the next `v*` tag,
+and runs `goreleaser`, which builds and publishes the `mockpve` helper binary.
+Do not tag manually in normal flow (`just release` is recovery-only). The SDK
+itself is "released" by the tag — consumers pin
+`github.com/donaldgifford/proxmox-go-sdk@vX.Y.Z`.
 
 ## Continuous integration
 

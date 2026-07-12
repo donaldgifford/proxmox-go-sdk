@@ -86,8 +86,10 @@ when the repos split (DESIGN-0001). New public packages are admitted under
 - `pvelab` provisions an ephemeral nested-PVE cluster on the outer host so the
   live-only IMPL-0001 criteria (P4 HA placement, P6 VNC/RFB) can be verified
   without touching real guests. Run via `just dogfood-iso` / `dogfood-up` /
-  `dogfood-down` (all `go run ./cmd/pvelab`, all touch r740a — Donald runs
-  these).
+  `dogfood-down` (all touch r740a — Donald runs these). The recipes run the
+  **stable-pinned** pvelab (`justfile` var `pvelab_pin`, IMPL-0002 Phase 4:
+  released code provisions, branch code is what gets tested); set `PVELAB_DEV=1`
+  to run the branch's `./cmd/pvelab` when developing the harness itself.
 - Config is `pvelab.yaml` (git-ignored; copy `pvelab.example.yaml`). Secrets are
   env-var NAMES in the config, resolved+validated at load; site topology stays
   out of the repo. `TestExampleConfigValid` pins the example to the schema.
@@ -141,15 +143,19 @@ when the repos split (DESIGN-0001). New public packages are admitted under
 - The **SDK is released by the git tag itself** — consumers pin
   `github.com/donaldgifford/proxmox-go-sdk/proxmox@vX.Y.Z`. There is no binary
   to publish for the library.
-- `just release v0.1.0` — tag + push. CI picks up the `v*` tag and runs
-  `goreleaser release --clean`, which builds and publishes the **mockpve**
-  helper (multi-arch archives + checksums + SBOM + signatures) to Forgejo (via
-  `GITEA_TOKEN`) or GitHub (via `GITHUB_TOKEN`).
+- **Releases are automatic, driven by PR semver labels** (found 2026-07-12):
+  `release.yml` runs on every merge to main — `pr-semver-bump` reads the merged
+  PR's `major`/`minor`/`patch`/`dont-release` label, mints the next `v*` tag,
+  and runs `goreleaser release --clean`, which builds and publishes the
+  **mockpve** helper (multi-arch archives + checksums + SBOM + GPG signature;
+  the workflow imports `GPG_PRIVATE_KEY` and passes `GPG_FINGERPRINT`). Do
+  **not** tag manually in normal flow — `just release` is exceptional-recovery
+  only; a manual tag desyncs the label-driven bump.
 - Version metadata is injected into `cmd/mockpve` via `-ldflags`:
   `main.version`, `main.commit`, `main.date`.
 - Cut `v1.0.0` only once the core + compute + storage surfaces are stable
-  (DESIGN-0001 rollout). During early co-evolution with the service, tag `v0.x`
-  frequently and let the service pin a known-good tag (use a local
+  (DESIGN-0001 rollout). During early co-evolution with the service, label
+  `v0.x` bumps per PR and let the service pin a known-good tag (use a local
   `go.mod replace` for in-flight changes).
 
 ### Container build

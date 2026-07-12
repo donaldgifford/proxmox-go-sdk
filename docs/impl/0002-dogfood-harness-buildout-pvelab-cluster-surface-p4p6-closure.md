@@ -664,7 +664,9 @@ regression-guards it in CI forever after.
 - The P4 cassette replays green in the `Test Replay (cassettes)` CI job — the
   placement criterion is regression-guarded, not once-observed. — _2026-07-12:
   wired + green locally via the identical `just test-replay` recipe; the CI leg
-  fires on this branch's push._
+  fires on this branch's push._ — _confirmed same day: the job ran green on PR
+  #12's full-CI run (the first with the cassette) and on every main push since
+  the stack merged. CRITERION MET._
 
 ---
 
@@ -683,16 +685,45 @@ stays what's under test.
       entry for a future `cmd/`, so a comment now sits directly on the `builds`
       block naming pvelab as `go run`-only per OQ-2 and pointing at
       DESIGN-0002/IMPL-0002. `goreleaser check` green._
-- [ ] Land pvelab + the cluster surface in a stable tag (target `v0.2.0`,
-      `just release`)
-- [ ] Switch the `dogfood-*` recipes to
+- [x] Land pvelab + the cluster surface in a stable tag (target `v0.2.0`,
+      `just release`) — _2026-07-12: landed as **v0.6.0**, and the task's
+      premise was stale: releases are AUTOMATIC — `release.yml` runs
+      `pr-semver-bump` on every merge to main, minting the next tag from the
+      merged PR's semver label (that is what the mandatory PR labels are for).
+      `v0.2.0` was auto-minted 2026-07-11 by an unrelated merge; the #8–#12
+      stack minted v0.3.0 → v0.6.0, so v0.6.0 is the first tag carrying the full
+      pvelab + cluster surface. `just release` never was the flow (recipe +
+      README/DEVELOPMENT/CLAUDE.md corrected). Found in the same sweep: every
+      v0.2.0–v0.6.0 goreleaser run FAILED at the final signing step
+      (`.goreleaser.yml` signs checksums with `{{ .Env.GPG_FINGERPRINT }}` but
+      the workflow never imported a key) — tags and module consumption were
+      unaffected; only the GitHub Release artifacts (mockpve binaries) never
+      published. Fixed in this phase's PR (GPG import step + `GPG_FINGERPRINT`
+      env; secrets added by Donald); the fix proves itself on this PR's own
+      merge-release._
+- [x] Switch the `dogfood-*` recipes to
       `go run github.com/donaldgifford/proxmox-go-sdk/cmd/pvelab@v0.2.0` (exact
       pin, bumped intentionally); keep branch-run available behind
-      `PVELAB_DEV=1`
+      `PVELAB_DEV=1` — _2026-07-12: done, pinned to **v0.6.0** (see above; the
+      task's v0.2.0 was the desk-estimated tag). `justfile` gains `pvelab_pin` +
+      a `pvelab_pkg` expression: default is the pinned module path,
+      `PVELAB_DEV=1` switches to `./cmd/pvelab`. Verified: the pin resolves and
+      self-reports `pvelab v0.6.0` via `go run`, and both recipe variants render
+      correctly (`just -n`). TESTING.md's run-on-host section shows the pinned
+      cross-compile (`GOOS=linux GOARCH=amd64 go install …@v0.6.0`) alongside
+      the dev build._
 - [ ] **(live)** Post-tag smoke: from a clean checkout with only `pvelab.yaml` +
       env configured, `just dogfood` end-to-end with the pinned CLI
-- [ ] Final doc sweep (README / CLAUDE.md / TESTING.md consistent on pvelab's
-      `go run`-only, never-released status); changelog regenerated
+- [x] Final doc sweep (README / CLAUDE.md / TESTING.md consistent on pvelab's
+      `go run`-only, never-released status); changelog regenerated —
+      _2026-07-12: swept together with the auto-release correction — README,
+      DEVELOPMENT.md, and CLAUDE.md now describe the label-driven automatic
+      release flow (manual `just release` demoted to recovery-only), CLAUDE.md's
+      dogfood section names the pin + `PVELAB_DEV=1`, and TESTING.md's
+      run-on-host runbook shows both the pinned `go install` and the dev build.
+      pvelab's status is unchanged and consistently stated: `go run`-only, never
+      a goreleaser artifact (the pin changes WHICH source `go run` builds, not
+      how it ships)._
 
 #### Success Criteria
 
