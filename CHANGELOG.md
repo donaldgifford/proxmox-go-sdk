@@ -34,6 +34,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(mockpve)* Persist create-form keys into guest config
 - *(pvelab)* Quote installer-supplied log values; static env-write error
 - *(pvelab)* Use the modeled newline-strip sanitizer for installer log values
+- *(pvelab)* Gate each cluster join on runtime quorum, not config presence
 
 ### Refactor
 
