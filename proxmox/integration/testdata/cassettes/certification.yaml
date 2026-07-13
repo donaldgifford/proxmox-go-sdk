@@ -49,3 +49,27 @@
     corosync CONFIG nodelist precedes runtime health (pvelab cluster.go).
     TestConsoleRFB ran in the same batch and verified the WebSocket-framed
     RFB greeting live ("RFB 003.008\n") but has no cassette by design.
+- pve_version: 9.1.1
+  recorded: 2026-07-13 # version-matrix run — first non-9.2 minor
+  commit: 661ddfd # code state of the recording run (main, post-#15)
+  harness: pvelab # 9.1 lab via LINKED CLONES (pvelab-tmpl-9-1, 3m11s to quorate)
+  cassettes:
+    - TestVersionRoundTrip
+    - TestComputeReads
+    - TestStorageReads
+    - TestClusterAndHAReads
+    - TestNetworkReads
+    - TestAccessReads
+    - TestResourceAffinityPlacement
+  notes: >-
+    First version-matrix batch (IMPL-0002 Phase 5): the suite ran against a
+    nested PVE 9.1.1 cluster provisioned via linked clones from the 9.1
+    template. NO SDK or mockpve divergences surfaced — reads, placement
+    (including the LRM-lag rule-create retry, which fired and settled again),
+    and the live RFB greeting were all green on 9.1. The 9.2.7 install
+    assistant prepared the 9.1 ISO without issue. The corpus is now
+    mixed-version by design: these seven cassettes carry 9.1.1 responses
+    while the QEMU/LXC lifecycles, ISO upload, and console mint remain 9.2-1
+    (provenance per batch entry). First fully-automated scrub batch — the
+    Request.Host topology fix held with zero hand-edits. TestConsoleRFB ran
+    live in the batch (cassette-less by design).

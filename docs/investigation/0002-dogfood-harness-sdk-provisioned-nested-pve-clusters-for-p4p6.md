@@ -411,6 +411,22 @@ post-rename pmxcfs/corosync/cert health confirmed by the formation itself.
 Teardown left the template in place (it outlives labs, by design), so subsequent
 runs pay only the 3-minute clone path.
 
+### The multi-version model works (2026-07-13, first matrix run: PVE 9.1.1)
+
+The Question's final clause — on-demand, clean-room, **multi-version**
+environments certifying mockpve per PVE version — is now demonstrated, not
+hypothesized. One new config file (`pvelab-9.1.yaml`: version, base ISO,
+distinct VMIDs) was the entire per-minor cost: the 9.2.7 assistant prepared the
+9.1 ISO, `template build` + linked-clone `up` brought a quorate 9.1.1 cluster up
+in 3m11s (PVE 9.1 tolerates the clone rename too), and the full inner suite
+passed against it — including placement and the live RFB greeting — surfacing
+**zero** SDK/mock divergences. The run was recorded: seven cassettes now carry
+9.1.1 responses (the corpus is deliberately mixed-version; `certification.yaml`
+tracks per-batch provenance, three entries so far: 9.2-1, 9.2.2, 9.1.1), the
+first batch scrubbed entirely by automation. Two templates (9.2, 9.1) coexist on
+r740a in the 9210–9219 sub-range, so future runs on either minor pay only the
+~3-minute clone path.
+
 ### Desk + web research (2026-07-08 — hardware-validated where noted above)
 
 > Facts below are sourced from the upstream PVE API schema
