@@ -6,10 +6,53 @@ interactions:
         proto: HTTP/1.1
         proto_major: 1
         proto_minor: 1
+        content_length: 41
+        host: pve.example:8006
+        body: password=REDACTED&username=root%40pam
+        form:
+            password:
+                - REDACTED
+            username:
+                - root@pam
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/access/ticket
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: -1
+        uncompressed: true
+        body: '{"data":{"cap":{"mapping":{"Mapping.Audit":1,"Permissions.Modify":1,"Mapping.Use":1,"Mapping.Modify":1},"dc":{"Sys.Modify":1,"SDN.Audit":1,"SDN.Allocate":1,"SDN.Use":1,"Sys.Audit":1},"storage":{"Datastore.AllocateTemplate":1,"Datastore.AllocateSpace":1,"Datastore.Allocate":1,"Permissions.Modify":1,"Datastore.Audit":1},"sdn":{"SDN.Audit":1,"SDN.Allocate":1,"SDN.Use":1,"Permissions.Modify":1},"nodes":{"Sys.Console":1,"Sys.Modify":1,"Sys.Syslog":1,"Sys.AccessNetwork":1,"Sys.PowerMgmt":1,"Permissions.Modify":1,"Sys.Audit":1,"Sys.Incoming":1},"access":{"Permissions.Modify":1,"Group.Allocate":1,"User.Modify":1},"vms":{"VM.Config.Options":1,"VM.PowerMgmt":1,"VM.Allocate":1,"VM.Migrate":1,"VM.Config.Network":1,"VM.GuestAgent.Unrestricted":1,"VM.GuestAgent.FileRead":1,"VM.Console":1,"VM.Replicate":1,"VM.Config.CDROM":1,"VM.Backup":1,"VM.Clone":1,"VM.GuestAgent.FileWrite":1,"VM.Config.Cloudinit":1,"VM.Config.Memory":1,"VM.Config.HWType":1,"VM.GuestAgent.FileSystemMgmt":1,"VM.Snapshot.Rollback":1,"VM.GuestAgent.Audit":1,"VM.Config.Disk":1,"VM.Snapshot":1,"Permissions.Modify":1,"VM.Config.CPU":1,"VM.Audit":1}},"CSRFPreventionToken":"REDACTED","clustername":"dogfood","ticket":"REDACTED","username":"root@pam"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Mon, 13 Jul 2026 12:10:56 GMT
+            Expires:
+                - Mon, 13 Jul 2026 12:10:56 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 164.42025ms
+    - id: 1
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
         content_length: 0
         host: pve.example:8006
         headers:
-            Authorization:
+            Cookie:
                 - REDACTED
             User-Agent:
                 - proxmox-go-sdk
@@ -20,7 +63,7 @@ interactions:
         proto_major: 1
         proto_minor: 1
         content_length: 72
-        body: '{"data":{"release":"9.2","version":"9.2.4","repoid":"5e5ae681198514d4"}}'
+        body: '{"data":{"repoid":"42db4a6cf33dac83","release":"9.1","version":"9.1.1"}}'
         headers:
             Cache-Control:
                 - max-age=0
@@ -31,17 +74,17 @@ interactions:
             Content-Type:
                 - application/json;charset=UTF-8
             Date:
-                - Sun, 05 Jul 2026 16:19:38 GMT
+                - Mon, 13 Jul 2026 12:10:56 GMT
             Expires:
-                - Sun, 05 Jul 2026 16:19:38 GMT
+                - Mon, 13 Jul 2026 12:10:56 GMT
             Pragma:
                 - no-cache
             Server:
                 - pve-api-daemon/3.0
         status: 200 OK
         code: 200
-        duration: 19.664958ms
-    - id: 1
+        duration: 26.224834ms
+    - id: 2
       request:
         proto: HTTP/1.1
         proto_major: 1
@@ -49,7 +92,7 @@ interactions:
         content_length: 0
         host: pve.example:8006
         headers:
-            Authorization:
+            Cookie:
                 - REDACTED
             User-Agent:
                 - proxmox-go-sdk
@@ -59,29 +102,28 @@ interactions:
         proto: HTTP/1.1
         proto_major: 1
         proto_minor: 1
-        content_length: 779
-        body: '{"data":[{"node":"pve","level":"","maxmem":134754836480,"uptime":962,"maxcpu":56,"maxdisk":231006797824,"cpu":0.000549392124198065,"mem":3648548864,"status":"online","disk":2717253632,"cgroup-mode":2,"id":"node/pve","type":"node"},{"status":"available","content":"images,rootdir","shared":0,"plugintype":"zfspool","node":"pve","type":"storage","id":"storage/pve/local-zfs","storage":"local-zfs","maxdisk":228289642496,"disk":98304},{"status":"available","content":"vztmpl,import,backup,iso","shared":0,"plugintype":"dir","node":"pve","type":"storage","id":"storage/pve/local","storage":"local","maxdisk":228289675264,"disk":131072},{"network":"localnetwork","node":"pve","network-type":"zone","status":"ok","type":"network","id":"network/pve/zone/localnetwork"}]}'
+        content_length: -1
+        uncompressed: true
+        body: '{"data":[{"cpu":0.177993527508091,"disk":4135010304,"maxcpu":4,"hastate":"online","maxmem":8327639040,"status":"online","uptime":3378,"cgroup-mode":2,"level":"","id":"node/pve2-dogfood","mem":1878560768,"type":"node","maxdisk":14484905984,"node":"pve2-dogfood"},{"cpu":0.181435643564356,"disk":4134989824,"cgroup-mode":2,"uptime":3318,"status":"online","maxcpu":4,"hastate":"online","maxmem":8327634944,"type":"node","mem":1880612864,"maxdisk":14484905984,"level":"","id":"node/pve3-dogfood","node":"pve3-dogfood"},{"disk":4134985728,"cpu":0.0213452469595433,"maxcpu":4,"maxmem":8327630848,"hastate":"online","status":"online","uptime":3428,"cgroup-mode":2,"level":"","id":"node/pve","type":"node","mem":1718321152,"maxdisk":14484905984,"node":"pve"},{"status":"available","plugintype":"lvmthin","node":"pve2-dogfood","storage":"local-lvm","content":"images,rootdir","id":"storage/pve2-dogfood/local-lvm","disk":0,"type":"storage","shared":0,"maxdisk":12675186688},{"storage":"local-lvm","content":"images,rootdir","id":"storage/pve3-dogfood/local-lvm","disk":0,"type":"storage","maxdisk":12675186688,"shared":0,"plugintype":"lvmthin","status":"available","node":"pve3-dogfood"},{"status":"available","plugintype":"lvmthin","node":"pve","content":"images,rootdir","storage":"local-lvm","id":"storage/pve/local-lvm","disk":0,"type":"storage","maxdisk":12675186688,"shared":0},{"node":"pve2-dogfood","plugintype":"dir","status":"available","maxdisk":14484905984,"shared":0,"type":"storage","disk":4135010304,"id":"storage/pve2-dogfood/local","content":"iso,import,vztmpl,backup","storage":"local"},{"plugintype":"dir","status":"available","node":"pve3-dogfood","storage":"local","content":"iso,import,vztmpl,backup","id":"storage/pve3-dogfood/local","disk":4134989824,"type":"storage","shared":0,"maxdisk":14484905984},{"shared":0,"maxdisk":14484905984,"type":"storage","disk":4134985728,"id":"storage/pve/local","storage":"local","content":"iso,import,vztmpl,backup","node":"pve","plugintype":"dir","status":"available"},{"node":"pve2-dogfood","type":"network","id":"network/pve2-dogfood/zone/localnetwork","network-type":"zone","status":"ok","network":"localnetwork"},{"network":"localnetwork","status":"ok","network-type":"zone","id":"network/pve3-dogfood/zone/localnetwork","node":"pve3-dogfood","type":"network"},{"type":"network","node":"pve","network-type":"zone","id":"network/pve/zone/localnetwork","status":"ok","network":"localnetwork"}]}'
         headers:
             Cache-Control:
                 - max-age=0
             Connection:
                 - Keep-Alive
-            Content-Length:
-                - "779"
             Content-Type:
                 - application/json;charset=UTF-8
             Date:
-                - Sun, 05 Jul 2026 16:19:38 GMT
+                - Mon, 13 Jul 2026 12:10:56 GMT
             Expires:
-                - Sun, 05 Jul 2026 16:19:38 GMT
+                - Mon, 13 Jul 2026 12:10:56 GMT
             Pragma:
                 - no-cache
             Server:
                 - pve-api-daemon/3.0
         status: 200 OK
         code: 200
-        duration: 7.270792ms
-    - id: 2
+        duration: 13.57775ms
+    - id: 3
       request:
         proto: HTTP/1.1
         proto_major: 1
@@ -89,7 +131,7 @@ interactions:
         content_length: 0
         host: pve.example:8006
         headers:
-            Authorization:
+            Cookie:
                 - REDACTED
             User-Agent:
                 - proxmox-go-sdk
@@ -111,13 +153,13 @@ interactions:
             Content-Type:
                 - application/json;charset=UTF-8
             Date:
-                - Sun, 05 Jul 2026 16:19:38 GMT
+                - Mon, 13 Jul 2026 12:10:56 GMT
             Expires:
-                - Sun, 05 Jul 2026 16:19:38 GMT
+                - Mon, 13 Jul 2026 12:10:56 GMT
             Pragma:
                 - no-cache
             Server:
                 - pve-api-daemon/3.0
         status: 200 OK
         code: 200
-        duration: 6.733542ms
+        duration: 6.574375ms

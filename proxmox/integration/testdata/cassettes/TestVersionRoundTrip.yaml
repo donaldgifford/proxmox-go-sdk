@@ -6,10 +6,53 @@ interactions:
         proto: HTTP/1.1
         proto_major: 1
         proto_minor: 1
+        content_length: 41
+        host: pve.example:8006
+        body: password=REDACTED&username=root%40pam
+        form:
+            password:
+                - REDACTED
+            username:
+                - root@pam
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/access/ticket
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: -1
+        uncompressed: true
+        body: '{"data":{"CSRFPreventionToken":"REDACTED","clustername":"dogfood","cap":{"vms":{"VM.Config.CPU":1,"VM.Audit":1,"VM.Config.HWType":1,"VM.Snapshot":1,"Permissions.Modify":1,"VM.GuestAgent.FileSystemMgmt":1,"VM.Snapshot.Rollback":1,"VM.GuestAgent.Audit":1,"VM.Config.Disk":1,"VM.Config.CDROM":1,"VM.Backup":1,"VM.Console":1,"VM.Replicate":1,"VM.Config.Memory":1,"VM.Clone":1,"VM.GuestAgent.FileWrite":1,"VM.Config.Cloudinit":1,"VM.Config.Network":1,"VM.GuestAgent.FileRead":1,"VM.GuestAgent.Unrestricted":1,"VM.Allocate":1,"VM.Config.Options":1,"VM.PowerMgmt":1,"VM.Migrate":1},"storage":{"Datastore.AllocateTemplate":1,"Datastore.AllocateSpace":1,"Datastore.Allocate":1,"Permissions.Modify":1,"Datastore.Audit":1},"sdn":{"SDN.Audit":1,"SDN.Allocate":1,"SDN.Use":1,"Permissions.Modify":1},"nodes":{"Permissions.Modify":1,"Sys.Audit":1,"Sys.Incoming":1,"Sys.AccessNetwork":1,"Sys.PowerMgmt":1,"Sys.Syslog":1,"Sys.Console":1,"Sys.Modify":1},"access":{"Group.Allocate":1,"Permissions.Modify":1,"User.Modify":1},"mapping":{"Mapping.Use":1,"Mapping.Modify":1,"Permissions.Modify":1,"Mapping.Audit":1},"dc":{"Sys.Audit":1,"SDN.Audit":1,"Sys.Modify":1,"SDN.Use":1,"SDN.Allocate":1}},"username":"root@pam","ticket":"REDACTED"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Mon, 13 Jul 2026 12:10:55 GMT
+            Expires:
+                - Mon, 13 Jul 2026 12:10:55 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 159.024417ms
+    - id: 1
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
         content_length: 0
         host: pve.example:8006
         headers:
-            Authorization:
+            Cookie:
                 - REDACTED
             User-Agent:
                 - proxmox-go-sdk
@@ -20,7 +63,7 @@ interactions:
         proto_major: 1
         proto_minor: 1
         content_length: 72
-        body: '{"data":{"release":"9.2","repoid":"5e5ae681198514d4","version":"9.2.4"}}'
+        body: '{"data":{"repoid":"42db4a6cf33dac83","release":"9.1","version":"9.1.1"}}'
         headers:
             Cache-Control:
                 - max-age=0
@@ -31,13 +74,13 @@ interactions:
             Content-Type:
                 - application/json;charset=UTF-8
             Date:
-                - Sun, 05 Jul 2026 16:19:38 GMT
+                - Mon, 13 Jul 2026 12:10:55 GMT
             Expires:
-                - Sun, 05 Jul 2026 16:19:38 GMT
+                - Mon, 13 Jul 2026 12:10:55 GMT
             Pragma:
                 - no-cache
             Server:
                 - pve-api-daemon/3.0
         status: 200 OK
         code: 200
-        duration: 20.103834ms
+        duration: 29.975583ms
