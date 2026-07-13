@@ -397,6 +397,20 @@ demonstrated four times over:
   starts ("VM is locked (migrate)"); the suite's delete now settles,
   re-resolving the VM's current node per retry.
 
+### Clone path verified live (2026-07-12, IMPL-0002 Phase 5 first template run)
+
+The template/linked-clone evolution's load-bearing unknown — whether PVE
+tolerates a clone being renamed (hostname, IP, host keys, pmxcfs node dir) after
+booting the template's baked-in identity — is **resolved: it does**, first try,
+on PVE 9.2. `template build` = one 4m20s install-and-convert; clone `up` = 3m06s
+to a quorate 3-node cluster vs 4m39–41s for the ISO path (~33% faster; the three
+ISO baselines sat within a 2-second spread). Linked clones materialized in ~1 s;
+the serialized SSH re-identify cost ~51–53 s per node; and the renamed nodes'
+cluster formation timings were indistinguishable from ISO-installed nodes —
+post-rename pmxcfs/corosync/cert health confirmed by the formation itself.
+Teardown left the template in place (it outlives labs, by design), so subsequent
+runs pay only the 3-minute clone path.
+
 ### Desk + web research (2026-07-08 — hardware-validated where noted above)
 
 > Facts below are sourced from the upstream PVE API schema

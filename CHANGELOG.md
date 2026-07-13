@@ -9,6 +9,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 ### Documentation
 
 - *(impl)* Phase 4 COMPLETE — post-tag smoke passed, v0.6.1 signed release confirmed
+- *(impl)* Phase 5 clone path verified live — PVE tolerates the rename
 
 ## [0.6.1] - 2026-07-12
 
