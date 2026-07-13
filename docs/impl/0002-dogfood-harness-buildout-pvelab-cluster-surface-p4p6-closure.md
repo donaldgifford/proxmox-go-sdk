@@ -779,7 +779,7 @@ verified against which real PVE version.
       tracking, templates outlive labs. `-force` deletes ours by computed name;
       a foreign VM on the template VMID is always refused. The actual build
       against r740a is **live-only** (unattended install), still unrun._
-- [ ] `up` via **linked clones** when the version's template exists (ISO install
+- [x] `up` via **linked clones** when the version's template exists (ISO install
       as fallback when it doesn't); **(live)** measure clone-boot vs ISO-install
       wall-clock — _2026-07-11: implemented + mock-verified; only the **(live)**
       half keeps this box open. `cloneSource` picks the path: a real template +
@@ -797,7 +797,20 @@ verified against which real PVE version.
       hostname/IP rename end-to-end is the clone path's load-bearing live-verify
       unknown** — tests pin command sequence, dial retry, serialization order,
       and the tolerated reboot drop, never PVE's behaviour. Wall-clock
-      measurement + first live clone run remain **(live)**._
+      measurement + first live clone run remain **(live)**._ — _2026-07-12,
+      first live clone run (Donald, r740a, pinned v0.6.0): **PVE TOLERATES THE
+      RENAME — the clone path works end-to-end, first try.** `template build`
+      installed + converted `pvelab-tmpl-9-2` (VMID 9210) in 4m20s (install
+      4m00s, shutdown+detach+convert ~14s). The clone `up`: linked clones of all
+      3 nodes materialized in ~1 s, serialized re-identify ran 51 s / 53 s / 51
+      s per node, and the RENAMED nodes formed a quorate cluster with timings
+      indistinguishable from ISO-installed ones (pve2 join 14 s → quorate(2) →
+      pve3 join 6 s → quorate(3)) — pmxcfs, corosync, and the cert plumbing all
+      healthy post-rename. **Wall-clock: 3m06s cloned vs 4m39–41 s ISO (three
+      ISO baselines within 2 s) — ~1m34s (~33%) faster**, with the one-time
+      4m20s template build amortizing across runs. `down` deleted the three node
+      VMs and left template 9210 in place (by design — teardown enumerates only
+      `cfg.Nested.Nodes`); state files removed, prepared ISO intact._
 - [ ] Version matrix: base ISOs/templates for the supported minors
       (9.0/9.1/9.2); `nested.pve_version` selects; **(live)** run the
       capability-gate tests against at least one real non-9.2 minor —
