@@ -700,7 +700,10 @@ stays what's under test.
       unaffected; only the GitHub Release artifacts (mockpve binaries) never
       published. Fixed in this phase's PR (GPG import step + `GPG_FINGERPRINT`
       env; secrets added by Donald); the fix proves itself on this PR's own
-      merge-release._
+      merge-release._ — _confirmed same day: PR #13's merge minted v0.6.1 and
+      its Release run went green — the repo's FIRST successful goreleaser
+      publish (mockpve archives ×4 platforms + SBOMs + `checksums.txt` +
+      `checksums.txt.sig` on the v0.6.1 release page)._
 - [x] Switch the `dogfood-*` recipes to
       `go run github.com/donaldgifford/proxmox-go-sdk/cmd/pvelab@v0.2.0` (exact
       pin, bumped intentionally); keep branch-run available behind
@@ -712,8 +715,20 @@ stays what's under test.
       correctly (`just -n`). TESTING.md's run-on-host section shows the pinned
       cross-compile (`GOOS=linux GOARCH=amd64 go install …@v0.6.0`) alongside
       the dev build._
-- [ ] **(live)** Post-tag smoke: from a clean checkout with only `pvelab.yaml` +
-      env configured, `just dogfood` end-to-end with the pinned CLI
+- [x] **(live)** Post-tag smoke: from a clean checkout with only `pvelab.yaml` +
+      env configured, `just dogfood` end-to-end with the pinned CLI —
+      _2026-07-12 (Donald, on r740a): PASSED with the pinned CLI built straight
+      from the module proxy —
+      `GOBIN= GOOS=linux GOARCH=amd64 go install …/cmd/pvelab@v0.6.0` (no
+      checkout at all, a stronger form of "clean checkout"; the empty GOBIN
+      dodges mise's setting, which blocks cross-compiled installs), scp'd to
+      r740a per the run-on-host posture with the same `pvelab.yaml` + env. `up`
+      formed quorate(3) in **4m40s** — the third consecutive formation inside a
+      2-second spread (4m41s, 4m39s, 4m40s) — `down` deleted all three VMIDs,
+      and the clean check passed (VMID block empty, state files removed,
+      prepared ISO intact). Smoked at v0.6.0, the recipes' exact pin; v0.6.1
+      (minted by this phase's own merge) contains no pvelab changes and the pin
+      moves only when pvelab itself does._
 - [x] Final doc sweep (README / CLAUDE.md / TESTING.md consistent on pvelab's
       `go run`-only, never-released status); changelog regenerated —
       _2026-07-12: swept together with the auto-release correction — README,
@@ -729,7 +744,10 @@ stays what's under test.
 
 - From a clean checkout, `just dogfood` runs the **stable-pinned** CLI
   end-to-end green — released code provisions, branch code is what gets tested.
-  **(live)**
+  **(live)** — _2026-07-12: MET (run-on-host form): the pinned CLI was built
+  from the module proxy with no checkout and provisioned/tore down a quorate
+  3-node lab on r740a; the recipes run that identical pinned module path. The
+  designed chicken-and-egg state is over — Phase 4 is COMPLETE._
 
 ---
 
