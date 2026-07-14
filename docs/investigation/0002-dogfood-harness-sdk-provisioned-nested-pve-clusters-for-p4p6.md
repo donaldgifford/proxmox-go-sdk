@@ -3,7 +3,7 @@ id: INV-0002
 title:
   "Dogfood harness: SDK-provisioned nested PVE clusters for P4/P6 live
   verification"
-status: Open
+status: Concluded
 author: Donald Gifford
 created: 2026-07-08
 ---
@@ -12,8 +12,8 @@ created: 2026-07-08
 
 # INV 0002: Dogfood harness: SDK-provisioned nested PVE clusters for P4/P6 live verification
 
-**Status:** Open **Author:** Donald Gifford **Date:** 2026-07-08 (review
-feedback incorporated 2026-07-09)
+**Status:** Concluded **Author:** Donald Gifford **Date:** 2026-07-08 (review
+feedback incorporated 2026-07-09; concluded 2026-07-13)
 
 <!--toc:start-->
 
@@ -31,6 +31,10 @@ feedback incorporated 2026-07-09)
 - [Environment](#environment)
 - [Findings](#findings)
   - [Phase 0 hardware validation (2026-07-10, IMPL-0002 Phase 0 spike on r740a)](#phase-0-hardware-validation-2026-07-10-impl-0002-phase-0-spike-on-r740a)
+  - [First live formations (2026-07-12, IMPL-0002 Phase 1/2 acceptance runs)](#first-live-formations-2026-07-12-impl-0002-phase-12-acceptance-runs)
+  - [P4 + P6 closed live (2026-07-12, IMPL-0002 Phase 3 inner-suite runs)](#p4--p6-closed-live-2026-07-12-impl-0002-phase-3-inner-suite-runs)
+  - [Clone path verified live (2026-07-12, IMPL-0002 Phase 5 first template run)](#clone-path-verified-live-2026-07-12-impl-0002-phase-5-first-template-run)
+  - [The multi-version model works (2026-07-13, first matrix run: PVE 9.1.1)](#the-multi-version-model-works-2026-07-13-first-matrix-run-pve-911)
   - [Desk + web research (2026-07-08 — hardware-validated where noted above)](#desk--web-research-2026-07-08--hardware-validated-where-noted-above)
   - [Cluster create/join are real REST endpoints — new SDK surface](#cluster-createjoin-are-real-rest-endpoints--new-sdk-surface)
   - [Unattended PVE install is fully supported by upstream tooling](#unattended-pve-install-is-fully-supported-by-upstream-tooling)
@@ -605,6 +609,20 @@ path-binding, HA rule update required-props, HA-active feasibility counting)
 were each folded back into the SDK + mockpve. This stays **Open** only for the
 steady-state tail (Recommendation steps 6–7: ship + pin, the multi-minor
 matrix + methodology DESIGN doc), concluding with IMPL-0002's final phase.
+
+**CONCLUDED 2026-07-13 — the steady-state tail is done.** Step 6 (ship + pin):
+the pvelab + cluster surface shipped in v0.6.0, the dogfood recipes run the
+stable-pinned CLI (`PVELAB_DEV=1` for harness development), and the post-tag
+smoke passed from a proxy-built binary with no checkout. Step 7 (evolve): the
+template/linked-clone path is live-proven on TWO minors (PVE 9.2 and 9.1 both
+tolerate the clone rename; ~3m10s clone labs vs ~4m40s ISO), the version matrix
+ran against 9.1.1 with zero SDK/mock divergences, and per-version certification
+is real (`certification.yaml`: 9.2-1, 9.2.2, 9.1.1 batches; the 9.1.1 batch was
+the first scrubbed entirely by automation). The settled methodology is
+DESIGN-0002 (→ Implemented); no separate harness-architecture DESIGN was needed
+— DESIGN-0002 already is that document. Every question this INV asked has a
+hardware-validated answer; the answer-server productization thread continues
+separately as INV-0003. INV-0001 concludes alongside.
 
 ## Recommendation
 

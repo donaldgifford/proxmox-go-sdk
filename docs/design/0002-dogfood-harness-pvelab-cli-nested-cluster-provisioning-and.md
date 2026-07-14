@@ -3,7 +3,7 @@ id: DESIGN-0002
 title:
   "Dogfood harness: pvelab CLI, nested cluster provisioning, and recording
   pipeline"
-status: Draft
+status: Implemented
 author: Donald Gifford
 created: 2026-07-09
 ---
@@ -12,7 +12,8 @@ created: 2026-07-09
 
 # DESIGN 0002: Dogfood harness: pvelab CLI, nested cluster provisioning, and recording pipeline
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-07-09
+**Status:** Implemented **Author:** Donald Gifford **Date:** 2026-07-09
+(implemented 2026-07-13 — IMPL-0002 Completed; every phase live-verified)
 
 <!--toc:start-->
 
@@ -23,7 +24,7 @@ created: 2026-07-09
 - [Background](#background)
 - [Detailed Design](#detailed-design)
   - [Component map](#component-map)
-  - [The `pvelab` CLI](#the-pvelab-cli)
+  - [The pvelab CLI](#the-pvelab-cli)
   - [YAML configuration](#yaml-configuration)
   - [State and environment handoff](#state-and-environment-handoff)
   - [New SDK surface: cluster create/join](#new-sdk-surface-cluster-createjoin)
