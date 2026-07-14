@@ -10,6 +10,11 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 - *(impl)* Phase 4 COMPLETE — post-tag smoke passed, v0.6.1 signed release confirmed
 - *(impl)* Phase 5 clone path verified live — PVE tolerates the rename
+- *(impl)* Version-matrix run PASSED on 9.1.1 — Phase 5 criteria both met
+
+### Testing
+
+- *(integration)* Re-record 7 cassettes against PVE 9.1.1 (matrix run)
 
 ## [0.6.1] - 2026-07-12
 

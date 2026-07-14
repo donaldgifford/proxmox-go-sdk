@@ -811,7 +811,7 @@ verified against which real PVE version.
       4m20s template build amortizing across runs. `down` deleted the three node
       VMs and left template 9210 in place (by design — teardown enumerates only
       `cfg.Nested.Nodes`); state files removed, prepared ISO intact._
-- [ ] Version matrix: base ISOs/templates for the supported minors
+- [x] Version matrix: base ISOs/templates for the supported minors
       (9.0/9.1/9.2); `nested.pve_version` selects; **(live)** run the
       capability-gate tests against at least one real non-9.2 minor —
       _2026-07-11: the non-live half fell out of tasks 1–2 (deliberately
@@ -820,7 +820,24 @@ verified against which real PVE version.
       sub-range (9210–9219) plus the one-config-file-per-minor convention are
       documented in `pvelab.example.yaml`. No new code. Open on the **(live)**
       half: a second minor's base ISO on r740a + the capability-gate run against
-      it._
+      it._ — _2026-07-13, first matrix run (Donald, r740a, pinned v0.6.0, config
+      `pvelab-9.1.yaml`): **PASSED end-to-end on PVE 9.1.1.** The 9.2.7
+      assistant prepared the 9.1 ISO; `template build` installed + converted
+      `pvelab-tmpl-9-1` in 4m04s (install 3m44s — 9.1 installs slightly faster
+      than 9.2); the clone `up` formed quorate(3) in **3m11s** (re-identify
+      54/52/53 s per node — PVE 9.1 also tolerates the rename; formation shape
+      identical). As-run VMIDs deviate from the example convention and that is
+      fine: the 9.1 config gave its NODES 9211–9213 and the template 9219 —
+      validation only demands nodes in 9200–9399, template in 9210–9219, no
+      collisions; both templates (9210 for 9.2, 9219 for 9.1) now coexist on
+      r740a. The inner suite ran green against 9.1.1
+      (`connected to PVE     9.1.1`): all six read tests, placement (negative
+      AND positive — the LRM-lag retry fired and settled again), and the live
+      RFB greeting. No SDK or mockpve divergence surfaced. Donald recorded the
+      run (`PVE_RECORD=1`): seven cassettes re-recorded against 9.1.1,
+      leak-reviewed (first fully-automated scrub — the Request.Host fix held
+      with zero hand-edits), `just test-replay` green on the mixed corpus, and
+      `certification.yaml` gained the 9.1.1 batch entry._
 - [x] `proxmox/integration/testdata/cassettes/certification.yaml` (design OQ-8
       schema: `pve_version`, `recorded`, `commit`, `harness`, `cassettes`,
       `notes`): first entry for the 9.2 batch, one entry per matrix run
@@ -852,9 +869,14 @@ verified against which real PVE version.
 #### Success Criteria
 
 - A dogfood run against a **second PVE minor** completes via linked clones,
-  measurably faster than the ISO-install path. **(live)**
+  measurably faster than the ISO-install path. **(live)** — _2026-07-13: MET —
+  PVE 9.1.1 via linked clones in 3m11s vs the 4m39–41s ISO baselines (~32%
+  faster), full inner-suite pass included._
 - `certification.yaml` exists with at least one entry per tested PVE version,
-  and `mockpve`'s behaviour has been reconciled against those recordings.
+  and `mockpve`'s behaviour has been reconciled against those recordings. —
+  _2026-07-13: MET — three batch entries (9.2-1 r740a, 9.2.2 pvelab, 9.1.1
+  pvelab matrix); every divergence found across them is fixed in the SDK/mock
+  and named in `notes`; the 9.1.1 batch surfaced none._
 
 ---
 
