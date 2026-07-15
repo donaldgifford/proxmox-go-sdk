@@ -1,7 +1,7 @@
 ---
 id: IMPL-0002
 title: "Dogfood harness buildout: pvelab, cluster surface, P4/P6 closure"
-status: Draft
+status: Completed
 author: Donald Gifford
 created: 2026-07-09
 ---
@@ -10,7 +10,8 @@ created: 2026-07-09
 
 # IMPL 0002: Dogfood harness buildout: pvelab, cluster surface, P4/P6 closure
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-07-09
+**Status:** Completed **Author:** Donald Gifford **Date:** 2026-07-09 (completed
+2026-07-13)
 
 <!--toc:start-->
 
@@ -43,7 +44,6 @@ created: 2026-07-09
 - [Dependencies](#dependencies)
 - [Open Questions](#open-questions)
 - [References](#references)
-
 <!--toc:end-->
 
 ## Objective
@@ -863,8 +863,16 @@ verified against which real PVE version.
       dogfood run → stale-cassette re-record/review/force-add → reconcile
       mockpve + append the batch entry to `certification.yaml`, with
       `just test-replay` as the regression guard._
-- [ ] Conclude INV-0001 + INV-0002 (→ Concluded, final findings); DESIGN-0002 →
-      Implemented; this IMPL → Completed
+- [x] Conclude INV-0001 + INV-0002 (→ Concluded, final findings); DESIGN-0002 →
+      Implemented; this IMPL → Completed — _2026-07-13: done, with every
+      predecessor gate closed first. INV-0001 concluded with hardware-validated
+      answers to all three sub-questions (the Terraform Phase 1 was deliberately
+      skipped — recorded there); INV-0002 concluded with the steady-state tail
+      done (ship+pin v0.6.0, two-minor clone matrix, three-batch certification);
+      DESIGN-0002 → Implemented (it IS the settled methodology doc); this IMPL →
+      Completed. **Every task in every phase of this ledger is checked, and
+      every phase's Success Criteria — including all (live) ones — carries dated
+      pass evidence.**_
 
 #### Success Criteria
 

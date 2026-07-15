@@ -1,7 +1,7 @@
 ---
 id: INV-0001
 title: "Nested Proxmox nodes for automated live SDK testing"
-status: Open
+status: Concluded
 author: Donald Gifford
 created: 2026-07-05
 ---
@@ -10,7 +10,8 @@ created: 2026-07-05
 
 # INV 0001: Nested Proxmox nodes for automated live SDK testing
 
-**Status:** Open **Author:** Donald Gifford **Date:** 2026-07-05
+**Status:** Concluded **Author:** Donald Gifford **Date:** 2026-07-05 (concluded
+2026-07-13)
 
 <!--toc:start-->
 
@@ -184,6 +185,28 @@ clone-per-run, SDK clone/start/delete) is individually well-established. The
 open risks are cost/time (nested QEMU boots; multi-node clusters for HA/SDN)
 rather than feasibility. This stays **Open** until a Phase 1 PoC produces real
 timings and a captured cassette.
+
+**CONCLUDED 2026-07-13 — answer: yes to all three, validated on hardware.** The
+pipeline this INV asked for exists as `pvelab` (INV-0002 → DESIGN-0002 →
+IMPL-0002), with one deliberate re-sequencing: the Terraform Phase 1 was
+**skipped** — by the time execution started, the SDK's provisioning ops were
+already live-verified against r740a, so INV-0002 went straight to this INV's
+Phase 2 (the SDK provisions its own test environment). Empirical answers to the
+three sub-questions: (1) PVE-in-PVE exercises everything the suite needs —
+unattended nested installs run ~4 min, a 3-node nested cluster reaches quorum in
+under 5 min total, the HA scheduler places guests, and a real RFB byte stream
+flows over `console.Connect`; (2) the template → clone → test → destroy pipeline
+is automated (template build 4m04–4m20s once per minor; linked-clone lab in
+~3m10s, ~33% faster than ISO installs; teardown leaves the host clean — proven
+back-to-back); (3) the SDK provisions its own test environment in production
+form — the dogfood recipes run a stable-pinned `pvelab` while branch code is
+what gets tested. The Open questions resolved: cadence is on-demand (not per-PR
+CI); templates are one-per-minor in the 9210–9219 sub-range, rebuilt on demand;
+`local-zfs` on the nested nodes suffices (storage-level volume-chain snapshots
+turned out not to exist as a PVE REST surface at all); and cassettes are
+committed + replayed in CI (`just test-replay`), certified per PVE version in
+`certification.yaml` (9.2-1, 9.2.2, 9.1.1 batches). Final findings live in
+INV-0002; the settled methodology is DESIGN-0002 (Implemented).
 
 ## Recommendation
 
