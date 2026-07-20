@@ -14,8 +14,11 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -63,9 +66,9 @@ func main() {
 // failures (unreadable files, malformed input). Keeping os.Exit and stdout out
 // of run makes it directly testable.
 func run(apidocPath, baselinePath string, update bool) (report string, drift bool, err error) {
-	apidocJS, err := os.ReadFile(apidocPath)
+	apidocJS, err := readApidoc(apidocPath)
 	if err != nil {
-		return "", false, fmt.Errorf("read apidoc: %w", err)
+		return "", false, err
 	}
 	current, err := schema.Parse(apidocJS)
 	if err != nil {
@@ -77,7 +80,7 @@ func run(apidocPath, baselinePath string, update bool) (report string, drift boo
 		if err != nil {
 			return "", false, err
 		}
-		if err := os.WriteFile(baselinePath, data, 0o644); err != nil { //nolint:gosec // G306: the baseline is non-secret committed data.
+		if err := os.WriteFile(baselinePath, data, 0o644); err != nil {
 			return "", false, fmt.Errorf("write baseline: %w", err)
 		}
 		return fmt.Sprintf("baseline updated: %d endpoint(s)\n", len(current)), false, nil
@@ -105,4 +108,33 @@ func run(apidocPath, baselinePath string, update bool) (report string, drift boo
 	}
 	lines = append(lines, fmt.Sprintf("schema drift: %d added, %d removed", len(diff.Added), len(diff.Removed)))
 	return strings.Join(lines, "\n") + "\n", true, nil
+}
+
+// gzipMagic is the two-byte header every gzip stream starts with.
+var gzipMagic = []byte{0x1f, 0x8b}
+
+// readApidoc reads the apidoc.js dump, transparently gunzipping it when the
+// content is gzip-compressed (detected by magic bytes, not file extension).
+// The real ~4 MB dump is committed gzipped (IMPL-0003 OQ-1) so CI can parse
+// genuine PVE output without bloating the module.
+func readApidoc(path string) ([]byte, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read apidoc: %w", err)
+	}
+	if !bytes.HasPrefix(data, gzipMagic) {
+		return data, nil
+	}
+	zr, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("gunzip apidoc: %w", err)
+	}
+	raw, err := io.ReadAll(zr)
+	if err != nil {
+		return nil, fmt.Errorf("gunzip apidoc: %w", err)
+	}
+	if err := zr.Close(); err != nil {
+		return nil, fmt.Errorf("gunzip apidoc: %w", err)
+	}
+	return raw, nil
 }
