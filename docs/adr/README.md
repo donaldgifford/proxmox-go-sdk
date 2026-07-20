@@ -32,7 +32,7 @@ docz create adr "Your ADR Title"
 
 | ID       | Title                                            | Status   | Date       | Author         | Link                                                                                                                 |
 | -------- | ------------------------------------------------ | -------- | ---------- | -------------- | -------------------------------------------------------------------------------------------------------------------- |
-| ADR-0001 | Separate the Proxmox SDK into its own repository | Proposed | 2026-06-22 | Donald Gifford | [0001-separate-the-proxmox-sdk-into-its-own-repository.md](0001-separate-the-proxmox-sdk-into-its-own-repository.md) |
-| ADR-0002 | Target Proxmox VE 9.x only                       | Proposed | 2026-06-22 | Donald Gifford | [0002-target-proxmox-ve-9x-only.md](0002-target-proxmox-ve-9x-only.md)                                               |
+| ADR-0001 | Separate the Proxmox SDK into its own repository | Accepted | 2026-06-22 | Donald Gifford | [0001-separate-the-proxmox-sdk-into-its-own-repository.md](0001-separate-the-proxmox-sdk-into-its-own-repository.md) |
+| ADR-0002 | Target Proxmox VE 9.x only                       | Accepted | 2026-06-22 | Donald Gifford | [0002-target-proxmox-ve-9x-only.md](0002-target-proxmox-ve-9x-only.md)                                               |
 
 <!-- END DOCZ AUTO-GENERATED -->
