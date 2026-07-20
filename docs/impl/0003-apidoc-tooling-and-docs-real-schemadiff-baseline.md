@@ -114,12 +114,12 @@ all build on.
      deleting one endpoint from baseline.json → exit 1 with the drift line. CI
      confirmation lands with the PR run.)
 - [x] 6. (Found in PR #18 CI.) TruffleHog fails on PVE's own doc-example URI
-     (the `http_proxy` option's placeholder proxy URL with embedded example credentials)
-     inside the committed dump — the URI detector reports it as an unknown
-     result and `--results=verified,unknown` treats that as failure. Fixed by
-     excluding `cmd/pve-schemadiff/testdata/` via a new `.trufflehog-exclude`
-     file; the dump stays verbatim per OQ-1a (upstream PVE documentation
-     content, not repo secrets). (Done 2026-07-20.)
+     (the `http_proxy` option's placeholder proxy URL with embedded example
+     credentials) inside the committed dump — the URI detector reports it as an
+     unknown result and `--results=verified,unknown` treats that as failure.
+     Fixed by excluding `cmd/pve-schemadiff/testdata/` via a new
+     `.trufflehog-exclude` file; the dump stays verbatim per OQ-1a (upstream PVE
+     documentation content, not repo secrets). (Done 2026-07-20.)
 
 #### Success Criteria
 
