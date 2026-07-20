@@ -92,9 +92,22 @@ gives you a URL; `mock.NewClient()` returns a wired `api.Client` + cleanup.
 ### Schema-drift guard
 
 `cmd/pve-schemadiff` parses a Proxmox `apidoc.js` into a (method, path) set and
-fails CI on drift from a committed baseline. By default it guards a synthetic
-fixture; point `-apidoc` at a real 9.x dump (and `-update` to rebaseline) to
-guard the live REST surface.
+fails CI on drift from a committed baseline. Since IMPL-0003 it guards the
+**real PVE 9.2 REST surface**: `just schemadiff` parses the committed
+`cmd/pve-schemadiff/testdata/apidoc-9.2.js.gz` (a genuine dump, gzipped — the
+tool gunzips by magic bytes) against `testdata/baseline.json` (675 endpoints;
+fetched from the homelab 9.2 node, 2026-07-19).
+
+To refresh the baseline for a new PVE version:
+
+```bash
+curl -sk https://<node>:8006/pve-docs/api-viewer/apidoc.js | gzip -9 \
+  > cmd/pve-schemadiff/testdata/apidoc-9.2.js.gz
+just schemadiff -update   # rewrites baseline.json; review the diff in the PR
+```
+
+The endpoint diff in the resulting PR **is** the minor-release API delta —
+review it against the capability gates before merging.
 
 ## Changelog and releases
 

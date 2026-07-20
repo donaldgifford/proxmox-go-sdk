@@ -89,7 +89,7 @@ dogfood:
 # node) to guard the live REST surface, and re-run with `-update` to rebaseline.
 schemadiff *args:
     go run ./cmd/pve-schemadiff \
-        -apidoc cmd/pve-schemadiff/testdata/apidoc.sample.js \
+        -apidoc cmd/pve-schemadiff/testdata/apidoc-9.2.js.gz \
         -baseline cmd/pve-schemadiff/testdata/baseline.json {{args}}
 
 # Lint Go + yaml + Actions workflows + markdown + format
