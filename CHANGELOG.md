@@ -23,6 +23,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 ### Miscellaneous Tasks
 
 - *(schemadiff)* Adopt the real PVE 9.2 baseline in CI
+- Exclude schemadiff testdata from TruffleHog secret scanning
 
 ## [0.6.2] - 2026-07-14
 

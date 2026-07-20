@@ -113,6 +113,13 @@ all build on.
      change. (Done 2026-07-20 locally — recipe passes; tamper check verified:
      deleting one endpoint from baseline.json → exit 1 with the drift line. CI
      confirmation lands with the PR run.)
+- [x] 6. (Found in PR #18 CI.) TruffleHog fails on PVE's own doc-example URI
+     (the `http_proxy` option's placeholder proxy URL with embedded example credentials)
+     inside the committed dump — the URI detector reports it as an unknown
+     result and `--results=verified,unknown` treats that as failure. Fixed by
+     excluding `cmd/pve-schemadiff/testdata/` via a new `.trufflehog-exclude`
+     file; the dump stays verbatim per OQ-1a (upstream PVE documentation
+     content, not repo secrets). (Done 2026-07-20.)
 
 #### Success Criteria
 
@@ -132,8 +139,8 @@ all build on.
 - [x] 2. Commit `docs/REVIEW.md` (per OQ-2a). (Done 2026-07-20.)
 - [x] 3. Changelog as the branch's final commit (`git-cliff -o CHANGELOG.md` +
      `chore(changelog): Auto-sync`).
-- [x] 4. Open the PR with the `patch` label — PR #18, 2026-07-20 (auto-release mints
-     the next patch tag).
+- [x] 4. Open the PR with the `patch` label — PR #18, 2026-07-20 (auto-release
+     mints the next patch tag).
 
 #### Success Criteria
 

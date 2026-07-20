@@ -17,4 +17,4 @@ jobs:
       - name: Secret Scanning
         uses: trufflesecurity/trufflehog@v3.95.8
         with:
-          extra_args: --results=verified,unknown
+          extra_args: --results=verified,unknown --exclude-paths=.trufflehog-exclude
