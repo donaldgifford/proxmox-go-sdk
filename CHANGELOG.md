@@ -19,6 +19,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - Conclude the dogfood-harness document set — IMPL-0002 COMPLETED
 - INV-0004 apidoc cross-check + the remediation doc set
 - *(impl)* IMPL-0003 phase 3 boxes — changelog + PR #18 opened
+- *(impl)* Prettier rewrap of IMPL-0003 task note
 
 ### Miscellaneous Tasks
 
