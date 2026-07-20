@@ -34,17 +34,18 @@ type node struct {
 }
 
 // Parse extracts the endpoint set from apidoc.js content. PVE ships the schema
-// as a JavaScript assignment (e.g. `const apiSchema = [ … ];`); Parse tolerates
-// the wrapper by decoding the outermost JSON array between the first '[' and the
-// last ']'. The result is sorted and de-duplicated.
+// as a JavaScript assignment (e.g. `const apiSchema = [ … ];`) followed by the
+// API-viewer application code, so the array's closing bracket is NOT the last
+// ']' in the file. Parse decodes the first complete JSON value starting at the
+// first '[' and ignores everything after it. The result is sorted and
+// de-duplicated.
 func Parse(apidocJS []byte) ([]Endpoint, error) {
 	start := bytes.IndexByte(apidocJS, '[')
-	end := bytes.LastIndexByte(apidocJS, ']')
-	if start < 0 || end <= start {
+	if start < 0 {
 		return nil, fmt.Errorf("schema: no JSON array found in apidoc.js")
 	}
 	var roots []node
-	if err := json.Unmarshal(apidocJS[start:end+1], &roots); err != nil {
+	if err := json.NewDecoder(bytes.NewReader(apidocJS[start:])).Decode(&roots); err != nil {
 		return nil, fmt.Errorf("schema: parse apidoc.js array: %w", err)
 	}
 	seen := make(map[string]Endpoint)
