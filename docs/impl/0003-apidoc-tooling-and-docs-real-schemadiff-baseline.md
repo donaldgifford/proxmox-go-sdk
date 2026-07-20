@@ -130,9 +130,9 @@ all build on.
      Draft DESIGN-0003/0004/0005 set created alongside rides the same commit —
      their OQ decisions land in their own implementation PRs.)
 - [x] 2. Commit `docs/REVIEW.md` (per OQ-2a). (Done 2026-07-20.)
-- [ ] 3. Changelog as the branch's final commit (`git-cliff -o CHANGELOG.md` +
+- [x] 3. Changelog as the branch's final commit (`git-cliff -o CHANGELOG.md` +
      `chore(changelog): Auto-sync`).
-- [ ] 4. Open the PR with the `patch` label; merge on green (auto-release mints
+- [x] 4. Open the PR with the `patch` label — PR #18, 2026-07-20 (auto-release mints
      the next patch tag).
 
 #### Success Criteria
