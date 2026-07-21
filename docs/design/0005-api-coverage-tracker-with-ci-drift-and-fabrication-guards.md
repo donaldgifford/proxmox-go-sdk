@@ -1,7 +1,7 @@
 ---
 id: DESIGN-0005
 title: "API coverage tracker with CI drift and fabrication guards"
-status: Draft
+status: Approved
 author: Donald Gifford
 created: 2026-07-19
 ---
@@ -10,7 +10,8 @@ created: 2026-07-19
 
 # DESIGN 0005: API coverage tracker with CI drift and fabrication guards
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-07-19
+**Status:** Approved **Author:** Donald Gifford **Date:** 2026-07-19 (OQs
+decided 2026-07-21: all a)
 
 <!--toc:start-->
 
@@ -188,7 +189,7 @@ source parsing.
 
 ## Open Questions
 
-1. **Where does the tool live?**
+1. **Where does the tool live?** **Decision (2026-07-21): a.**
    - **a (recommended):** A `-coverage` mode on `cmd/pve-schemadiff` — it
      already owns apidoc parsing, the baseline, and the CI slot; both features
      are "compare a surface against the baseline". One tool, one `schema`
@@ -196,7 +197,7 @@ source parsing.
    - b: A new `cmd/pve-coverage` importing the `schema` package. Cleaner
      single-purpose binaries, one more cmd to version/wire/document.
 
-2. **What is the coverage numerator?**
+2. **What is the coverage numerator?** **Decision (2026-07-21): a.**
    - **a (recommended):** mockpve's route table. Zero new bookkeeping, kept
      honest by the existing every-op-tests-against-mockpve discipline plus
      cassette certification; drifts only if that discipline drifts (which the
@@ -208,14 +209,14 @@ source parsing.
      and no mock dependency, but a fragile mini-parser over `fmt.Sprintf`-built
      paths.
 
-3. **Report format?**
+3. **Report format?** **Decision (2026-07-21): a.**
    - **a (recommended):** Full per-endpoint tables per service (greppable,
      diff-reviewable, self-explanatory in the repo).
    - b: Summary percentages only (short but hides _which_ endpoints gap).
    - c: Summary in-repo + full report as a CI artifact (splits the truth across
      two places).
 
-4. **When does the first report land?**
+4. **When does the first report land?** **Decision (2026-07-21): a.**
    - **a (recommended):** After DESIGN-0003/0004 merge — the guard's first run
      is then clean, and the report never memorializes routes we already know are
      wrong.
@@ -223,7 +224,7 @@ source parsing.
      diffs; requires seeding `allow_unmatched_routes` with the known-bad routes
      just to get CI green, which is backwards.
 
-5. **Release label for the tracker PR?**
+5. **Release label for the tracker PR?** **Decision (2026-07-21): a.**
    - **a (recommended):** `minor` — `mockpve.Routes()` is new public API on an
      importable package.
    - b: `patch` — treat it as tooling; defensible only if `Routes()` stays

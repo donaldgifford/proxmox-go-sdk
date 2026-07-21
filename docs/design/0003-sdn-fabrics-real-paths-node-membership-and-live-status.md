@@ -1,7 +1,7 @@
 ---
 id: DESIGN-0003
 title: "SDN fabrics real paths, node membership, and live status"
-status: Draft
+status: Approved
 author: Donald Gifford
 created: 2026-07-19
 ---
@@ -10,7 +10,8 @@ created: 2026-07-19
 
 # DESIGN 0003: SDN fabrics real paths, node membership, and live status
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-07-19
+**Status:** Approved **Author:** Donald Gifford **Date:** 2026-07-19 (OQs
+decided 2026-07-21: all a)
 
 <!--toc:start-->
 
@@ -201,7 +202,7 @@ interface change is uncontentious.
 
 ## Open Questions
 
-1. **How deep does the live verification go?**
+1. **How deep does the live verification go?** **Decision (2026-07-21): a.**
    - **a (recommended):** Full: OpenFabric fabric across the three nested
      nodes + node membership + status reads + teardown, recorded. This is the
      only way the _semantics_ (not just paths) get verified, and the nested
@@ -210,7 +211,8 @@ interface change is uncontentious.
      convergence (no interfaces/neighbors checks). Cheaper, but status reads
      would be recorded against an unconverged fabric.
 
-2. **Which observed fabric fields get promoted to typed fields?**
+2. **Which observed fabric fields get promoted to typed fields?** **Decision
+   (2026-07-21): a.**
    - **a (recommended):** Promote the protocol-neutral core (`Protocol`,
      `IPPrefix`, `IP6Prefix`, `Redistribute`, `RouteFilter`) and leave the
      per-protocol tunables (OpenFabric/OSPF timers, WireGuard keepalive) in
@@ -221,25 +223,33 @@ interface change is uncontentious.
    - c: Promote nothing new; `Extra` for all. Safest, least useful.
 
 3. **Are the fabric runtime reads (`interfaces`/`neighbors`/`routes`, plus
-   `bridges`/`ip-vrf`/`mac-vrf`) in scope?**
+   `bridges`/`ip-vrf`/`mac-vrf`) in scope?** **Decision (2026-07-21): a.**
    - **a (recommended):** Yes — they are trivial GETs on the same node-scoped
      surface, land as lossless reads in the same PR, and the live run exercises
      them for free.
    - b: Defer to a follow-up; ship only zones/content/vnet status now.
 
-4. **Do we model `GET /cluster/sdn/fabrics` (index) and `/all`?**
+4. **Do we model `GET /cluster/sdn/fabrics` (index) and `/all`?** **Decision
+   (2026-07-21): a.**
    - **a (recommended):** No. The index is a subdir listing (not data) and
      `/all` merges the two collections we already expose; consumers can compose.
      Fewer methods, no information loss.
    - b: Add `ListFabricsAll` for one-call convenience.
 
-5. **Model the `pending`/`running` query filters on fabric reads?**
+5. **Model the `pending`/`running` query filters on fabric reads?** **Decision
+   (2026-07-21): a — deferred, revisit post-ship** (see OQ-6).
    - **a (recommended):** Not now — they expose the SDN transaction view; add
      them with transaction support if/when OQ-6 says so. Reads return the
      running config, matching zones/vnets today.
    - b: Add `WithPending`/`WithRunning` functional options now.
 
-6. **SDN config transactions (`lock-token`, `digest`, rollback)?**
+6. **SDN config transactions (`lock-token`, `digest`, rollback)?** **Decision
+   (2026-07-21): a — deferred, revisit after this design ships and runs live.**
+   Deliberately NO placeholder transactions design doc now: the live run will
+   teach us how `lock-token`/`digest` actually behave, and a design written then
+   is better-informed (a blocked stub today would be speculation — the
+   REST-with-caveat failure mode). If a consumer needs transactional SDN, that
+   future design also folds in OQ-5's `pending`/`running` filters.
    - **a (recommended):** Out of scope; document that callers needing locked
      applies pass `lock-token` via `Extra`. Revisit as its own design if a
      consumer needs transactional SDN.

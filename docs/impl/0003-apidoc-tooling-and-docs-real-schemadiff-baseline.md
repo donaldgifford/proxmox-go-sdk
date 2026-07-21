@@ -1,7 +1,7 @@
 ---
 id: IMPL-0003
 title: "Apidoc tooling and docs: real schemadiff baseline"
-status: In Progress
+status: Completed
 author: Donald Gifford
 created: 2026-07-19
 ---
@@ -10,8 +10,8 @@ created: 2026-07-19
 
 # IMPL 0003: Apidoc tooling and docs: real schemadiff baseline
 
-**Status:** In Progress **Author:** Donald Gifford **Date:** 2026-07-19 (OQs
-decided 2026-07-20)
+**Status:** Completed **Author:** Donald Gifford **Date:** 2026-07-19 (OQs
+decided 2026-07-20; completed 2026-07-21)
 
 <!--toc:start-->
 
@@ -145,7 +145,8 @@ all build on.
 #### Success Criteria
 
 - PR merged; all CI jobs green including the now-real schema-drift guard; patch
-  tag auto-minted by the release workflow.
+  tag auto-minted by the release workflow. **MET 2026-07-21: PR #18 merged,
+  v0.6.3 minted and published (signed checksums + SBOMs).**
 
 ## Open Questions
 

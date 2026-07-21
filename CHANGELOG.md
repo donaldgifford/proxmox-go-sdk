@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [unreleased]
+
+### Documentation
+
+- Record OQ decisions — designs Approved, IMPL-0003 Completed
+- *(impl)* Add IMPL-0004/0005 — DESIGN-0003/0004 delivery plans
+- *(impl)* Record OQ decisions for IMPL-0004/0005 — all a
+- *(impl)* Add IMPL-0006 — API coverage tracker delivery plan
+- *(impl)* Record OQ decisions for IMPL-0006 — all a
+
 ## [0.6.3] - 2026-07-21
 
 ### Features
