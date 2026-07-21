@@ -63,8 +63,8 @@ func TestClusterAndHAReads(t *testing.T) {
 }
 
 // TestNetworkReads covers Phase 5's read criterion: enumerating zones, VNets,
-// and fabrics without error. (The live-status half is pverr.ErrUnsupported in
-// 9.x, so it is not exercised here.)
+// and fabrics without error. (The node-scoped live-status half is covered by
+// TestSDNStatusReads and TestSDNFabricLifecycle, DESIGN-0003.)
 func TestNetworkReads(t *testing.T) {
 	c := newClient(t)
 	ctx := testCtx(t)
