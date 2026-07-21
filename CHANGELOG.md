@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [unreleased]
+
+### Features
+
+- *(sdn)* [**breaking**] Fabrics on real nested paths, node membership, live status reads
+
+### Documentation
+
+- Record OQ decisions — designs Approved, IMPL-0003 Completed
+- Record the DESIGN-0003 remediation across the doc surfaces
+
+### Testing
+
+- *(integration)* SDN status reads + fabric lifecycle live tests
+
 ## [0.6.3] - 2026-07-21
 
 ### Features
