@@ -61,6 +61,32 @@ func TestParse(t *testing.T) {
 	}
 }
 
+// TestParseTrailingAppCode pins the real-world apidoc.js shape: PVE ships the
+// schema array followed by the ExtJS API-viewer application, so the file's
+// last ']' belongs to viewer code, not the schema. A first-'['-to-last-']'
+// slice (the pre-2026-07-19 implementation) fails this test with
+// "invalid character ';' after top-level value".
+func TestParseTrailingAppCode(t *testing.T) {
+	t.Parallel()
+	trailing := sampleAPIDoc + `
+Ext.onReady(function() {
+    let store = buildStore([{"path": "/fake"}]);
+    window.onhashchange = function() { render(store.data[0]); };
+});
+`
+	want, err := schema.Parse([]byte(sampleAPIDoc))
+	if err != nil {
+		t.Fatalf("Parse(clean): %v", err)
+	}
+	got, err := schema.Parse([]byte(trailing))
+	if err != nil {
+		t.Fatalf("Parse(trailing app code): %v", err)
+	}
+	if rep := schema.Diff(want, got); !rep.Empty() {
+		t.Errorf("trailing app code changed the endpoint set: %+v", rep)
+	}
+}
+
 func TestParseErrors(t *testing.T) {
 	t.Parallel()
 	if _, err := schema.Parse([]byte("const x = 42;")); err == nil {

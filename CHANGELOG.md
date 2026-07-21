@@ -6,9 +6,25 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [unreleased]
 
+### Features
+
+- *(schemadiff)* Transparent gzip support for -apidoc input
+
+### Bug Fixes
+
+- *(schemadiff)* Decode only the schema array from real apidoc.js
+
 ### Documentation
 
 - Conclude the dogfood-harness document set — IMPL-0002 COMPLETED
+- INV-0004 apidoc cross-check + the remediation doc set
+- *(impl)* IMPL-0003 phase 3 boxes — changelog + PR #18 opened
+- *(impl)* Prettier rewrap of IMPL-0003 task note
+
+### Miscellaneous Tasks
+
+- *(schemadiff)* Adopt the real PVE 9.2 baseline in CI
+- Exclude schemadiff testdata from TruffleHog secret scanning
 
 ## [0.6.2] - 2026-07-14
 

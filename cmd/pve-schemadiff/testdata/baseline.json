@@ -1,11 +1,1219 @@
 [
   {
     "method": "GET",
+    "path": "/access"
+  },
+  {
+    "method": "GET",
+    "path": "/access/acl"
+  },
+  {
+    "method": "PUT",
+    "path": "/access/acl"
+  },
+  {
+    "method": "GET",
+    "path": "/access/domains"
+  },
+  {
+    "method": "POST",
+    "path": "/access/domains"
+  },
+  {
+    "method": "DELETE",
+    "path": "/access/domains/{realm}"
+  },
+  {
+    "method": "GET",
+    "path": "/access/domains/{realm}"
+  },
+  {
+    "method": "PUT",
+    "path": "/access/domains/{realm}"
+  },
+  {
+    "method": "POST",
+    "path": "/access/domains/{realm}/sync"
+  },
+  {
+    "method": "GET",
+    "path": "/access/groups"
+  },
+  {
+    "method": "POST",
+    "path": "/access/groups"
+  },
+  {
+    "method": "DELETE",
+    "path": "/access/groups/{groupid}"
+  },
+  {
+    "method": "GET",
+    "path": "/access/groups/{groupid}"
+  },
+  {
+    "method": "PUT",
+    "path": "/access/groups/{groupid}"
+  },
+  {
+    "method": "GET",
+    "path": "/access/openid"
+  },
+  {
+    "method": "POST",
+    "path": "/access/openid/auth-url"
+  },
+  {
+    "method": "POST",
+    "path": "/access/openid/login"
+  },
+  {
+    "method": "PUT",
+    "path": "/access/password"
+  },
+  {
+    "method": "GET",
+    "path": "/access/permissions"
+  },
+  {
+    "method": "GET",
+    "path": "/access/roles"
+  },
+  {
+    "method": "POST",
+    "path": "/access/roles"
+  },
+  {
+    "method": "DELETE",
+    "path": "/access/roles/{roleid}"
+  },
+  {
+    "method": "GET",
+    "path": "/access/roles/{roleid}"
+  },
+  {
+    "method": "PUT",
+    "path": "/access/roles/{roleid}"
+  },
+  {
+    "method": "GET",
+    "path": "/access/tfa"
+  },
+  {
+    "method": "GET",
+    "path": "/access/tfa/{userid}"
+  },
+  {
+    "method": "POST",
+    "path": "/access/tfa/{userid}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/access/tfa/{userid}/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/access/tfa/{userid}/{id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/access/tfa/{userid}/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/access/ticket"
+  },
+  {
+    "method": "POST",
+    "path": "/access/ticket"
+  },
+  {
+    "method": "GET",
     "path": "/access/users"
   },
   {
     "method": "POST",
     "path": "/access/users"
+  },
+  {
+    "method": "DELETE",
+    "path": "/access/users/{userid}"
+  },
+  {
+    "method": "GET",
+    "path": "/access/users/{userid}"
+  },
+  {
+    "method": "PUT",
+    "path": "/access/users/{userid}"
+  },
+  {
+    "method": "GET",
+    "path": "/access/users/{userid}/tfa"
+  },
+  {
+    "method": "GET",
+    "path": "/access/users/{userid}/token"
+  },
+  {
+    "method": "DELETE",
+    "path": "/access/users/{userid}/token/{tokenid}"
+  },
+  {
+    "method": "GET",
+    "path": "/access/users/{userid}/token/{tokenid}"
+  },
+  {
+    "method": "POST",
+    "path": "/access/users/{userid}/token/{tokenid}"
+  },
+  {
+    "method": "PUT",
+    "path": "/access/users/{userid}/token/{tokenid}"
+  },
+  {
+    "method": "PUT",
+    "path": "/access/users/{userid}/unlock-tfa"
+  },
+  {
+    "method": "POST",
+    "path": "/access/vncticket"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/acme"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/acme/account"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/acme/account"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/acme/account/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/acme/account/{name}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/acme/account/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/acme/challenge-schema"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/acme/directories"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/acme/meta"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/acme/plugins"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/acme/plugins"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/acme/plugins/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/acme/plugins/{id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/acme/plugins/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/acme/tos"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/backup"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/backup"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/backup-info"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/backup-info/not-backed-up"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/backup/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/backup/{id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/backup/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/backup/{id}/included_volumes"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/bulk-action"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/bulk-action/guest"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/bulk-action/guest/migrate"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/bulk-action/guest/shutdown"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/bulk-action/guest/start"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/bulk-action/guest/suspend"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/ceph"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/ceph/flags"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/ceph/flags"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/ceph/flags/{flag}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/ceph/flags/{flag}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/ceph/metadata"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/ceph/status"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/config"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/config"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/config/apiversion"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/config/join"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/config/join"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/config/nodes"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/config/nodes/{node}"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/config/nodes/{node}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/config/qdevice"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/config/totem"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/firewall"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/firewall/aliases"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/firewall/aliases"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/firewall/aliases/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/firewall/aliases/{name}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/firewall/aliases/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/firewall/groups"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/firewall/groups"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/firewall/groups/{group}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/firewall/groups/{group}"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/firewall/groups/{group}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/firewall/groups/{group}/{pos}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/firewall/groups/{group}/{pos}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/firewall/groups/{group}/{pos}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/firewall/ipset"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/firewall/ipset"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/firewall/ipset/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/firewall/ipset/{name}"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/firewall/ipset/{name}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/firewall/ipset/{name}/{cidr}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/firewall/ipset/{name}/{cidr}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/firewall/ipset/{name}/{cidr}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/firewall/macros"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/firewall/options"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/firewall/options"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/firewall/refs"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/firewall/rules"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/firewall/rules"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/firewall/rules/{pos}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/firewall/rules/{pos}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/firewall/rules/{pos}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/ha"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/ha/groups"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/ha/groups"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/ha/groups/{group}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/ha/groups/{group}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/ha/groups/{group}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/ha/resources"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/ha/resources"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/ha/resources/{sid}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/ha/resources/{sid}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/ha/resources/{sid}"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/ha/resources/{sid}/migrate"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/ha/resources/{sid}/relocate"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/ha/rules"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/ha/rules"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/ha/rules/{rule}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/ha/rules/{rule}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/ha/rules/{rule}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/ha/status"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/ha/status/arm-ha"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/ha/status/current"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/ha/status/disarm-ha"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/ha/status/manager_status"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/jobs"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/jobs/realm-sync"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/jobs/realm-sync/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/jobs/realm-sync/{id}"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/jobs/realm-sync/{id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/jobs/realm-sync/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/jobs/schedule-analyze"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/log"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/mapping"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/mapping/dir"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/mapping/dir"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/mapping/dir/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/mapping/dir/{id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/mapping/dir/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/mapping/pci"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/mapping/pci"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/mapping/pci/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/mapping/pci/{id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/mapping/pci/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/mapping/usb"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/mapping/usb"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/mapping/usb/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/mapping/usb/{id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/mapping/usb/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/metrics"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/metrics/export"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/metrics/server"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/metrics/server/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/metrics/server/{id}"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/metrics/server/{id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/metrics/server/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/nextid"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/notifications"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/notifications/endpoints"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/notifications/endpoints/gotify"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/notifications/endpoints/gotify"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/notifications/endpoints/gotify/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/notifications/endpoints/gotify/{name}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/notifications/endpoints/gotify/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/notifications/endpoints/sendmail"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/notifications/endpoints/sendmail"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/notifications/endpoints/sendmail/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/notifications/endpoints/sendmail/{name}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/notifications/endpoints/sendmail/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/notifications/endpoints/smtp"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/notifications/endpoints/smtp"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/notifications/endpoints/smtp/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/notifications/endpoints/smtp/{name}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/notifications/endpoints/smtp/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/notifications/endpoints/webhook"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/notifications/endpoints/webhook"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/notifications/endpoints/webhook/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/notifications/endpoints/webhook/{name}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/notifications/endpoints/webhook/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/notifications/matcher-field-values"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/notifications/matcher-fields"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/notifications/matchers"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/notifications/matchers"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/notifications/matchers/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/notifications/matchers/{name}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/notifications/matchers/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/notifications/targets"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/notifications/targets/{name}/test"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/options"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/options"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/qemu"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/qemu/cpu-flags"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/qemu/custom-cpu-models"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/qemu/custom-cpu-models"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/qemu/custom-cpu-models/{cputype}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/qemu/custom-cpu-models/{cputype}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/qemu/custom-cpu-models/{cputype}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/replication"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/replication"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/replication/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/replication/{id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/replication/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/resources"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/sdn"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/controllers"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/sdn/controllers"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/sdn/controllers/{controller}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/controllers/{controller}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/sdn/controllers/{controller}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/dns"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/sdn/dns"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/sdn/dns/{dns}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/dns/{dns}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/sdn/dns/{dns}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/dry-run"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/fabrics"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/fabrics/all"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/fabrics/fabric"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/sdn/fabrics/fabric"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/sdn/fabrics/fabric/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/fabrics/fabric/{id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/sdn/fabrics/fabric/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/fabrics/node"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/fabrics/node/{fabric_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/sdn/fabrics/node/{fabric_id}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/sdn/fabrics/node/{fabric_id}/{node_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/fabrics/node/{fabric_id}/{node_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/sdn/fabrics/node/{fabric_id}/{node_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/ipams"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/sdn/ipams"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/sdn/ipams/{ipam}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/ipams/{ipam}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/sdn/ipams/{ipam}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/ipams/{ipam}/status"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/sdn/lock"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/sdn/lock"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/prefix-lists"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/sdn/prefix-lists"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/sdn/prefix-lists/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/prefix-lists/{id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/sdn/prefix-lists/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/prefix-lists/{id}/entries"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/sdn/prefix-lists/{id}/entries"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/sdn/prefix-lists/{id}/entries/{url_seq}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/prefix-lists/{id}/entries/{url_seq}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/sdn/prefix-lists/{id}/entries/{url_seq}"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/sdn/rollback"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/route-maps"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/route-maps/entries"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/sdn/route-maps/entries"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/route-maps/entries/{route-map-id}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/sdn/route-maps/entries/{route-map-id}/entry/{order}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/route-maps/entries/{route-map-id}/entry/{order}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/sdn/route-maps/entries/{route-map-id}/entry/{order}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/vnets"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/sdn/vnets"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/sdn/vnets/{vnet}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/vnets/{vnet}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/sdn/vnets/{vnet}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/vnets/{vnet}/firewall"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/vnets/{vnet}/firewall/options"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/sdn/vnets/{vnet}/firewall/options"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/vnets/{vnet}/firewall/rules"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/sdn/vnets/{vnet}/firewall/rules"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/sdn/vnets/{vnet}/firewall/rules/{pos}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/vnets/{vnet}/firewall/rules/{pos}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/sdn/vnets/{vnet}/firewall/rules/{pos}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/sdn/vnets/{vnet}/ips"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/sdn/vnets/{vnet}/ips"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/sdn/vnets/{vnet}/ips"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/vnets/{vnet}/subnets"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/sdn/vnets/{vnet}/subnets"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/sdn/vnets/{vnet}/subnets/{subnet}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/vnets/{vnet}/subnets/{subnet}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/sdn/vnets/{vnet}/subnets/{subnet}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/zones"
+  },
+  {
+    "method": "POST",
+    "path": "/cluster/sdn/zones"
+  },
+  {
+    "method": "DELETE",
+    "path": "/cluster/sdn/zones/{zone}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/sdn/zones/{zone}"
+  },
+  {
+    "method": "PUT",
+    "path": "/cluster/sdn/zones/{zone}"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/status"
+  },
+  {
+    "method": "GET",
+    "path": "/cluster/tasks"
   },
   {
     "method": "GET",
@@ -13,15 +1221,1479 @@
   },
   {
     "method": "GET",
+    "path": "/nodes/{node}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/aplinfo"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/aplinfo"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/apt"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/apt/changelog"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/apt/repositories"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/apt/repositories"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/apt/repositories"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/apt/update"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/apt/update"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/apt/versions"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/capabilities"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/capabilities/qemu"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/capabilities/qemu/cpu"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/capabilities/qemu/cpu-flags"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/capabilities/qemu/machines"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/capabilities/qemu/migration"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/cfg"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/cfg/db"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/cfg/raw"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/cfg/value"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/cmd-safety"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/crush"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/fs"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/ceph/fs/{name}"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/ceph/fs/{name}"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/ceph/init"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/log"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/mds"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/ceph/mds/{name}"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/ceph/mds/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/mgr"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/ceph/mgr/{id}"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/ceph/mgr/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/mon"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/ceph/mon/{monid}"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/ceph/mon/{monid}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/osd"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/ceph/osd"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/ceph/osd/{osdid}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/osd/{osdid}"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/ceph/osd/{osdid}/in"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/osd/{osdid}/lv-info"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/osd/{osdid}/metadata"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/ceph/osd/{osdid}/out"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/ceph/osd/{osdid}/scrub"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/pool"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/ceph/pool"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/ceph/pool/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/pool/{name}"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/ceph/pool/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/pool/{name}/status"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/ceph/restart"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/rules"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/ceph/start"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/ceph/status"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/ceph/stop"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/certificates"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/certificates/acme"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/certificates/acme/certificate"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/certificates/acme/certificate"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/certificates/acme/certificate"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/certificates/custom"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/certificates/custom"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/certificates/info"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/config"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/config"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/disks"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/disks/directory"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/disks/directory"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/disks/directory/{name}"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/disks/initgpt"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/disks/list"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/disks/lvm"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/disks/lvm"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/disks/lvm/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/disks/lvmthin"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/disks/lvmthin"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/disks/lvmthin/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/disks/smart"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/disks/wipedisk"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/disks/zfs"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/disks/zfs"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/disks/zfs/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/disks/zfs/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/dns"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/dns"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/execute"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/firewall"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/firewall/log"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/firewall/options"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/firewall/options"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/firewall/rules"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/firewall/rules"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/firewall/rules/{pos}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/firewall/rules/{pos}"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/firewall/rules/{pos}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/hardware"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/hardware/pci"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/hardware/pci/{pci-id-or-mapping}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/hardware/pci/{pci-id-or-mapping}/mdev"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/hardware/usb"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/hosts"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/hosts"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/journal"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/lxc/{vmid}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/clone"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/config"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/lxc/{vmid}/config"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/feature"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/aliases"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/aliases"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/aliases/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/aliases/{name}"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/aliases/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/ipset"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/ipset"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/ipset/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/ipset/{name}"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/ipset/{name}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/ipset/{name}/{cidr}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/ipset/{name}/{cidr}"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/ipset/{name}/{cidr}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/log"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/options"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/options"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/refs"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/rules"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/rules"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/rules/{pos}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/rules/{pos}"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/lxc/{vmid}/firewall/rules/{pos}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/interfaces"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/migrate"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/migrate"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/move_volume"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/mtunnel"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/mtunnelwebsocket"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/pending"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/remote_migrate"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/lxc/{vmid}/resize"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/rrd"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/rrddata"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/snapshot"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/snapshot"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/lxc/{vmid}/snapshot/{snapname}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/snapshot/{snapname}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/snapshot/{snapname}/config"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/lxc/{vmid}/snapshot/{snapname}/config"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/snapshot/{snapname}/rollback"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/spiceproxy"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/status"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/status/current"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/status/reboot"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/status/resume"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/status/shutdown"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/status/start"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/status/stop"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/status/suspend"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/template"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/termproxy"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/lxc/{vmid}/vncproxy"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/lxc/{vmid}/vncwebsocket"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/migrateall"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/netstat"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/network"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/network"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/network"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/network"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/network/{iface}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/network/{iface}"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/network/{iface}"
+  },
+  {
+    "method": "GET",
     "path": "/nodes/{node}/qemu"
   },
   {
     "method": "POST",
     "path": "/nodes/{node}/qemu"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/qemu/{vmid}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/agent"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/agent"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/exec"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/exec-status"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/file-read"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/file-write"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/fsfreeze-freeze"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/fsfreeze-status"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/fsfreeze-thaw"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/fstrim"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/get-fsinfo"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/get-host-name"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/get-memory-block-info"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/get-memory-blocks"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/get-osinfo"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/get-time"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/get-timezone"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/get-users"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/get-vcpus"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/info"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/network-get-interfaces"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/ping"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/set-user-password"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/shutdown"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/suspend-disk"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/suspend-hybrid"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/agent/suspend-ram"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/clone"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/cloudinit"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/qemu/{vmid}/cloudinit"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/cloudinit/dump"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/config"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/config"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/qemu/{vmid}/config"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/dbus-vmstate"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/feature"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/aliases"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/aliases"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/aliases/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/aliases/{name}"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/aliases/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/ipset"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/ipset"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/ipset/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/ipset/{name}"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/ipset/{name}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/ipset/{name}/{cidr}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/ipset/{name}/{cidr}"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/ipset/{name}/{cidr}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/log"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/options"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/options"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/refs"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/rules"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/rules"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/rules/{pos}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/rules/{pos}"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/qemu/{vmid}/firewall/rules/{pos}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/migrate"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/migrate"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/monitor"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/move_disk"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/mtunnel"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/mtunnelwebsocket"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/pending"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/remote_migrate"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/qemu/{vmid}/resize"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/rrd"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/rrddata"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/qemu/{vmid}/sendkey"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/snapshot"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/snapshot"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/qemu/{vmid}/snapshot/{snapname}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/snapshot/{snapname}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/snapshot/{snapname}/config"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/qemu/{vmid}/snapshot/{snapname}/config"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/snapshot/{snapname}/rollback"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/spiceproxy"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/status"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/status/current"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/status/reboot"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/status/reset"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/status/resume"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/status/shutdown"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/status/start"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/status/stop"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/status/suspend"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/template"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/qemu/{vmid}/termproxy"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/qemu/{vmid}/unlink"
   },
   {
     "method": "POST",
     "path": "/nodes/{node}/qemu/{vmid}/vncproxy"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/qemu/{vmid}/vncwebsocket"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/query-oci-repo-tags"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/query-url-metadata"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/replication"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/replication/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/replication/{id}/log"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/replication/{id}/schedule_now"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/replication/{id}/status"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/report"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/rrd"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/rrddata"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/scan"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/scan/cifs"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/scan/iscsi"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/scan/lvm"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/scan/lvmthin"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/scan/nfs"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/scan/pbs"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/scan/zfs"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/sdn"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/sdn/fabrics/{fabric}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/sdn/fabrics/{fabric}/interfaces"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/sdn/fabrics/{fabric}/neighbors"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/sdn/fabrics/{fabric}/routes"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/sdn/vnets/{vnet}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/sdn/vnets/{vnet}/mac-vrf"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/sdn/zones"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/sdn/zones/{zone}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/sdn/zones/{zone}/bridges"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/sdn/zones/{zone}/content"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/sdn/zones/{zone}/ip-vrf"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/services"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/services/{service}"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/services/{service}/reload"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/services/{service}/restart"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/services/{service}/start"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/services/{service}/state"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/services/{service}/stop"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/spiceshell"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/startall"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/status"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/status"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/stopall"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/storage"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/storage/{storage}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/storage/{storage}/content"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/storage/{storage}/content"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/storage/{storage}/content/{volume}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/storage/{storage}/content/{volume}"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/storage/{storage}/content/{volume}"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/storage/{storage}/content/{volume}"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/storage/{storage}/download-url"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/storage/{storage}/file-restore/download"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/storage/{storage}/file-restore/list"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/storage/{storage}/identity"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/storage/{storage}/import-metadata"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/storage/{storage}/oci-registry-pull"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/storage/{storage}/prunebackups"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/storage/{storage}/prunebackups"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/storage/{storage}/rrd"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/storage/{storage}/rrddata"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/storage/{storage}/status"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/storage/{storage}/upload"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/subscription"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/subscription"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/subscription"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/subscription"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/suspendall"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/syslog"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/tasks"
+  },
+  {
+    "method": "DELETE",
+    "path": "/nodes/{node}/tasks/{upid}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/tasks/{upid}"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/tasks/{upid}/log"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/tasks/{upid}/status"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/termproxy"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/time"
+  },
+  {
+    "method": "PUT",
+    "path": "/nodes/{node}/time"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/version"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/vncshell"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/vncwebsocket"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/vzdump"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/vzdump/defaults"
+  },
+  {
+    "method": "GET",
+    "path": "/nodes/{node}/vzdump/extractconfig"
+  },
+  {
+    "method": "POST",
+    "path": "/nodes/{node}/wakeonlan"
+  },
+  {
+    "method": "DELETE",
+    "path": "/pools"
+  },
+  {
+    "method": "GET",
+    "path": "/pools"
+  },
+  {
+    "method": "POST",
+    "path": "/pools"
+  },
+  {
+    "method": "PUT",
+    "path": "/pools"
+  },
+  {
+    "method": "DELETE",
+    "path": "/pools/{poolid}"
+  },
+  {
+    "method": "GET",
+    "path": "/pools/{poolid}"
+  },
+  {
+    "method": "PUT",
+    "path": "/pools/{poolid}"
+  },
+  {
+    "method": "GET",
+    "path": "/storage"
+  },
+  {
+    "method": "POST",
+    "path": "/storage"
+  },
+  {
+    "method": "DELETE",
+    "path": "/storage/{storage}"
+  },
+  {
+    "method": "GET",
+    "path": "/storage/{storage}"
+  },
+  {
+    "method": "PUT",
+    "path": "/storage/{storage}"
   },
   {
     "method": "GET",

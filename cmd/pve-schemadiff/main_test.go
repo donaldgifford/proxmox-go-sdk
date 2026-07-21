@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,6 +68,39 @@ func TestRunDetectsDrift(t *testing.T) {
 	}
 	if !strings.Contains(report, "+ POST /nodes/{node}/qemu") {
 		t.Errorf("drift output = %q, want the added POST endpoint", report)
+	}
+}
+
+// TestRunGzippedApidoc covers the committed-artifact path: the real apidoc is
+// checked in gzipped (IMPL-0003 OQ-1a) and detected by magic bytes.
+func TestRunGzippedApidoc(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	if _, err := zw.Write([]byte(apidocJS)); err != nil {
+		t.Fatalf("gzip write: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("gzip close: %v", err)
+	}
+	apidoc := writeTemp(t, "apidoc.js.gz", buf.String())
+	baseline := filepath.Join(t.TempDir(), "baseline.json")
+
+	report, drift, err := run(apidoc, baseline, true)
+	if err != nil {
+		t.Fatalf("run(update, gz): %v", err)
+	}
+	if drift {
+		t.Error("run(update, gz) drift = true, want false")
+	}
+	if !strings.Contains(report, "baseline updated: 3 endpoint(s)") {
+		t.Errorf("gz update output = %q, want 3 endpoints", report)
+	}
+
+	// A truncated gzip stream is an operational error, not silent garbage.
+	broken := writeTemp(t, "broken.js.gz", buf.String()[:8])
+	if _, _, err := run(broken, baseline, false); err == nil {
+		t.Error("run(truncated gzip) error = nil, want non-nil")
 	}
 }
 

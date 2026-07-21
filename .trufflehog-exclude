@@ -1,0 +1,6 @@
+# Paths excluded from TruffleHog secret scanning (regex per line).
+# The committed real PVE apidoc dump contains upstream PVE documentation
+# example URIs with embedded placeholder credentials (e.g. the http_proxy
+# option's illustrative proxy URL). Public upstream documentation content,
+# not repo secrets (IMPL-0003).
+cmd/pve-schemadiff/testdata/
