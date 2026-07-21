@@ -30,6 +30,7 @@ decided 2026-07-21: all a)
 - [Testing Strategy](#testing-strategy)
 - [Migration / Rollout Plan](#migration--rollout-plan)
 - [Open Questions](#open-questions)
+- [Implementation Corrections (2026-07-21)](#implementation-corrections-2026-07-21)
 - [References](#references)
 <!--toc:end-->
 
@@ -254,6 +255,32 @@ interface change is uncontentious.
      applies pass `lock-token` via `Extra`. Revisit as its own design if a
      consumer needs transactional SDN.
    - b: First-class `Lock`/`Apply`/`Rollback` support in this PR.
+
+## Implementation Corrections (2026-07-21)
+
+Recorded while implementing against the mined 9.2 apidoc `returns`/`parameters`
+(deeper than the path-level mining this design was written from):
+
+1. **No per-VNet status read.** The planned `VNetStatus(ctx, node, vnet)`
+   targeted `GET /nodes/{node}/sdn/vnets/{vnet}` — which is a **subdir index**
+   on real PVE (as are `…/zones/{zone}` and `…/fabrics/{fabric}`), not a data
+   endpoint. The shipped surface is the leaf reads: `ZoneContent` is the
+   per-VNet health read (`{vnet, status?, statusmsg?}` rows) and `VNetMACVRF`
+   the EVPN view; `ZoneBridges`/`ZoneIPVRF` and the three fabric runtime reads
+   (OQ-3a) complete the eight node-scoped GETs. All field types came from the
+   apidoc `returns` blocks (e.g. neighbor `uptime` is an FRR string like
+   `8h24m12s`, ip-vrf `metric` is an integer); array-valued fields
+   (`ports`/`nexthops`/`via`) stay in `Extra` as raw JSON per the lossless
+   pattern.
+2. **`Redistribute` is NOT promoted** (amending OQ-2a): the apidoc types
+   `redistribute` as an **array** whose wire form is unverified, so promoting it
+   would be exactly the guessed-wire-form failure mode OQ-2b was rejected for.
+   It stays in `Extra`; promote after the pvelab live run shows the real form. A
+   fabric also has **no `nodes`/`comment` fields** at all — membership is solely
+   the node sub-collection.
+3. **Fabric-node `interfaces` is sent as repeated form values**, not CSV-joined
+   (amending the ZFS-`Devices` analogy in the design): the apidoc types it as a
+   proper array parameter, and PVE's array params take repeated keys.
 
 ## References
 
