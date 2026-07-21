@@ -16,6 +16,8 @@ type sdnState struct {
 	fabrics map[string]*sdnFabricRecord // keyed by fabric id.
 	// subnets is keyed by vnet, then by subnet CIDR.
 	subnets map[string]map[string]*sdnSubnetRecord
+	// fabricNodes is keyed by fabric id, then by node id.
+	fabricNodes map[string]map[string]*sdnFabricNodeRecord
 }
 
 // sdnZoneRecord is one SDN zone.
@@ -47,12 +49,24 @@ type sdnSubnetRecord struct {
 	SNAT    bool
 }
 
-// sdnFabricRecord is one SDN fabric.
+// sdnFabricRecord is one SDN fabric. A fabric carries no node list — node
+// membership is the fabricNodes sub-collection, as on real PVE.
 type sdnFabricRecord struct {
-	Fabric   string
-	Protocol string
-	Nodes    string
-	Comment  string
+	Fabric      string
+	Protocol    string
+	IPPrefix    string
+	IP6Prefix   string
+	RouteFilter string
+}
+
+// sdnFabricNodeRecord is one node's membership in a fabric.
+type sdnFabricNodeRecord struct {
+	NodeID     string
+	Fabric     string
+	Protocol   string
+	IP         string
+	IP6        string
+	Interfaces []string
 }
 
 // sdnZonePayload mirrors GET /cluster/sdn/zones entries.
@@ -84,12 +98,87 @@ type sdnSubnetPayload struct {
 	SNAT    int    `json:"snat,omitempty"`
 }
 
-// sdnFabricPayload mirrors GET /cluster/sdn/fabrics entries.
+// sdnFabricPayload mirrors GET /cluster/sdn/fabrics/fabric entries.
 type sdnFabricPayload struct {
-	Fabric   string `json:"id"`
+	Fabric      string `json:"id"`
+	Protocol    string `json:"protocol,omitempty"`
+	IPPrefix    string `json:"ip_prefix,omitempty"`
+	IP6Prefix   string `json:"ip6_prefix,omitempty"`
+	RouteFilter string `json:"route_filter,omitempty"`
+}
+
+// sdnFabricNodePayload mirrors GET /cluster/sdn/fabrics/node/{fabric} entries.
+type sdnFabricNodePayload struct {
+	NodeID   string `json:"node_id"`
+	Fabric   string `json:"fabric_id,omitempty"`
 	Protocol string `json:"protocol,omitempty"`
-	Nodes    string `json:"nodes,omitempty"`
-	Comment  string `json:"comment,omitempty"`
+	IP       string `json:"ip,omitempty"`
+	IP6      string `json:"ip6,omitempty"`
+}
+
+// Node-scoped SDN live-status payloads (GET /nodes/{node}/sdn/…). The mock
+// synthesizes status from seeded config state: seeded objects report as
+// available/up, and the route/VRF tables carry one static synthetic row so
+// decoders see every field shape.
+
+// sdnZoneStatusPayload mirrors GET /nodes/{node}/sdn/zones entries.
+type sdnZoneStatusPayload struct {
+	Zone   string `json:"zone"`
+	Status string `json:"status"`
+}
+
+// sdnVNetStatusPayload mirrors GET /nodes/{node}/sdn/zones/{zone}/content.
+type sdnVNetStatusPayload struct {
+	VNet      string `json:"vnet"`
+	Status    string `json:"status,omitempty"`
+	StatusMsg string `json:"statusmsg,omitempty"`
+}
+
+// sdnZoneBridgePayload mirrors GET /nodes/{node}/sdn/zones/{zone}/bridges.
+type sdnZoneBridgePayload struct {
+	Name          string                 `json:"name"`
+	VLANFiltering string                 `json:"vlan_filtering,omitempty"`
+	Ports         []sdnBridgePortPayload `json:"ports"`
+}
+
+// sdnBridgePortPayload is one member port of a zone bridge.
+type sdnBridgePortPayload struct {
+	Name string `json:"name"`
+}
+
+// sdnIPVRFPayload mirrors GET /nodes/{node}/sdn/zones/{zone}/ip-vrf.
+type sdnIPVRFPayload struct {
+	IP       string   `json:"ip"`
+	Metric   int      `json:"metric"`
+	Protocol string   `json:"protocol"`
+	Nexthops []string `json:"nexthops"`
+}
+
+// sdnMACVRFPayload mirrors GET /nodes/{node}/sdn/vnets/{vnet}/mac-vrf.
+type sdnMACVRFPayload struct {
+	IP      string `json:"ip"`
+	MAC     string `json:"mac"`
+	Nexthop string `json:"nexthop"`
+}
+
+// sdnFabricIfacePayload mirrors GET …/sdn/fabrics/{fabric}/interfaces.
+type sdnFabricIfacePayload struct {
+	Name  string `json:"name"`
+	State string `json:"state"`
+	Type  string `json:"type"`
+}
+
+// sdnFabricNeighborPayload mirrors GET …/sdn/fabrics/{fabric}/neighbors.
+type sdnFabricNeighborPayload struct {
+	Neighbor string `json:"neighbor"`
+	Status   string `json:"status"`
+	Uptime   string `json:"uptime"`
+}
+
+// sdnFabricRoutePayload mirrors GET …/sdn/fabrics/{fabric}/routes.
+type sdnFabricRoutePayload struct {
+	Route string   `json:"route"`
+	Via   []string `json:"via"`
 }
 
 // AddZone seeds an SDN zone. Call before serving.
@@ -130,6 +219,32 @@ func (s *Server) AddFabric(fabric, protocol string) {
 	s.st.sdn.fabrics[fabric] = &sdnFabricRecord{Fabric: fabric, Protocol: protocol}
 }
 
+// AddFabricNode seeds a node's membership in a fabric (the fabric itself must
+// be seeded separately with AddFabric). Call before serving.
+func (s *Server) AddFabricNode(fabric, node string) {
+	s.st.mu.Lock()
+	defer s.st.mu.Unlock()
+	s.ensureFabricNodesLocked(fabric)
+	protocol := ""
+	if f := s.st.sdn.fabrics[fabric]; f != nil {
+		protocol = f.Protocol
+	}
+	s.st.sdn.fabricNodes[fabric][node] = &sdnFabricNodeRecord{
+		NodeID: node, Fabric: fabric, Protocol: protocol,
+	}
+}
+
+// ensureFabricNodesLocked makes the fabric-node maps ready for fabric. Caller
+// holds mu.
+func (s *Server) ensureFabricNodesLocked(fabric string) {
+	if s.st.sdn.fabricNodes == nil {
+		s.st.sdn.fabricNodes = make(map[string]map[string]*sdnFabricNodeRecord)
+	}
+	if s.st.sdn.fabricNodes[fabric] == nil {
+		s.st.sdn.fabricNodes[fabric] = make(map[string]*sdnFabricNodeRecord)
+	}
+}
+
 // ensureSubnetVNetLocked makes the subnet maps ready for vnet. Caller holds mu.
 func (s *Server) ensureSubnetVNetLocked(vnet string) {
 	if s.st.sdn.subnets == nil {
@@ -156,12 +271,25 @@ func (s *Server) registerSDNRoutes() {
 	s.mux.HandleFunc("GET /api2/json/cluster/sdn/vnets/{vnet}/subnets/{subnet}", s.handleSubnetGet)
 	s.mux.HandleFunc("PUT /api2/json/cluster/sdn/vnets/{vnet}/subnets/{subnet}", s.handleSubnetUpdate)
 	s.mux.HandleFunc("DELETE /api2/json/cluster/sdn/vnets/{vnet}/subnets/{subnet}", s.handleSubnetDelete)
-	s.mux.HandleFunc("GET /api2/json/cluster/sdn/fabrics", s.handleFabricList)
-	s.mux.HandleFunc("POST /api2/json/cluster/sdn/fabrics", s.handleFabricCreate)
-	s.mux.HandleFunc("GET /api2/json/cluster/sdn/fabrics/{fabric}", s.handleFabricGet)
-	s.mux.HandleFunc("PUT /api2/json/cluster/sdn/fabrics/{fabric}", s.handleFabricUpdate)
-	s.mux.HandleFunc("DELETE /api2/json/cluster/sdn/fabrics/{fabric}", s.handleFabricDelete)
+	s.mux.HandleFunc("GET /api2/json/cluster/sdn/fabrics/fabric", s.handleFabricList)
+	s.mux.HandleFunc("POST /api2/json/cluster/sdn/fabrics/fabric", s.handleFabricCreate)
+	s.mux.HandleFunc("GET /api2/json/cluster/sdn/fabrics/fabric/{fabric}", s.handleFabricGet)
+	s.mux.HandleFunc("PUT /api2/json/cluster/sdn/fabrics/fabric/{fabric}", s.handleFabricUpdate)
+	s.mux.HandleFunc("DELETE /api2/json/cluster/sdn/fabrics/fabric/{fabric}", s.handleFabricDelete)
+	s.mux.HandleFunc("GET /api2/json/cluster/sdn/fabrics/node/{fabric}", s.handleFabricNodeList)
+	s.mux.HandleFunc("POST /api2/json/cluster/sdn/fabrics/node/{fabric}", s.handleFabricNodeCreate)
+	s.mux.HandleFunc("GET /api2/json/cluster/sdn/fabrics/node/{fabric}/{node}", s.handleFabricNodeGet)
+	s.mux.HandleFunc("PUT /api2/json/cluster/sdn/fabrics/node/{fabric}/{node}", s.handleFabricNodeUpdate)
+	s.mux.HandleFunc("DELETE /api2/json/cluster/sdn/fabrics/node/{fabric}/{node}", s.handleFabricNodeDelete)
 	s.mux.HandleFunc("PUT /api2/json/cluster/sdn", s.handleSDNApply)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/sdn/zones", s.handleNodeSDNZones)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/sdn/zones/{zone}/content", s.handleNodeSDNZoneContent)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/sdn/zones/{zone}/bridges", s.handleNodeSDNZoneBridges)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/sdn/zones/{zone}/ip-vrf", s.handleNodeSDNZoneIPVRF)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/sdn/vnets/{vnet}/mac-vrf", s.handleNodeSDNVNetMACVRF)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/sdn/fabrics/{fabric}/interfaces", s.handleNodeSDNFabricInterfaces)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/sdn/fabrics/{fabric}/neighbors", s.handleNodeSDNFabricNeighbors)
+	s.mux.HandleFunc("GET /api2/json/nodes/{node}/sdn/fabrics/{fabric}/routes", s.handleNodeSDNFabricRoutes)
 }
 
 // handleSDNApply commits the pending SDN config. The mock applies writes
@@ -593,7 +721,9 @@ func (s *Server) handleFabricCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	rec := &sdnFabricRecord{
 		Fabric: fabric, Protocol: r.PostForm.Get("protocol"),
-		Nodes: r.PostForm.Get("nodes"), Comment: r.PostForm.Get("comment"),
+		IPPrefix:    r.PostForm.Get("ip_prefix"),
+		IP6Prefix:   r.PostForm.Get("ip6_prefix"),
+		RouteFilter: r.PostForm.Get("route_filter"),
 	}
 	s.st.mu.Lock()
 	if s.st.sdn.fabrics == nil {
@@ -618,15 +748,7 @@ func (s *Server) handleFabricUpdate(w http.ResponseWriter, r *http.Request) {
 	s.st.mu.Lock()
 	rec := s.st.sdn.fabrics[fabric]
 	if rec != nil {
-		if v := r.PostForm.Get("protocol"); v != "" {
-			rec.Protocol = v
-		}
-		if v := r.PostForm.Get("nodes"); v != "" {
-			rec.Nodes = v
-		}
-		if v := r.PostForm.Get("comment"); v != "" {
-			rec.Comment = v
-		}
+		applyFabricForm(rec, r.PostForm)
 	}
 	s.st.mu.Unlock()
 	if rec == nil {
@@ -636,7 +758,23 @@ func (s *Server) handleFabricUpdate(w http.ResponseWriter, r *http.Request) {
 	s.writeData(w, nil)
 }
 
-// handleFabricDelete removes a fabric. Synchronous.
+// applyFabricForm applies a PUT form's fields to rec. The caller holds st.mu.
+func applyFabricForm(rec *sdnFabricRecord, form url.Values) {
+	if v := form.Get("protocol"); v != "" {
+		rec.Protocol = v
+	}
+	if v := form.Get("ip_prefix"); v != "" {
+		rec.IPPrefix = v
+	}
+	if v := form.Get("ip6_prefix"); v != "" {
+		rec.IP6Prefix = v
+	}
+	if v := form.Get("route_filter"); v != "" {
+		rec.RouteFilter = v
+	}
+}
+
+// handleFabricDelete removes a fabric and its node membership. Synchronous.
 func (s *Server) handleFabricDelete(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
@@ -646,6 +784,7 @@ func (s *Server) handleFabricDelete(w http.ResponseWriter, r *http.Request) {
 	_, found := s.st.sdn.fabrics[fabric]
 	if found {
 		delete(s.st.sdn.fabrics, fabric)
+		delete(s.st.sdn.fabricNodes, fabric)
 	}
 	s.st.mu.Unlock()
 	if !found {
@@ -657,6 +796,333 @@ func (s *Server) handleFabricDelete(w http.ResponseWriter, r *http.Request) {
 
 func sdnFabricToPayload(rec *sdnFabricRecord) sdnFabricPayload {
 	return sdnFabricPayload{
-		Fabric: rec.Fabric, Protocol: rec.Protocol, Nodes: rec.Nodes, Comment: rec.Comment,
+		Fabric: rec.Fabric, Protocol: rec.Protocol, IPPrefix: rec.IPPrefix,
+		IP6Prefix: rec.IP6Prefix, RouteFilter: rec.RouteFilter,
 	}
+}
+
+func (s *Server) handleFabricNodeList(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	fabric := r.PathValue("fabric")
+	s.st.mu.Lock()
+	_, found := s.st.sdn.fabrics[fabric]
+	nodes := s.st.sdn.fabricNodes[fabric]
+	out := make([]sdnFabricNodePayload, 0, len(nodes))
+	for _, rec := range nodes {
+		out = append(out, sdnFabricNodeToPayload(rec))
+	}
+	s.st.mu.Unlock()
+	if !found {
+		s.writeError(w, http.StatusNotFound, msgNoSuchFabric)
+		return
+	}
+	s.writeData(w, out)
+}
+
+func (s *Server) handleFabricNodeGet(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	fabric := r.PathValue("fabric")
+	node := r.PathValue("node")
+	s.st.mu.Lock()
+	rec := s.lookupFabricNodeLocked(fabric, node)
+	var payload sdnFabricNodePayload
+	if rec != nil {
+		payload = sdnFabricNodeToPayload(rec)
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchFabricNode)
+		return
+	}
+	s.writeData(w, payload)
+}
+
+// lookupFabricNodeLocked returns the fabric-node record or nil. The caller
+// holds st.mu.
+func (s *Server) lookupFabricNodeLocked(fabric, node string) *sdnFabricNodeRecord {
+	if s.st.sdn.fabricNodes[fabric] == nil {
+		return nil
+	}
+	return s.st.sdn.fabricNodes[fabric][node]
+}
+
+// handleFabricNodeCreate adds a node to a fabric. Synchronous (data null).
+func (s *Server) handleFabricNodeCreate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	fabric := r.PathValue("fabric")
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if err := r.ParseForm(); err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	node := r.PostForm.Get("node_id")
+	if node == "" {
+		s.writeError(w, http.StatusBadRequest, "missing node_id")
+		return
+	}
+	rec := &sdnFabricNodeRecord{
+		NodeID: node, Fabric: fabric, Protocol: r.PostForm.Get("protocol"),
+		IP: r.PostForm.Get("ip"), IP6: r.PostForm.Get("ip6"),
+		Interfaces: r.PostForm["interfaces"],
+	}
+	s.st.mu.Lock()
+	_, found := s.st.sdn.fabrics[fabric]
+	if found {
+		s.ensureFabricNodesLocked(fabric)
+		s.st.sdn.fabricNodes[fabric][node] = rec
+	}
+	s.st.mu.Unlock()
+	if !found {
+		s.writeError(w, http.StatusNotFound, msgNoSuchFabric)
+		return
+	}
+	s.writeData(w, nil)
+}
+
+// handleFabricNodeUpdate mutates a node's fabric membership. Synchronous.
+func (s *Server) handleFabricNodeUpdate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	fabric := r.PathValue("fabric")
+	node := r.PathValue("node")
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
+	if err := r.ParseForm(); err != nil {
+		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+		return
+	}
+	s.st.mu.Lock()
+	rec := s.lookupFabricNodeLocked(fabric, node)
+	if rec != nil {
+		applyFabricNodeForm(rec, r.PostForm)
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchFabricNode)
+		return
+	}
+	s.writeData(w, nil)
+}
+
+// applyFabricNodeForm applies a PUT form's fields to rec. The caller holds
+// st.mu.
+func applyFabricNodeForm(rec *sdnFabricNodeRecord, form url.Values) {
+	if v := form.Get("ip"); v != "" {
+		rec.IP = v
+	}
+	if v := form.Get("ip6"); v != "" {
+		rec.IP6 = v
+	}
+	if v := form["interfaces"]; len(v) > 0 {
+		rec.Interfaces = v
+	}
+}
+
+// handleFabricNodeDelete removes a node from a fabric. Synchronous.
+func (s *Server) handleFabricNodeDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	fabric := r.PathValue("fabric")
+	node := r.PathValue("node")
+	s.st.mu.Lock()
+	rec := s.lookupFabricNodeLocked(fabric, node)
+	if rec != nil {
+		delete(s.st.sdn.fabricNodes[fabric], node)
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchFabricNode)
+		return
+	}
+	s.writeData(w, nil)
+}
+
+func sdnFabricNodeToPayload(rec *sdnFabricNodeRecord) sdnFabricNodePayload {
+	return sdnFabricNodePayload{
+		NodeID: rec.NodeID, Fabric: rec.Fabric, Protocol: rec.Protocol,
+		IP: rec.IP, IP6: rec.IP6,
+	}
+}
+
+// handleNodeSDNZones reports every seeded zone as available on the node.
+func (s *Server) handleNodeSDNZones(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	s.st.mu.Lock()
+	out := make([]sdnZoneStatusPayload, 0, len(s.st.sdn.zones))
+	for _, rec := range s.st.sdn.zones {
+		out = append(out, sdnZoneStatusPayload{Zone: rec.Zone, Status: "available"})
+	}
+	s.st.mu.Unlock()
+	s.writeData(w, out)
+}
+
+// handleNodeSDNZoneContent reports the zone's VNets as available.
+func (s *Server) handleNodeSDNZoneContent(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	zone := r.PathValue("zone")
+	s.st.mu.Lock()
+	_, found := s.st.sdn.zones[zone]
+	var out []sdnVNetStatusPayload
+	for _, rec := range s.st.sdn.vnets {
+		if rec.Zone == zone {
+			out = append(out, sdnVNetStatusPayload{VNet: rec.VNet, Status: "available"})
+		}
+	}
+	s.st.mu.Unlock()
+	if !found {
+		s.writeError(w, http.StatusNotFound, msgNoSuchZone)
+		return
+	}
+	s.writeData(w, out)
+}
+
+// handleNodeSDNZoneBridges reports one bridge per VNet in the zone, with a
+// static member port so decoders see the nested `ports` array.
+func (s *Server) handleNodeSDNZoneBridges(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	zone := r.PathValue("zone")
+	s.st.mu.Lock()
+	_, found := s.st.sdn.zones[zone]
+	var out []sdnZoneBridgePayload
+	for _, rec := range s.st.sdn.vnets {
+		if rec.Zone == zone {
+			out = append(out, sdnZoneBridgePayload{
+				Name:          rec.VNet,
+				VLANFiltering: "0",
+				Ports:         []sdnBridgePortPayload{{Name: "tap100i0"}},
+			})
+		}
+	}
+	s.st.mu.Unlock()
+	if !found {
+		s.writeError(w, http.StatusNotFound, msgNoSuchZone)
+		return
+	}
+	s.writeData(w, out)
+}
+
+// handleNodeSDNZoneIPVRF returns one static synthetic VRF row for a seeded
+// zone, so decoders exercise every field shape (including the nexthops array).
+func (s *Server) handleNodeSDNZoneIPVRF(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	zone := r.PathValue("zone")
+	s.st.mu.Lock()
+	_, found := s.st.sdn.zones[zone]
+	s.st.mu.Unlock()
+	if !found {
+		s.writeError(w, http.StatusNotFound, msgNoSuchZone)
+		return
+	}
+	s.writeData(w, []sdnIPVRFPayload{{
+		IP: "10.0.0.0/24", Metric: 20, Protocol: "bgp",
+		Nexthops: []string{"192.0.2.1"},
+	}})
+}
+
+// handleNodeSDNVNetMACVRF returns one static synthetic MAC-VRF row for a
+// seeded VNet.
+func (s *Server) handleNodeSDNVNetMACVRF(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	vnet := r.PathValue("vnet")
+	s.st.mu.Lock()
+	_, found := s.st.sdn.vnets[vnet]
+	s.st.mu.Unlock()
+	if !found {
+		s.writeError(w, http.StatusNotFound, msgNoSuchVNet)
+		return
+	}
+	s.writeData(w, []sdnMACVRFPayload{{
+		IP: "10.0.0.10", MAC: "BC:24:11:00:00:01", Nexthop: "192.0.2.1",
+	}})
+}
+
+// handleNodeSDNFabricInterfaces reports the requesting node's seeded fabric
+// interfaces as up.
+func (s *Server) handleNodeSDNFabricInterfaces(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	fabric := r.PathValue("fabric")
+	s.st.mu.Lock()
+	_, found := s.st.sdn.fabrics[fabric]
+	out := make([]sdnFabricIfacePayload, 0)
+	if rec := s.lookupFabricNodeLocked(fabric, node); rec != nil {
+		for _, iface := range rec.Interfaces {
+			out = append(out, sdnFabricIfacePayload{
+				Name: iface, State: "up", Type: "Point-to-Point",
+			})
+		}
+	}
+	s.st.mu.Unlock()
+	if !found {
+		s.writeError(w, http.StatusNotFound, msgNoSuchFabric)
+		return
+	}
+	s.writeData(w, out)
+}
+
+// handleNodeSDNFabricNeighbors reports every OTHER fabric member node as an
+// established neighbor of the requesting node.
+func (s *Server) handleNodeSDNFabricNeighbors(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	fabric := r.PathValue("fabric")
+	s.st.mu.Lock()
+	_, found := s.st.sdn.fabrics[fabric]
+	out := make([]sdnFabricNeighborPayload, 0)
+	for _, rec := range s.st.sdn.fabricNodes[fabric] {
+		if rec.NodeID != node {
+			out = append(out, sdnFabricNeighborPayload{
+				Neighbor: rec.NodeID, Status: "Up", Uptime: "8h24m12s",
+			})
+		}
+	}
+	s.st.mu.Unlock()
+	if !found {
+		s.writeError(w, http.StatusNotFound, msgNoSuchFabric)
+		return
+	}
+	s.writeData(w, out)
+}
+
+// handleNodeSDNFabricRoutes returns one static synthetic route row for a
+// seeded fabric (the fabric's ip_prefix when set), so decoders exercise the
+// `via` array.
+func (s *Server) handleNodeSDNFabricRoutes(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	fabric := r.PathValue("fabric")
+	s.st.mu.Lock()
+	rec := s.st.sdn.fabrics[fabric]
+	route := "10.0.0.0/24"
+	if rec != nil && rec.IPPrefix != "" {
+		route = rec.IPPrefix
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchFabric)
+		return
+	}
+	s.writeData(w, []sdnFabricRoutePayload{{Route: route, Via: []string{"192.0.2.1"}}})
 }
