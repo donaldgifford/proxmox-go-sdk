@@ -9,38 +9,44 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/internal/svcutil"
 )
 
-// FabricProtocol is the routing protocol an SDN fabric runs. OpenFabric and OSPF
-// are the 9.0 baseline; BGP is a 9.2 addition (see SDNAdvancedFabrics).
+// FabricProtocol is the routing protocol an SDN fabric runs. OpenFabric and
+// OSPF are the 9.0 baseline; BGP and WireGuard are 9.2 additions (see
+// SDNAdvancedFabrics). The full enum is confirmed by the real 9.2 apidoc.
 type FabricProtocol string
 
-// The SDN fabric routing protocols. openfabric/ospf are baseline (9.0); bgp is
-// gated on PVE 9.2 (SDNAdvancedFabrics).
+// The SDN fabric routing protocols. openfabric/ospf are baseline (9.0);
+// bgp/wireguard are gated on PVE 9.2 (SDNAdvancedFabrics).
 const (
 	FabricProtocolOpenFabric FabricProtocol = "openfabric"
 	FabricProtocolOSPF       FabricProtocol = "ospf"
 	FabricProtocolBGP        FabricProtocol = "bgp"
+	FabricProtocolWireGuard  FabricProtocol = "wireguard"
 )
 
-// Fabric is one entry from GET /cluster/sdn/fabrics or
-// /cluster/sdn/fabrics/{fabric}. Reads are lossless: fabric configs are
-// protocol-dependent (OpenFabric carries an area/net, OSPF an area, BGP an ASN),
-// so unmodelled keys are preserved in Extra.
+// Fabric is one entry from GET /cluster/sdn/fabrics/fabric or
+// /cluster/sdn/fabrics/fabric/{id}. Reads are lossless: fabric configs are
+// protocol-dependent (OpenFabric/OSPF carry an area and timers, WireGuard-style
+// keepalives appear on 9.2), so unmodelled keys — including the per-protocol
+// tunables, the `redistribute` list, and the SDN transaction fields
+// (`lock-token`/`digest`, DESIGN-0003 OQ-6) — are preserved in Extra.
 //
-// API-shape caveat: SDN fabrics are a real 9.0 feature, but the exact REST path
-// and field names have NOT been verified against a live 9.x node; the SDK
-// targets /cluster/sdn/fabrics with the apidoc field names provisionally. Treat
-// the modelled fields as best-effort and rely on Extra for anything unmodelled.
+// The paths and field names are confirmed against the real 9.2 apidoc
+// (INV-0004); the exact wire forms of the per-protocol tunables await the
+// pvelab live run. Note that a fabric has NO nodes field — node membership is
+// its own sub-collection (see FabricNode).
 type Fabric struct {
-	Fabric   string         `json:"id"`
-	Protocol FabricProtocol `json:"protocol,omitempty"`
-	Nodes    string         `json:"nodes,omitempty"` // CSV of member nodes.
-	Comment  string         `json:"comment,omitempty"`
+	Fabric      string         `json:"id"`
+	Protocol    FabricProtocol `json:"protocol,omitempty"`
+	IPPrefix    string         `json:"ip_prefix,omitempty"`
+	IP6Prefix   string         `json:"ip6_prefix,omitempty"`
+	RouteFilter string         `json:"route_filter,omitempty"`
 	// Extra carries fabric keys the SDK does not model.
 	Extra map[string]string `json:"-"`
 }
 
 var fabricKnownFields = map[string]bool{
-	"id": true, "protocol": true, "nodes": true, "comment": true,
+	"id": true, "protocol": true, "ip_prefix": true, "ip6_prefix": true,
+	"route_filter": true,
 }
 
 // UnmarshalJSON decodes the modelled fields and routes unknown keys into Extra.
@@ -59,27 +65,31 @@ func (f *Fabric) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// FabricSpec is the body of POST /cluster/sdn/fabrics. Fabric (the id) and
-// Protocol are required. A Protocol beyond the 9.0 baseline (FabricProtocolBGP)
-// requires PVE 9.2 — CreateFabric enforces this via SDNAdvancedFabrics. Pass it
+// FabricSpec is the body of POST /cluster/sdn/fabrics/fabric. Fabric (the id)
+// and Protocol are required. A Protocol beyond the 9.0 baseline
+// (FabricProtocolBGP) requires PVE 9.2 — CreateFabric enforces this via
+// SDNAdvancedFabrics. The `redistribute` list is deliberately unmodelled (its
+// array wire form is unverified) — pass it via Extra if needed. Pass the spec
 // by pointer.
 type FabricSpec struct {
-	Fabric   string         `json:"id"`
-	Protocol FabricProtocol `json:"protocol"`
-	Nodes    string         `json:"nodes,omitempty"`
-	Comment  string         `json:"comment,omitempty"`
+	Fabric      string         `json:"id"`
+	Protocol    FabricProtocol `json:"protocol"`
+	IPPrefix    string         `json:"ip_prefix,omitempty"`
+	IP6Prefix   string         `json:"ip6_prefix,omitempty"`
+	RouteFilter string         `json:"route_filter,omitempty"`
 	// Extra carries PVE parameters the SDK does not model.
 	Extra map[string]string `json:"-"`
 }
 
-// FabricUpdate is the body of PUT /cluster/sdn/fabrics/{fabric}. Setting an
-// advanced Protocol requires PVE 9.2 (see FabricSpec). Use Delete to unset keys.
-// Pass it by pointer.
+// FabricUpdate is the body of PUT /cluster/sdn/fabrics/fabric/{id}. Setting an
+// advanced Protocol requires PVE 9.2 (see FabricSpec). Use Delete to unset
+// keys. Pass it by pointer.
 type FabricUpdate struct {
-	Protocol FabricProtocol `json:"protocol,omitempty"`
-	Nodes    string         `json:"nodes,omitempty"`
-	Comment  string         `json:"comment,omitempty"`
-	Delete   string         `json:"delete,omitempty"`
+	Protocol    FabricProtocol `json:"protocol,omitempty"`
+	IPPrefix    string         `json:"ip_prefix,omitempty"`
+	IP6Prefix   string         `json:"ip6_prefix,omitempty"`
+	RouteFilter string         `json:"route_filter,omitempty"`
+	Delete      string         `json:"delete,omitempty"`
 	// Extra carries PVE parameters the SDK does not model.
 	Extra map[string]string `json:"-"`
 }
@@ -87,10 +97,10 @@ type FabricUpdate struct {
 // advancedFabricProtocol reports whether p is a fabric protocol introduced after
 // the 9.0 baseline and therefore gated on PVE 9.2 (SDNAdvancedFabrics).
 func advancedFabricProtocol(p FabricProtocol) bool {
-	return p == FabricProtocolBGP
+	return p == FabricProtocolBGP || p == FabricProtocolWireGuard
 }
 
-// ListFabrics returns every SDN fabric.
+// ListFabrics returns every SDN fabric definition.
 func (s *Service) ListFabrics(ctx context.Context) ([]Fabric, error) {
 	var fabrics []Fabric
 	if err := s.c.DoRequest(ctx, http.MethodGet, sdnFabricsPath(), nil, &fabrics); err != nil {

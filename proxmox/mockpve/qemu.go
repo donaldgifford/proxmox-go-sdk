@@ -26,10 +26,11 @@ const (
 	msgNoSuchReplJob    = "no such replication job"
 	msgNoSuchIface      = "no such network interface"
 
-	msgNoSuchZone   = "no such sdn zone"
-	msgNoSuchVNet   = "no such sdn vnet"
-	msgNoSuchSubnet = "no such sdn subnet"
-	msgNoSuchFabric = "no such sdn fabric"
+	msgNoSuchZone       = "no such sdn zone"
+	msgNoSuchVNet       = "no such sdn vnet"
+	msgNoSuchSubnet     = "no such sdn subnet"
+	msgNoSuchFabric     = "no such sdn fabric"
+	msgNoSuchFabricNode = "no such sdn fabric node"
 
 	msgNoSuchRule       = "no such firewall rule"
 	msgNoSuchIPSet      = "no such firewall ipset"

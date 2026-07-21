@@ -8,17 +8,16 @@ import (
 )
 
 // Service wraps PVE software-defined networking: zones, VNets, and their
-// subnets, plus the cluster-wide apply that activates staged changes. SDN is
-// cluster-scoped — every endpoint lives under /cluster/sdn and binds no node.
-// It is safe for concurrent use; construct it with NewService or via the root
-// client's SDN accessor.
+// subnets, fabrics and their node membership, plus the cluster-wide apply that
+// activates staged changes. Configuration is cluster-scoped — every config
+// endpoint lives under /cluster/sdn and binds no node; the live-status reads
+// are node-scoped (/nodes/{node}/sdn) and take the node per call. It is safe
+// for concurrent use; construct it with NewService or via the root client's
+// SDN accessor.
 //
 // SDN configuration is transactional: creates, updates, and deletes stage
 // changes into a pending config, and ApplySDN commits them cluster-wide. All
 // config writes are synchronous (they return an error, not a tasks.Ref).
-//
-// Task 2 lands zones, VNets, and subnets; task 3 adds fabrics; task 4 adds the
-// (currently unsupported) live status reads.
 type Service struct {
 	c    api.Client
 	caps version.Capabilities
@@ -32,9 +31,10 @@ func NewService(c api.Client, caps version.Capabilities) *Service {
 }
 
 // API is the SDN service contract, published so consumers can stand in a test
-// double for *Service. Every operation is cluster-scoped (no node argument).
-// Config writes are synchronous — they return an error, not a tasks.Ref; reads
-// return typed data directly. The interface grows as later Phase 5 tasks land.
+// double for *Service. Config operations are cluster-scoped (no node
+// argument); the live-status reads are node-scoped and take the node per call.
+// Config writes are synchronous — they return an error, not a tasks.Ref;
+// reads return typed data directly.
 type API interface {
 	// Zones (task 2). A zone is the SDN backing technology (simple, VLAN, QinQ,
 	// VXLAN, EVPN). Writes stage into the pending config; call ApplySDN to
@@ -59,24 +59,40 @@ type API interface {
 	UpdateSubnet(ctx context.Context, vnet, subnet string, update *SubnetUpdate) error
 	DeleteSubnet(ctx context.Context, vnet, subnet string) error
 
-	// Fabrics (task 3, 9.0+) — the OpenFabric/OSPF routing layer. Writes stage
-	// into the pending config. The REST surface is provisional (see Fabric); a
-	// protocol beyond the 9.0 baseline requires PVE 9.2 (SDNAdvancedFabrics).
+	// Fabrics (9.0+) — the OpenFabric/OSPF routing layer, at
+	// /cluster/sdn/fabrics/fabric (paths confirmed against the real 9.2
+	// apidoc, INV-0004). Writes stage into the pending config; a protocol
+	// beyond the 9.0 baseline requires PVE 9.2 (SDNAdvancedFabrics).
 	ListFabrics(ctx context.Context) ([]Fabric, error)
 	GetFabric(ctx context.Context, fabric string) (*Fabric, error)
 	CreateFabric(ctx context.Context, spec *FabricSpec) error
 	UpdateFabric(ctx context.Context, fabric string, update *FabricUpdate) error
 	DeleteFabric(ctx context.Context, fabric string) error
 
+	// Fabric node membership — a fabric's nodes are their own sub-collection
+	// at /cluster/sdn/fabrics/node/{fabric} (a fabric config has no nodes
+	// field). Writes stage into the pending config.
+	ListFabricNodes(ctx context.Context, fabric string) ([]FabricNode, error)
+	GetFabricNode(ctx context.Context, fabric, node string) (*FabricNode, error)
+	CreateFabricNode(ctx context.Context, fabric string, spec *FabricNodeSpec) error
+	UpdateFabricNode(ctx context.Context, fabric, node string, update *FabricNodeUpdate) error
+	DeleteFabricNode(ctx context.Context, fabric, node string) error
+
 	// ApplySDN commits the pending SDN config cluster-wide (task 2). It is
 	// synchronous.
 	ApplySDN(ctx context.Context) error
 
-	// SDN live status (task 4). No confirmed PVE REST endpoint exists for SDN
-	// status, so these return pverr.ErrUnsupported (see SDNStatus). The return
-	// types are fixed so they become real calls without a signature change.
-	SDNStatus(ctx context.Context) ([]SDNZoneStatus, error)
-	VNetStatus(ctx context.Context, vnet string) (*VNetStatus, error)
+	// SDN live status — node-scoped reads under /nodes/{node}/sdn. There is
+	// no per-VNet status endpoint (the vnets/{vnet} path is a subdir index);
+	// ZoneContent is the per-VNet health read and VNetMACVRF the EVPN view.
+	SDNStatus(ctx context.Context, node string) ([]SDNZoneStatus, error)
+	ZoneContent(ctx context.Context, node, zone string) ([]VNetStatus, error)
+	ZoneBridges(ctx context.Context, node, zone string) ([]ZoneBridge, error)
+	ZoneIPVRF(ctx context.Context, node, zone string) ([]IPVRFRoute, error)
+	VNetMACVRF(ctx context.Context, node, vnet string) ([]MACVRFEntry, error)
+	FabricInterfaces(ctx context.Context, node, fabric string) ([]FabricInterface, error)
+	FabricNeighbors(ctx context.Context, node, fabric string) ([]FabricNeighbor, error)
+	FabricRoutes(ctx context.Context, node, fabric string) ([]FabricRoute, error)
 }
 
 // Compile-time assertion that *Service implements the published contract.

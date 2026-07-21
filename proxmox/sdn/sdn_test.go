@@ -344,7 +344,7 @@ func TestCreateFabric(t *testing.T) {
 	if err := svc.CreateFabric(ctx, &sdn.FabricSpec{
 		Fabric:   "fab1",
 		Protocol: sdn.FabricProtocolOpenFabric,
-		Nodes:    "pve1,pve2",
+		IPPrefix: "10.0.0.0/24",
 	}); err != nil {
 		t.Fatalf("CreateFabric: %v", err)
 	}
@@ -352,8 +352,8 @@ func TestCreateFabric(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetFabric after create: %v", err)
 	}
-	if f.Protocol != sdn.FabricProtocolOpenFabric || f.Nodes != "pve1,pve2" {
-		t.Errorf("created fabric = %+v, want protocol=openfabric nodes=pve1,pve2", f)
+	if f.Protocol != sdn.FabricProtocolOpenFabric || f.IPPrefix != "10.0.0.0/24" {
+		t.Errorf("created fabric = %+v, want protocol=openfabric ip_prefix=10.0.0.0/24", f)
 	}
 }
 
@@ -386,6 +386,10 @@ func TestCreateFabricAdvancedProtocolGate(t *testing.T) {
 	if !errors.Is(err, pverr.ErrUnsupported) {
 		t.Fatalf("CreateFabric(bgp) on 9.1 = %v, want ErrUnsupported", err)
 	}
+	err = svc91.CreateFabric(ctx, &sdn.FabricSpec{Fabric: "wgfab", Protocol: sdn.FabricProtocolWireGuard})
+	if !errors.Is(err, pverr.ErrUnsupported) {
+		t.Fatalf("CreateFabric(wireguard) on 9.1 = %v, want ErrUnsupported", err)
+	}
 
 	mock92 := mockpve.New()
 	svc92 := newCappedService(t, mock92, "9.2") // gate satisfied.
@@ -401,15 +405,15 @@ func TestUpdateFabric(t *testing.T) {
 	svc := newService(t, mock)
 	ctx := context.Background()
 
-	if err := svc.UpdateFabric(ctx, "fab0", &sdn.FabricUpdate{Comment: "core"}); err != nil {
+	if err := svc.UpdateFabric(ctx, "fab0", &sdn.FabricUpdate{RouteFilter: "10.0.0.0/8"}); err != nil {
 		t.Fatalf("UpdateFabric: %v", err)
 	}
 	f, err := svc.GetFabric(ctx, "fab0")
 	if err != nil {
 		t.Fatalf("GetFabric after update: %v", err)
 	}
-	if f.Comment != "core" {
-		t.Errorf("comment after update = %q, want core", f.Comment)
+	if f.RouteFilter != "10.0.0.0/8" {
+		t.Errorf("route_filter after update = %q, want 10.0.0.0/8", f.RouteFilter)
 	}
 }
 
@@ -428,19 +432,204 @@ func TestDeleteFabric(t *testing.T) {
 	}
 }
 
-// TestStatusUnsupported documents that the SDN live-status reads have no
-// confirmed PVE REST endpoint and therefore return pverr.ErrUnsupported.
-func TestStatusUnsupported(t *testing.T) {
+func TestFabricNodeCRUD(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddFabric("fab0", "openfabric")
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	if err := svc.CreateFabricNode(ctx, "fab0", &sdn.FabricNodeSpec{
+		NodeID:     "pve1",
+		Protocol:   sdn.FabricProtocolOpenFabric,
+		IP:         "10.0.0.1",
+		Interfaces: []string{"ens19", "ens20"},
+	}); err != nil {
+		t.Fatalf("CreateFabricNode: %v", err)
+	}
+
+	nodes, err := svc.ListFabricNodes(ctx, "fab0")
+	if err != nil {
+		t.Fatalf("ListFabricNodes: %v", err)
+	}
+	if len(nodes) != 1 || nodes[0].NodeID != "pve1" {
+		t.Fatalf("ListFabricNodes = %+v, want one node pve1", nodes)
+	}
+
+	n, err := svc.GetFabricNode(ctx, "fab0", "pve1")
+	if err != nil {
+		t.Fatalf("GetFabricNode: %v", err)
+	}
+	if n.IP != "10.0.0.1" || n.Fabric != "fab0" {
+		t.Errorf("fabric node = %+v, want ip=10.0.0.1 fabric_id=fab0", n)
+	}
+
+	if err := svc.UpdateFabricNode(ctx, "fab0", "pve1", &sdn.FabricNodeUpdate{IP: "10.0.0.2"}); err != nil {
+		t.Fatalf("UpdateFabricNode: %v", err)
+	}
+	n, err = svc.GetFabricNode(ctx, "fab0", "pve1")
+	if err != nil {
+		t.Fatalf("GetFabricNode after update: %v", err)
+	}
+	if n.IP != "10.0.0.2" {
+		t.Errorf("ip after update = %q, want 10.0.0.2", n.IP)
+	}
+
+	if err := svc.DeleteFabricNode(ctx, "fab0", "pve1"); err != nil {
+		t.Fatalf("DeleteFabricNode: %v", err)
+	}
+	if _, err := svc.GetFabricNode(ctx, "fab0", "pve1"); !errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("GetFabricNode after delete = %v, want ErrNotFound", err)
+	}
+}
+
+func TestFabricNodeValidation(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()
 	svc := newService(t, mock)
 	ctx := context.Background()
 
-	if _, err := svc.SDNStatus(ctx); !errors.Is(err, pverr.ErrUnsupported) {
-		t.Errorf("SDNStatus = %v, want ErrUnsupported", err)
+	if err := svc.CreateFabricNode(ctx, "fab0", nil); err == nil {
+		t.Error("CreateFabricNode(nil) error = nil, want non-nil")
 	}
-	if _, err := svc.VNetStatus(ctx, "vnet0"); !errors.Is(err, pverr.ErrUnsupported) {
-		t.Errorf("VNetStatus = %v, want ErrUnsupported", err)
+	if err := svc.CreateFabricNode(ctx, "fab0", &sdn.FabricNodeSpec{Protocol: sdn.FabricProtocolOSPF}); err == nil {
+		t.Error("CreateFabricNode(no node_id) error = nil, want non-nil")
+	}
+	if err := svc.CreateFabricNode(ctx, "fab0", &sdn.FabricNodeSpec{NodeID: "pve1"}); err == nil {
+		t.Error("CreateFabricNode(no protocol) error = nil, want non-nil")
+	}
+	// The mock refuses membership writes against an unseeded fabric.
+	if err := svc.CreateFabricNode(ctx, "ghost", &sdn.FabricNodeSpec{
+		NodeID: "pve1", Protocol: sdn.FabricProtocolOSPF,
+	}); !errors.Is(err, pverr.ErrNotFound) {
+		t.Errorf("CreateFabricNode(ghost fabric) = %v, want ErrNotFound", err)
+	}
+}
+
+// TestSDNStatusReads covers the node-scoped live-status surface end-to-end
+// against the mock's synthesized state: seeded zones/vnets report available,
+// and the VRF/route tables carry the synthetic rows with their array-valued
+// fields preserved in Extra as raw JSON.
+func TestSDNStatusReads(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddZone("zone0", "vxlan")
+	mock.AddVNet("vnet0", "zone0")
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	zones, err := svc.SDNStatus(ctx, "pve1")
+	if err != nil {
+		t.Fatalf("SDNStatus: %v", err)
+	}
+	if len(zones) != 1 || zones[0].Zone != "zone0" || zones[0].Status != "available" {
+		t.Fatalf("SDNStatus = %+v, want zone0 available", zones)
+	}
+
+	vnets, err := svc.ZoneContent(ctx, "pve1", "zone0")
+	if err != nil {
+		t.Fatalf("ZoneContent: %v", err)
+	}
+	if len(vnets) != 1 || vnets[0].VNet != "vnet0" || vnets[0].Status != "available" {
+		t.Fatalf("ZoneContent = %+v, want vnet0 available", vnets)
+	}
+
+	bridges, err := svc.ZoneBridges(ctx, "pve1", "zone0")
+	if err != nil {
+		t.Fatalf("ZoneBridges: %v", err)
+	}
+	if len(bridges) != 1 || bridges[0].Name != "vnet0" {
+		t.Fatalf("ZoneBridges = %+v, want bridge vnet0", bridges)
+	}
+	if bridges[0].Extra["ports"] == "" {
+		t.Errorf("bridge Extra[ports] empty, want the raw ports JSON preserved")
+	}
+
+	routes, err := svc.ZoneIPVRF(ctx, "pve1", "zone0")
+	if err != nil {
+		t.Fatalf("ZoneIPVRF: %v", err)
+	}
+	if len(routes) != 1 || routes[0].Metric != 20 {
+		t.Fatalf("ZoneIPVRF = %+v, want one route with metric 20", routes)
+	}
+	if routes[0].Extra["nexthops"] == "" {
+		t.Errorf("route Extra[nexthops] empty, want the raw nexthops JSON preserved")
+	}
+
+	entries, err := svc.VNetMACVRF(ctx, "pve1", "vnet0")
+	if err != nil {
+		t.Fatalf("VNetMACVRF: %v", err)
+	}
+	if len(entries) != 1 || entries[0].MAC == "" {
+		t.Fatalf("VNetMACVRF = %+v, want one entry with a MAC", entries)
+	}
+}
+
+func TestSDNStatusNotFound(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	if _, err := svc.ZoneContent(ctx, "pve1", "ghost"); !errors.Is(err, pverr.ErrNotFound) {
+		t.Errorf("ZoneContent(ghost zone) = %v, want ErrNotFound", err)
+	}
+	if _, err := svc.VNetMACVRF(ctx, "pve1", "ghost"); !errors.Is(err, pverr.ErrNotFound) {
+		t.Errorf("VNetMACVRF(ghost vnet) = %v, want ErrNotFound", err)
+	}
+	if _, err := svc.FabricInterfaces(ctx, "pve1", "ghost"); !errors.Is(err, pverr.ErrNotFound) {
+		t.Errorf("FabricInterfaces(ghost fabric) = %v, want ErrNotFound", err)
+	}
+}
+
+// TestFabricStatusReads covers the fabric runtime reads: interfaces come from
+// the requesting node's membership, neighbors are the OTHER member nodes, and
+// routes carry the `via` array in Extra.
+func TestFabricStatusReads(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddFabric("fab0", "openfabric")
+	mock.AddFabricNode("fab0", "pve1")
+	mock.AddFabricNode("fab0", "pve2")
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	// pve1 has no seeded interfaces (AddFabricNode seeds membership only), so
+	// grow them through the SDK update path first.
+	if err := svc.UpdateFabricNode(ctx, "fab0", "pve1", &sdn.FabricNodeUpdate{
+		Interfaces: []string{"ens19"},
+	}); err != nil {
+		t.Fatalf("UpdateFabricNode: %v", err)
+	}
+
+	ifaces, err := svc.FabricInterfaces(ctx, "pve1", "fab0")
+	if err != nil {
+		t.Fatalf("FabricInterfaces: %v", err)
+	}
+	if len(ifaces) != 1 || ifaces[0].Name != "ens19" || ifaces[0].State != "up" {
+		t.Fatalf("FabricInterfaces = %+v, want ens19 up", ifaces)
+	}
+
+	neighbors, err := svc.FabricNeighbors(ctx, "pve1", "fab0")
+	if err != nil {
+		t.Fatalf("FabricNeighbors: %v", err)
+	}
+	if len(neighbors) != 1 || neighbors[0].Neighbor != "pve2" {
+		t.Fatalf("FabricNeighbors = %+v, want the one other member pve2", neighbors)
+	}
+	if neighbors[0].Uptime == "" {
+		t.Errorf("neighbor uptime empty, want FRR-style uptime string")
+	}
+
+	routes, err := svc.FabricRoutes(ctx, "pve1", "fab0")
+	if err != nil {
+		t.Fatalf("FabricRoutes: %v", err)
+	}
+	if len(routes) != 1 || routes[0].Route == "" {
+		t.Fatalf("FabricRoutes = %+v, want one route", routes)
+	}
+	if routes[0].Extra["via"] == "" {
+		t.Errorf("route Extra[via] empty, want the raw via JSON preserved")
 	}
 }
 
