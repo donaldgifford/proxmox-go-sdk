@@ -6,6 +6,10 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [unreleased]
 
+### Features
+
+- *(sdn)* [**breaking**] Fabrics on real nested paths, node membership, live status reads
+
 ### Documentation
 
 - Record OQ decisions — designs Approved, IMPL-0003 Completed
@@ -13,6 +17,12 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(impl)* Record OQ decisions for IMPL-0004/0005 — all a
 - *(impl)* Add IMPL-0006 — API coverage tracker delivery plan
 - *(impl)* Record OQ decisions for IMPL-0006 — all a
+- Record the DESIGN-0003 remediation across the doc surfaces
+- *(impl)* IMPL-0004 In Progress; check off Phase-1 tasks 1-2
+
+### Testing
+
+- *(integration)* SDN status reads + fabric lifecycle live tests
 
 ## [0.6.3] - 2026-07-21
 
