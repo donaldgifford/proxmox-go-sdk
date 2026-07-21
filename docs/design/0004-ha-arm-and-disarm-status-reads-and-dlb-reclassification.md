@@ -1,7 +1,7 @@
 ---
 id: DESIGN-0004
 title: "HA arm and disarm, status reads, and DLB reclassification"
-status: Draft
+status: Approved
 author: Donald Gifford
 created: 2026-07-19
 ---
@@ -10,7 +10,8 @@ created: 2026-07-19
 
 # DESIGN 0004: HA arm and disarm, status reads, and DLB reclassification
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-07-19
+**Status:** Approved **Author:** Donald Gifford **Date:** 2026-07-19 (OQs
+decided 2026-07-21: 1a, 2b-as-lossless, 3b)
 
 <!--toc:start-->
 
@@ -116,8 +117,12 @@ GetManagerStatus(ctx) (*ManagerStatus, error)  // GET …/status/manager_status
 ```
 
 `HAStatusEntry` is a lossless read modelling the twelve observed fields
-(`ArmedState` typed — it is the observable for arm/disarm). `ManagerStatus`
-modelling per OQ-2.
+(`ArmedState` typed — it is the observable for arm/disarm). `ManagerStatus` (per
+OQ-2 decision) is a fully typed **lossless read** of the observed blob —
+`MasterNode`, `Timestamp`, `NodeStatus` (node -> state map), `ServiceStatus`
+(sid -> typed entry, itself lossless) — with the standard `Extra` tail; the
+apidoc pins no shape, so the live run is the source of truth for the typed
+fields before cassettes commit.
 
 ### Resource migrate / relocate (new)
 
@@ -151,9 +156,9 @@ doubles, the `ArmHA`-stub precedent in reverse) but always return a documented
 No request is ever issued; the 9.2 gate check is removed from the call path. The
 `DLBStatus`/`DLBConfig` types are **retained** (the `VolumeSnapshot` precedent —
 a future PVE release may add the surface). The
-`version.Capabilities.DynamicLoadBalancer()` gate is re-documented as
-informational (OQ-3). mockpve's `lbalancer` routes are **removed** — the mock
-mirrors real PVE.
+`version.Capabilities.DynamicLoadBalancer()` gate is **removed** (OQ-3 decision
+b — a pre-v1 break; nothing gates on it). mockpve's `lbalancer` routes are
+**removed** — the mock mirrors real PVE.
 
 ### mockpve
 
@@ -183,7 +188,7 @@ needed).
 | Type                    | Kind                | Notes                                     |
 | ----------------------- | ------------------- | ----------------------------------------- |
 | `HAStatusEntry`         | lossless read (new) | 12 observed fields; `ArmedState` typed    |
-| `ManagerStatus`         | new, shape per OQ-2 | manager blob                              |
+| `ManagerStatus`         | lossless read (new) | typed observed blob + Extra (OQ-2: b)     |
 | `ResourceMode`          | string const (new)  | disarm `resource-mode` enum, live-checked |
 | `MigrateResult`         | lossless read (new) | sid, requested-node, blocking/comigrated  |
 | `BlockingResource`      | read (new)          | `{sid, cause}`; `Cause` enum typed        |
@@ -222,7 +227,8 @@ converts a would-be live 404 into a typed error — strictly less surprising.
 
 ## Open Questions
 
-1. **Does the live run actually disarm HA on the nested cluster?**
+1. **Does the live run actually disarm HA on the nested cluster?** **Decision
+   (2026-07-21): a.**
    - **a (recommended):** Yes — full disarm→observe→arm cycle. The ephemeral
      pvelab cluster exists precisely so cluster-wide switches can be flipped
      with zero blast radius, and `armed-state` in `current` makes the effect
@@ -232,7 +238,15 @@ converts a would-be live 404 into a typed error — strictly less surprising.
      Safer-feeling but the safety is already structural, and the cycle is the
      entire point of the upgrade.
 
-2. **How is `ManagerStatus` modelled?**
+2. **How is `ManagerStatus` modelled?** **Decision (2026-07-21): b, implemented
+   as the house lossless-read pattern** — a fully typed struct for every field
+   the live run observes (testable, per review), with the standard
+   `UnmarshalJSON` -> `Extra` tail so a PVE-pushed change lands in `Extra`
+   instead of breaking the decode (the apidoc pins nothing —
+   `returns: {"type": "object"}` — so plain-b would have no contract to mirror).
+   Drift is tracked by cassette re-certification per PVE version and surfaces in
+   the changelog when fields get promoted. Option a's mixed RawMessage core is
+   withdrawn as confusing/inconsistent.
    - **a (recommended):** Minimal typed core (manager node, quorum flag,
      per-service map as `json.RawMessage`) + lossless `Extra` — the blob is
      internal manager state whose schema PVE does not pin; commit to nothing
@@ -242,7 +256,10 @@ converts a would-be live 404 into a typed error — strictly less surprising.
    - c: Return the raw `json.RawMessage` only. Honest but pushes all parsing
      onto consumers.
 
-3. **What happens to `Capabilities.DynamicLoadBalancer()`?**
+3. **What happens to `Capabilities.DynamicLoadBalancer()`?** **Decision
+   (2026-07-21): b — remove it** (pre-v1 break; nothing gates on it anymore, and
+   an informational gate for a surface PVE never shipped invites the next
+   guess).
    - **a (recommended):** Keep it, re-documented as informational ("9.2+ ships
      the CRS rebalance-on-start controls") — the `VolumeChainSnapshots()`
      precedent; removing a public method is a needless break.
