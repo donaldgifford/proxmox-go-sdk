@@ -22,6 +22,8 @@ nav:
         - 'IMPL-0001: Proxmox VE 9.x SDK coverage': impl/0001-proxmox-ve-9x-sdk-coverage.md
         - 'IMPL-0002: Dogfood harness buildout: pvelab, cluster surface, P4/P6 closure': impl/0002-dogfood-harness-buildout-pvelab-cluster-surface-p4p6-closure.md
         - 'IMPL-0003: Apidoc tooling and docs: real schemadiff baseline': impl/0003-apidoc-tooling-and-docs-real-schemadiff-baseline.md
+        - 'IMPL-0004: SDN fabrics remediation delivery': impl/0004-sdn-fabrics-remediation-delivery.md
+        - 'IMPL-0005: HA arm disarm status and migrate delivery': impl/0005-ha-arm-disarm-status-and-migrate-delivery.md
     - Investigations:
         - Overview: investigation/README.md
         - 'INV-0001: Nested Proxmox nodes for automated live SDK testing': investigation/0001-nested-proxmox-nodes-for-automated-live-sdk-testing.md
