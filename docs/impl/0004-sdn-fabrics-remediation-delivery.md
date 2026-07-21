@@ -1,7 +1,7 @@
 ---
 id: IMPL-0004
 title: "SDN fabrics remediation delivery"
-status: Draft
+status: In Progress
 author: Donald Gifford
 created: 2026-07-21
 ---
@@ -10,8 +10,8 @@ created: 2026-07-21
 
 # IMPL 0004: SDN fabrics remediation delivery
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-07-21 (OQs decided
-2026-07-21: all a)
+**Status:** In Progress **Author:** Donald Gifford **Date:** 2026-07-21 (OQs
+decided 2026-07-21: all a)
 
 <!--toc:start-->
 
@@ -93,18 +93,26 @@ Bring the parked implementation back to a mergeable state on top of current
 
 #### Tasks
 
-- [ ] 1. Rebase `feat/sdn-fabrics-remediation` onto `main` (per OQ-1). The only
+- [x] 1. Rebase `feat/sdn-fabrics-remediation` onto `main` (per OQ-1). The only
      expected conflict is `CHANGELOG.md` — resolve by regenerating
      (`git fetch --tags origin` first, then `git-cliff -o CHANGELOG.md`; the
      tags fetch is load-bearing, see the PR-CI gotchas), keeping
-     `chore(changelog): Auto-sync` as the branch's final commit.
-- [ ] 2. Re-run the gates: `just fmt`, `just lint` (0 issues), `just test`
+     `chore(changelog): Auto-sync` as the branch's final commit. _(Done
+     2026-07-21: delivered as the OQ-1a revival with 1b's mechanics — Donald
+     asked for a fresh branch `feat/impl-0004-sdn-fabrics-delivery`, so the
+     three content commits were cherry-picked onto post-#20 `main` (zero
+     conflicts; the stale changelog commit was skipped and regenerates fresh as
+     the final commit). Identical content, tidier history.)_
+- [x] 2. Re-run the gates: `just fmt`, `just lint` (0 issues), `just test`
      (race), `go vet -tags=integration ./proxmox/integration/`. Confirm the
      branch content still matches DESIGN-0003 + its Implementation Corrections
      (nested fabric paths; fabric-node sub-collection with property-string
      `interfaces` and bare-IPv4 `ip`; the eight status reads with
      `ports`/`nexthops`/`via` in `Extra`; mockpve mirroring only real routes;
      `TestFabricPathsReal`/`TestNodeSDNStatusPaths` pinning the literal paths).
+     _(Done 2026-07-21: all four gates green on the revived branch; grep
+     confirms the nested `fabrics/fabric`/`fabrics/node` paths, both
+     path-pinning tests, and zero flat-path remnants.)_
 - [ ] 3. Open the PR: `minor` label, BREAKING interface note in the description
      and changelog (`SDNStatus`/`VNetStatus` signature changes, the `VNetStatus`
      _method_ replaced by `ZoneContent`/`VNetMACVRF`, `Fabric` field removals),
