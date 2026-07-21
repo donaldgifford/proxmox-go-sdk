@@ -10,7 +10,8 @@ created: 2026-07-21
 
 # IMPL 0004: SDN fabrics remediation delivery
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-07-21
+**Status:** Draft **Author:** Donald Gifford **Date:** 2026-07-21 (OQs decided
+2026-07-21: all a)
 
 <!--toc:start-->
 
@@ -181,7 +182,7 @@ IMPL-0005 Phase 3 (see OQ-3). All lab-touching steps are Donald's.
 
 ## Open Questions
 
-1. **Where does the implementation come from?**
+1. **Where does the implementation come from?** **Decision (2026-07-21): a.**
    - **a (recommended):** Revive the parked `feat/sdn-fabrics-remediation`
      branch (rebase + re-verify). The work is complete, green, and apidoc-mined;
      re-implementing rediscovers nothing and re-risks transcription errors. The
@@ -192,7 +193,8 @@ IMPL-0005 Phase 3 (see OQ-3). All lab-touching steps are Donald's.
    - c: Re-implement from scratch following DESIGN-0003. Maximum process purity,
      zero new information, real regression risk.
 
-2. **When is the `TestNetworkReads` cassette re-recorded?**
+2. **When is the `TestNetworkReads` cassette re-recorded?** **Decision
+   (2026-07-21): a.**
    - **a (recommended):** Pre-merge, on the PR branch (Phase 2 as written). The
      replay job stays authoritative — the PR that breaks a cassette ships its
      replacement, and `main` is never replay-red.
@@ -202,7 +204,7 @@ IMPL-0005 Phase 3 (see OQ-3). All lab-touching steps are Donald's.
      surface is changing and leaves a window where fabrics reads have no replay
      coverage.
 
-3. **One pvelab run or two?**
+3. **One pvelab run or two?** **Decision (2026-07-21): a.**
    - **a (recommended):** One shared clone-up after both IMPL-0004 and IMPL-0005
      merge — both designs already assume the shared run, one lab cycle (~3 min
      up via clones) covers fabric + HA + migrate, and one certification batch
@@ -211,6 +213,7 @@ IMPL-0005 Phase 3 (see OQ-3). All lab-touching steps are Donald's.
      cycles and `r740a` sessions for no verification gain.
 
 4. **Which interface do fabric nodes enroll (`PVE_TEST_FABRIC_IFACE`)?**
+   **Decision (2026-07-21): a.**
    - **a (recommended):** The nested nodes' existing management interface,
      first. OpenFabric runs FRR hellos over the interface without re-addressing
      it, the lab is disposable (worst case: teardown and retry), and it needs

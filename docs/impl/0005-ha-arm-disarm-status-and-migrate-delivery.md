@@ -10,7 +10,8 @@ created: 2026-07-21
 
 # IMPL 0005: HA arm disarm status and migrate delivery
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-07-21
+**Status:** Draft **Author:** Donald Gifford **Date:** 2026-07-21 (OQs decided
+2026-07-21: all a)
 
 <!--toc:start-->
 
@@ -230,7 +231,8 @@ radius (DESIGN-0004 OQ-1 decision a). All lab-touching steps are Donald's.
 
 1. **`DisarmHA` signature — the apidoc marks `resource-mode` REQUIRED, but the
    design (written before the param mining) specified an optional variadic
-   `DisarmHAOption`. Which wins?**
+   `DisarmHAOption`. Which wins?** **Decision (2026-07-21): a** — record the
+   deviation in DESIGN-0004 as an implementation correction when it lands.
    - **a (recommended):** `DisarmHA(ctx, mode ResourceMode) error` — a required
      argument mirroring the wire contract. Freeze-vs-ignore is a real semantic
      choice (state preserved vs HA tracking dropped) the caller must make;
@@ -246,6 +248,7 @@ radius (DESIGN-0004 OQ-1 decision a). All lab-touching steps are Donald's.
      as the zero-argument call.
 
 2. **Env gate for the live arm/disarm cycle (a cluster-wide switch)?**
+   **Decision (2026-07-21): a.**
    - **a (recommended):** A new explicit opt-in, `PVE_TEST_HA_ARM=1` — the cycle
      only ever runs where someone deliberately set it (the pvelab env), and it
      can never ride along on an `r740a` read-only session that happens to have
@@ -254,7 +257,7 @@ radius (DESIGN-0004 OQ-1 decision a). All lab-touching steps are Donald's.
      ⇒ quorate lab ⇒ cycle allowed). One less variable, but implicit
      blast-radius coupling between unrelated tests is how surprises happen.
 
-3. **Shape of the live migrate test?**
+3. **Shape of the live migrate test?** **Decision (2026-07-21): a.**
    - **a (recommended):** A standalone `TestHAResourceMigrate` that creates its
      own scratch VM pair + negative-affinity rule (reusing the placement test's
      helpers), asserts the blocked migrate and a successful one, and cleans up —
@@ -263,7 +266,7 @@ radius (DESIGN-0004 OQ-1 decision a). All lab-touching steps are Donald's.
      setup serves two criteria, but it conflates two ledger items in one
      cassette and re-records a test that is already certified.
 
-4. **PR sequencing against IMPL-0004?**
+4. **PR sequencing against IMPL-0004?** **Decision (2026-07-21): a.**
    - **a (recommended):** Serial — branch after the SDN PR merges. The two PRs
      share no code, but serial merging avoids the known changelog-conflict round
      on whichever lands second, and the shared pvelab run wants both merged
