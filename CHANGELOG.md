@@ -19,6 +19,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(impl)* Record OQ decisions for IMPL-0006 — all a
 - Record the DESIGN-0003 remediation across the doc surfaces
 - *(impl)* IMPL-0004 In Progress; check off Phase-1 tasks 1-2
+- *(impl)* Check off IMPL-0004 Phase-1 task 3 — PR #21 open, Phase 1 complete
 
 ### Testing
 
