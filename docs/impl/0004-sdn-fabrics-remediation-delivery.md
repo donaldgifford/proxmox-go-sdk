@@ -113,10 +113,13 @@ Bring the parked implementation back to a mergeable state on top of current
      _(Done 2026-07-21: all four gates green on the revived branch; grep
      confirms the nested `fabrics/fabric`/`fabrics/node` paths, both
      path-pinning tests, and zero flat-path remnants.)_
-- [ ] 3. Open the PR: `minor` label, BREAKING interface note in the description
+- [x] 3. Open the PR: `minor` label, BREAKING interface note in the description
      and changelog (`SDNStatus`/`VNetStatus` signature changes, the `VNetStatus`
      _method_ replaced by `ZoneContent`/`VNetMACVRF`, `Fabric` field removals),
-     and the Phase-2 cassette caveat stated up front.
+     and the Phase-2 cassette caveat stated up front. _(Done 2026-07-21: PR #21
+     open with `minor`; CI landed exactly as predicted — every job green except
+     `Test Replay (cassettes)`, whose log shows the expected stale-cassette 404
+     on `…/cluster/sdn/fabrics/fabric`. Phase 1 complete.)_
 
 #### Success Criteria
 
