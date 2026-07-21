@@ -10,6 +10,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Record OQ decisions — designs Approved, IMPL-0003 Completed
 - *(impl)* Add IMPL-0004/0005 — DESIGN-0003/0004 delivery plans
+- *(impl)* Record OQ decisions for IMPL-0004/0005 — all a
 
 ## [0.6.3] - 2026-07-21
 
