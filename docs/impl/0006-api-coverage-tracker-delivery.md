@@ -10,7 +10,8 @@ created: 2026-07-21
 
 # IMPL 0006: API coverage tracker delivery
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-07-21
+**Status:** Draft **Author:** Donald Gifford **Date:** 2026-07-21 (OQs decided
+2026-07-21: all a)
 
 <!--toc:start-->
 
@@ -211,6 +212,7 @@ checks.
 ## Open Questions
 
 1. **Does `Routes()` return raw registered patterns or normalized ones?**
+   **Decision (2026-07-21): a.**
    - **a (recommended):** Raw — exactly the Go 1.22 ServeMux patterns as
      registered (`"GET /api2/json/nodes/{node}/qemu"`). The public API stays a
      dumb, honest enumeration; normalization is the coverage tool's concern and
@@ -221,7 +223,7 @@ checks.
      API, and loses the placeholder names, which are useful to humans reading
      the list.
 
-2. **Where does the annotations file live?**
+2. **Where does the annotations file live?** **Decision (2026-07-21): a.**
    - **a (recommended):** `cmd/pve-schemadiff/coverage-annotations.yaml` —
      beside the tool and its testdata (baseline + apidoc), keeping all tracker
      inputs in one place and `docs/` free of hand-edited tracker inputs
@@ -231,7 +233,8 @@ checks.
      but it puts a hand-edited file in a directory whose tracker content is
      otherwise machine-written.
 
-3. **When does this start, relative to IMPL-0004/0005?**
+3. **When does this start, relative to IMPL-0004/0005?** **Decision
+   (2026-07-21): a.**
    - **a (recommended):** After both remediation PRs **merge** (IMPL-0004 Phase
      2 / IMPL-0005 Phase 2) — that satisfies DESIGN-0005 OQ-4's "first report is
      clean" requirement — running in parallel with their Phase-3
@@ -243,7 +246,9 @@ checks.
      tracker on lab scheduling it has no dependency on.
 
 4. **How do the untriaged gap families (notifications, mappings, pools, jobs,
-   bulk-action, …) appear in the first report?**
+   bulk-action, …) appear in the first report?** **Decision (2026-07-21): a** —
+   record the amendment to the design's annotation example in DESIGN-0005 when
+   this lands.
    - **a (recommended):** As **gaps** — the honest state; `out_of_scope` is
      reserved for decided non-goals with a deciding doc (pegaprox-go-side
      orchestration, the frontend). This amends DESIGN-0005's illustrative
