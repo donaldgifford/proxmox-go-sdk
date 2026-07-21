@@ -322,6 +322,20 @@ The 9.x-reworked area — model rules, never the deprecated groups.
 > nor live-verifiable here and is recorded as such (like `ha.ArmHA`).
 > Enumeration is satisfied; live status is written-but-unsupported pending a
 > reachable 9.x node to confirm the real endpoint.
+>
+> **Reclassified (2026-07-21, DESIGN-0003 / INV-0004):** both hedges above were
+> resolved by the real 9.2 apidoc. The fabrics path guess was **wrong** — CRUD
+> now targets the real nested `/cluster/sdn/fabrics/fabric[/{id}]`, `Fabric`
+> lost the nonexistent `Nodes`/`Comment` fields, and node membership landed as
+> its own sub-collection (`FabricNode*` over
+> `/cluster/sdn/fabrics/node/{fabric}`). SDN live status **does exist** — it is
+> node-scoped under `/nodes/{node}/sdn`: the `ErrUnsupported` stubs were
+> replaced by eight real reads (`SDNStatus(ctx,node)`, `ZoneContent`,
+> `ZoneBridges`, `ZoneIPVRF`, `VNetMACVRF`,
+> `FabricInterfaces`/`FabricNeighbors`/`FabricRoutes`), mock-verified with the
+> literal paths pinned in-repo (`TestFabricPathsReal`/`TestNodeSDNStatusPaths`).
+> Fabric lifecycle semantics + status contents are live-verified on the pvelab
+> run (`TestSDNFabricLifecycle`/`TestSDNStatusReads`, DESIGN-0003).
 
 ---
 

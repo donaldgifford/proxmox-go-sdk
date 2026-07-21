@@ -156,12 +156,15 @@ against real PVE:
   UPID parsing, `Extra` field pass-through).
 - Any operation on an **unconfirmed / provisional endpoint** (marked
   "REST-with-caveat" in the code and `docs/impl/0001-*`): several storage
-  volume-chain-snapshot paths, SDN fabrics, DEB822 repos, SMART, ACME, Ceph
-  paths, and the metric-server shapes.
+  volume-chain-snapshot paths, DEB822 repos, SMART, ACME, Ceph paths, and the
+  metric-server shapes. (SDN fabrics + node-scoped SDN live status graduated:
+  their paths and shapes are confirmed against the real 9.2 apidoc, INV-0004;
+  runtime semantics await the pvelab live run per DESIGN-0003.)
 - Operations that return `pverr.ErrUnsupported` because **no PVE REST endpoint
-  is confirmed**: SDN live status, `ha.ArmHA`/`DisarmHA`, RBD mirroring, RAIDZ
-  expansion, OTel config, PBS-native verify. These need a live node to discover
-  the real endpoint (if any).
+  is confirmed**: `ha.ArmHA`/`DisarmHA` (upgrading via DESIGN-0004 — the real
+  `/cluster/ha/status/{arm,disarm}-ha` endpoints exist in the 9.2 apidoc), RBD
+  mirroring, RAIDZ expansion, OTel config, PBS-native verify. These need a live
+  node to discover the real endpoint (if any).
 - The live **VNC (RFB) wire payload** from `console.Connect` (the WebSocket
   upgrade + duplex plumbing is mock-verified; the RFB bytes are not).
 
