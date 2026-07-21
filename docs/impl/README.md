@@ -38,5 +38,6 @@ docz create impl "Your Implementation Title"
 | IMPL-0003 | Apidoc tooling and docs: real schemadiff baseline                | Completed | 2026-07-19 | Donald Gifford | [0003-apidoc-tooling-and-docs-real-schemadiff-baseline.md](0003-apidoc-tooling-and-docs-real-schemadiff-baseline.md)                         |
 | IMPL-0004 | SDN fabrics remediation delivery                                 | Draft     | 2026-07-21 | Donald Gifford | [0004-sdn-fabrics-remediation-delivery.md](0004-sdn-fabrics-remediation-delivery.md)                                                         |
 | IMPL-0005 | HA arm disarm status and migrate delivery                        | Draft     | 2026-07-21 | Donald Gifford | [0005-ha-arm-disarm-status-and-migrate-delivery.md](0005-ha-arm-disarm-status-and-migrate-delivery.md)                                       |
+| IMPL-0006 | API coverage tracker delivery                                    | Draft     | 2026-07-21 | Donald Gifford | [0006-api-coverage-tracker-delivery.md](0006-api-coverage-tracker-delivery.md)                                                               |
 
 <!-- END DOCZ AUTO-GENERATED -->
