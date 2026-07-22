@@ -3,8 +3,10 @@ package ha
 import "net/url"
 
 // All HA endpoints are cluster-scoped under /cluster/ha. SIDs such as "vm:100"
-// carry a colon, so they are percent-escaped as path segments (url.PathEscape
-// encodes ":" as %3A); Go's ServeMux {sid} + PathValue round-trips them.
+// are inserted as single path segments via url.PathEscape, which guards the
+// genuinely reserved characters ('/', '%', …) but leaves ':' intact — a colon
+// is legal in a path segment, so the wire path is /resources/vm:100 (pinned by
+// TestHAStatusPathsReal); Go's ServeMux {sid} + PathValue round-trips it.
 
 func haResourcesPath() string { return "/cluster/ha/resources" }
 
