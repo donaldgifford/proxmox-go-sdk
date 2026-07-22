@@ -6,9 +6,28 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [unreleased]
 
+### Features
+
+- *(ha)* ArmHA drives the real POST /cluster/ha/status/arm-ha (IMPL-0005 P1.1)
+- *(ha)* [**breaking**] DisarmHA takes the required resource-mode (IMPL-0005 P1.2)
+- *(ha)* HAStatusCurrent lossless read of /cluster/ha/status/current (IMPL-0005 P1.3)
+- *(ha)* GetManagerStatus lossless CRM master state read (IMPL-0005 P1.4)
+- *(ha)* MigrateResource/RelocateResource with typed affinity-aware result (IMPL-0005 P1.5)
+- *(ha)* [**breaking**] Reclassify Dynamic Load Balancer to ErrUnsupported (IMPL-0005 P1.6)
+- *(mockpve)* Emulate the HA status/arm/disarm/migrate surface (IMPL-0005 P1.7)
+
+### Refactor
+
+- *(ha)* Fold in the Phase-1 review findings
+
 ### Documentation
 
 - *(impl)* Check off IMPL-0004 Phase-2 task 3 — PR #21 merged, v0.7.0 released
+- *(impl)* Check off IMPL-0005 Phase-1 tasks 1-9; DESIGN-0004 Implementation Corrections
+
+### Testing
+
+- *(ha)* Arm/disarm cycle, wire forms, migrate moves, lossless decodes, real-path pins (IMPL-0005 P1.8)
 
 ## [0.7.0] - 2026-07-22
 
