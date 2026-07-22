@@ -25,6 +25,8 @@ func clusterOptionsPath() string { return "/cluster/options" }
 // The /cluster/ha/status surface: the current-status read plus the 9.2
 // cluster-wide arm/disarm switch (both writes are synchronous, no task).
 
+func haStatusCurrentPath() string { return "/cluster/ha/status/current" }
+
 func haStatusArmPath() string { return "/cluster/ha/status/arm-ha" }
 
 func haStatusDisarmPath() string { return "/cluster/ha/status/disarm-ha" }
