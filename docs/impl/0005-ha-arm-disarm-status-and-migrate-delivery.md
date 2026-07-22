@@ -189,13 +189,17 @@ environment.
 
 #### Tasks
 
-- [ ] 1. Branch per the OQ-4 sequencing decision; changelog regenerated as the
-     branch's final commit.
-- [ ] 2. Open the PR: `minor` label; changelog/description note the new surface,
+- [x] 1. Branch per the OQ-4 sequencing decision; changelog regenerated as the
+     branch's final commit. _(Done 2026-07-22:
+     `feat/impl-0005-ha-remediation-delivery`, cut from post-#22 main — serial
+     after the SDN merge per OQ-4a.)_
+- [x] 2. Open the PR: `minor` label; changelog/description note the new surface,
      the DLB behavior reclassification (a would-be live 404 becomes a typed
      error), the `ha.API` interface growth (implementor-breaking,
      source-compatible for callers), and the removed
-     `Capabilities.DynamicLoadBalancer()` (pre-v1 break).
+     `Capabilities.DynamicLoadBalancer()` (pre-v1 break). _(Done 2026-07-22: PR
+     #23, `minor`, all breaks noted up front; a pre-PR review pass returned
+     MERGEABLE and its findings were folded in.)_
 - [ ] 3. CI fully green — no existing cassette touches this surface
      (`TestClusterAndHAReads` only lists resources), so
      `Test Replay (cassettes)` stays green; merge → the label auto-mints the
