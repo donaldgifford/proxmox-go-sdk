@@ -161,10 +161,14 @@ against real PVE:
   their paths and shapes are confirmed against the real 9.2 apidoc, INV-0004;
   runtime semantics await the pvelab live run per DESIGN-0003.)
 - Operations that return `pverr.ErrUnsupported` because **no PVE REST endpoint
-  is confirmed**: `ha.ArmHA`/`DisarmHA` (upgrading via DESIGN-0004 — the real
-  `/cluster/ha/status/{arm,disarm}-ha` endpoints exist in the 9.2 apidoc), RBD
-  mirroring, RAIDZ expansion, OTel config, PBS-native verify. These need a live
-  node to discover the real endpoint (if any).
+  exists**: the HA Dynamic Load Balancer (reclassified via DESIGN-0004 — the
+  provisional `/cluster/ha/lbalancer` path is absent from the real 9.2 apidoc),
+  RBD mirroring, RAIDZ expansion, OTel config, PBS-native verify. These need a
+  live node to discover the real endpoint (if any). (`ha.ArmHA`/`DisarmHA`
+  graduated: they now drive the real `/cluster/ha/status/{arm,disarm}-ha`
+  endpoints, mock-verified; the live cycle runs on the pvelab lab behind
+  `PVE_TEST_HA_ARM=1`, and the status reads + migrate/relocate results await the
+  same run per IMPL-0005 Phase 3.)
 - The live **VNC (RFB) wire payload** from `console.Connect` (the WebSocket
   upgrade + duplex plumbing is mock-verified; the RFB bytes are not).
 

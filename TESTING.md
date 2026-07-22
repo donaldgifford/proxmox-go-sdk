@@ -131,6 +131,7 @@ export PVE_TEST_PLACEMENT_VMID_1=9301   # HA placement pair (needs a quorate
 export PVE_TEST_PLACEMENT_VMID_2=9302   # multi-node cluster, e.g. the pvelab lab)
 export PVE_TEST_FABRIC_NODES="pvelab-1,pvelab-2,pvelab-3"  # SDN fabric lifecycle (>= 2 pvelab nodes)
 export PVE_TEST_FABRIC_IFACE="ens19"    # fabric-facing interface on every fabric node
+export PVE_TEST_HA_ARM=1                # HA arm/disarm cycle — DISPOSABLE clusters only (pvelab)
 ```
 
 Every variable:
@@ -158,6 +159,7 @@ Every variable:
 | `PVE_TEST_PLACEMENT_VMID_2` | gate     | the pair's second scratch VMID                             |
 | `PVE_TEST_FABRIC_NODES`     | gate     | CSV of >= 2 node names for the SDN fabric lifecycle        |
 | `PVE_TEST_FABRIC_IFACE`     | gate     | fabric-facing interface name on every fabric node          |
+| `PVE_TEST_HA_ARM`           | gate     | `1` to run the cluster-wide HA arm/disarm cycle (pvelab!)  |
 | `PVE_SCRUB_EXTRA`           | no       | extra `live=placeholder` recording-scrub pairs (CSV)       |
 
 \* one credential pair is required: `PVE_TOKEN_ID`+`PVE_TOKEN_SECRET` (wins when
@@ -553,6 +555,9 @@ Test → phase → gates:
 | `TestLXCLifecycle`              | 2     | `PVE_TEST_STORAGE`, `PVE_TEST_LXC_VMID`, `…_TEMPLATE`    |
 | `TestISOUpload`                 | 3     | `PVE_TEST_ISO_STORAGE`, `PVE_TEST_ISO_PATH`              |
 | `TestResourceAffinityPlacement` | 4     | `PVE_TEST_PLACEMENT_VMID_1`, `PVE_TEST_PLACEMENT_VMID_2` |
+| `TestHAStatusReads`             | 4     | (none)                                                   |
+| `TestHAArmDisarmCycle`          | 4     | `PVE_TEST_HA_ARM=1` (disposable cluster only)            |
+| `TestHAResourceMigrate`         | 4     | `PVE_TEST_PLACEMENT_VMID_1`, `PVE_TEST_PLACEMENT_VMID_2` |
 | `TestConsoleMint`               | 6     | `PVE_TEST_STORAGE`, `PVE_TEST_CONSOLE_VMID`              |
 | `TestConsoleRFB`                | 6     | `PVE_TEST_STORAGE`, `PVE_TEST_CONSOLE_VMID`              |
 
