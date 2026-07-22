@@ -4,17 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 
-	"github.com/donaldgifford/proxmox-go-sdk/proxmox/internal/svcutil"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/pverr"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/types"
 )
 
-// DLBStatus is the Dynamic Load Balancer configuration and running state (9.2+).
-// The DLB continuously rebalances HA services across nodes using the CRS
-// scheduler, rather than only relocating on node failure. Reads are lossless:
-// keys outside the typed set are preserved in Extra (the endpoint shape is
-// provisional — see GetDLBStatus).
+// DLBStatus is the Dynamic Load Balancer configuration and running state. The
+// type is retained for a future PVE release that exposes a DLB REST endpoint
+// (the storage.VolumeSnapshot precedent) — today none exists, and
+// GetDLBStatus always returns pverr.ErrUnsupported.
 type DLBStatus struct {
 	Enabled types.PVEBool `json:"enabled,omitempty"`
 	Mode    string        `json:"mode,omitempty"` // scheduler mode, e.g. "static".
@@ -56,8 +54,8 @@ func (d *DLBStatus) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// DLBConfig is the body of the Dynamic Load Balancer config write (9.2+). Pass
-// it by pointer.
+// DLBConfig is the body of a Dynamic Load Balancer config write. Retained
+// like DLBStatus; SetDLBConfig always returns pverr.ErrUnsupported today.
 type DLBConfig struct {
 	Enabled types.PVEBool `json:"enabled"`
 	Mode    string        `json:"mode,omitempty"`
@@ -65,41 +63,27 @@ type DLBConfig struct {
 	Extra map[string]string `json:"-"`
 }
 
-// GetDLBStatus returns the Dynamic Load Balancer configuration and status. It is
-// gated on the 9.2 DynamicLoadBalancer capability.
-//
-// API-shape caveat: the PVE 9.2 REST path for the DLB is unconfirmed without a
-// live 9.2 node. The provisional path (/cluster/ha/lbalancer) mirrors PVE's
-// ha-manager "lbalancer" naming; adjust dlbPath in paths.go once confirmed. The
-// capability gate fires before any request, so a sub-9.2 node never reaches the
-// wire.
-func (s *Service) GetDLBStatus(ctx context.Context) (*DLBStatus, error) {
-	if err := s.caps.Require("Dynamic Load Balancer", "9.2"); err != nil {
-		return nil, fmt.Errorf("ha.GetDLBStatus: %w", err)
-	}
-	var status DLBStatus
-	if err := s.c.DoRequest(ctx, http.MethodGet, dlbPath(), nil, &status); err != nil {
-		return nil, fmt.Errorf("ha.GetDLBStatus: %w", err)
-	}
-	return &status, nil
+// GetDLBStatus always returns a pverr.ErrUnsupported-wrapped error and never
+// issues a request: PVE has no Dynamic Load Balancer REST endpoint — the
+// provisional /cluster/ha/lbalancer path this op originally targeted does not
+// exist on a real 9.2 cluster (INV-0004 Finding 4). Continuous rebalancing is
+// driven through the CRS scheduler settings instead: see GetCRSSettings /
+// SetCRSSettings (the crs datacenter option, e.g. ha-rebalance-on-start).
+// The signature is kept so a real implementation can land non-breaking if a
+// future PVE release adds the endpoint.
+func (*Service) GetDLBStatus(_ context.Context) (*DLBStatus, error) {
+	return nil, fmt.Errorf(
+		"ha.GetDLBStatus: the Dynamic Load Balancer has no PVE REST endpoint; "+
+			"use the CRS settings (ha.GetCRSSettings): %w", pverr.ErrUnsupported,
+	)
 }
 
-// SetDLBConfig writes the Dynamic Load Balancer configuration (enable/disable
-// and mode). Gated on 9.2. The write is synchronous (no task). Same API-shape
-// caveat as GetDLBStatus.
-func (s *Service) SetDLBConfig(ctx context.Context, cfg *DLBConfig) error {
-	if cfg == nil {
-		return fmt.Errorf("ha.SetDLBConfig: %w", svcutil.ErrNilSpec)
-	}
-	if err := s.caps.Require("Dynamic Load Balancer", "9.2"); err != nil {
-		return fmt.Errorf("ha.SetDLBConfig: %w", err)
-	}
-	body, err := svcutil.EncodeWithExtra(cfg, cfg.Extra)
-	if err != nil {
-		return fmt.Errorf("ha.SetDLBConfig: %w", err)
-	}
-	if err := s.c.DoRequest(ctx, http.MethodPut, dlbPath(), body, nil); err != nil {
-		return fmt.Errorf("ha.SetDLBConfig: %w", err)
-	}
-	return nil
+// SetDLBConfig always returns a pverr.ErrUnsupported-wrapped error and never
+// issues a request — same reclassification as GetDLBStatus; configure the
+// scheduler via SetCRSSettings instead.
+func (*Service) SetDLBConfig(_ context.Context, _ *DLBConfig) error {
+	return fmt.Errorf(
+		"ha.SetDLBConfig: the Dynamic Load Balancer has no PVE REST endpoint; "+
+			"use the CRS settings (ha.SetCRSSettings): %w", pverr.ErrUnsupported,
+	)
 }

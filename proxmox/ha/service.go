@@ -57,8 +57,9 @@ type API interface {
 	GetCRSSettings(ctx context.Context) (*CRSSettings, error)
 	SetCRSSettings(ctx context.Context, update *CRSSettingsUpdate) error
 
-	// Dynamic Load Balancer (task 4, 9.2+). Gated on DynamicLoadBalancer; the
-	// REST path is provisional (see GetDLBStatus).
+	// Dynamic Load Balancer. PVE exposes no DLB REST endpoint (INV-0004),
+	// so both always return pverr.ErrUnsupported without issuing a request;
+	// use the CRS settings instead (see GetDLBStatus).
 	GetDLBStatus(ctx context.Context) (*DLBStatus, error)
 	SetDLBConfig(ctx context.Context, cfg *DLBConfig) error
 

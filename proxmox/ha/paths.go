@@ -37,11 +37,6 @@ func haStatusArmPath() string { return "/cluster/ha/status/arm-ha" }
 
 func haStatusDisarmPath() string { return "/cluster/ha/status/disarm-ha" }
 
-// dlbPath is the Dynamic Load Balancer endpoint (9.2+). The path is provisional
-// — it mirrors PVE's ha-manager "lbalancer" naming and is unconfirmed without a
-// live 9.2 node (see ha.GetDLBStatus).
-func dlbPath() string { return "/cluster/ha/lbalancer" }
-
 // Storage/ZFS replication jobs. Job IDs are "<vmid>-<jobnum>" (e.g. "100-0") —
 // a hyphen, not a colon, so url.PathEscape is effectively a no-op, but it is
 // applied for consistency and safety.
