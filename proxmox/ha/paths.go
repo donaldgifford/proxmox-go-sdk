@@ -22,6 +22,11 @@ func haRulePath(rule string) string {
 // /cluster/ha, but the CRS scheduler config lives here (the "crs" key).
 func clusterOptionsPath() string { return "/cluster/options" }
 
+// The /cluster/ha/status surface: the current-status read plus the 9.2
+// cluster-wide arm/disarm switch (both writes are synchronous, no task).
+
+func haStatusArmPath() string { return "/cluster/ha/status/arm-ha" }
+
 // dlbPath is the Dynamic Load Balancer endpoint (9.2+). The path is provisional
 // — it mirrors PVE's ha-manager "lbalancer" naming and is unconfirmed without a
 // live 9.2 node (see ha.GetDLBStatus).
