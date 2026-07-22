@@ -138,13 +138,20 @@ actually decoding the subdir index) — then merge.
 
 #### Tasks
 
-- [ ] 1. Re-record `TestNetworkReads` against `r740a` (Donald; reads-only, no
+- [x] 1. Re-record `TestNetworkReads` against `r740a` (Donald; reads-only, no
      pvelab, no destructive gates needed):
      `PVE_RECORD=1 go test -tags=integration -run 'TestNetworkReads' ./proxmox/integration/`
-     with the usual `.env.local` environment.
-- [ ] 2. Leak-review the new cassette (credentials redacted to `REDACTED`,
+     with the usual `.env.local` environment. _(Done 2026-07-22: recorded via
+     `op run --env-file=.env` — first attempt used the stale `.pvelab.env` and
+     dialed a torn-down nested-lab address; the r740a token env is the right
+     one. Four interactions; the fabrics read now hits the nested
+     `…/fabrics/fabric` path and honestly returns the empty list.)_
+- [x] 2. Leak-review the new cassette (credentials redacted to `REDACTED`,
      endpoint/node rewritten to the `pve.example`/`pve` placeholders) and commit
-     it on the PR branch, changelog re-synced as the final commit.
+     it on the PR branch, changelog re-synced as the final commit. _(Done
+     2026-07-22: scan clean — all hosts `pve.example`, Authorization `REDACTED`,
+     no real IPs/hostnames; full `just test-replay` green locally before
+     commit.)_
 - [ ] 3. All CI jobs green including `Test Replay (cassettes)`; merge. The
      `minor` label auto-mints the next tag — no manual tagging.
 
