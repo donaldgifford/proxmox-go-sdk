@@ -24,6 +24,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 ### Testing
 
 - *(integration)* SDN status reads + fabric lifecycle live tests
+- *(integration)* Re-record TestNetworkReads cassette on the nested fabrics path
 
 ## [0.6.3] - 2026-07-21
 
