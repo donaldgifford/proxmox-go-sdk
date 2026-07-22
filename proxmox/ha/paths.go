@@ -3,14 +3,20 @@ package ha
 import "net/url"
 
 // All HA endpoints are cluster-scoped under /cluster/ha. SIDs such as "vm:100"
-// carry a colon, so they are percent-escaped as path segments (url.PathEscape
-// encodes ":" as %3A); Go's ServeMux {sid} + PathValue round-trips them.
+// are inserted as single path segments via url.PathEscape, which guards the
+// genuinely reserved characters ('/', '%', …) but leaves ':' intact — a colon
+// is legal in a path segment, so the wire path is /resources/vm:100 (pinned by
+// TestHAStatusPathsReal); Go's ServeMux {sid} + PathValue round-trips it.
 
 func haResourcesPath() string { return "/cluster/ha/resources" }
 
 func haResourcePath(sid string) string {
 	return haResourcesPath() + "/" + url.PathEscape(sid)
 }
+
+func haResourceMigratePath(sid string) string { return haResourcePath(sid) + "/migrate" }
+
+func haResourceRelocatePath(sid string) string { return haResourcePath(sid) + "/relocate" }
 
 func haRulesPath() string { return "/cluster/ha/rules" }
 
@@ -22,10 +28,16 @@ func haRulePath(rule string) string {
 // /cluster/ha, but the CRS scheduler config lives here (the "crs" key).
 func clusterOptionsPath() string { return "/cluster/options" }
 
-// dlbPath is the Dynamic Load Balancer endpoint (9.2+). The path is provisional
-// — it mirrors PVE's ha-manager "lbalancer" naming and is unconfirmed without a
-// live 9.2 node (see ha.GetDLBStatus).
-func dlbPath() string { return "/cluster/ha/lbalancer" }
+// The /cluster/ha/status surface: the current-status read plus the 9.2
+// cluster-wide arm/disarm switch (both writes are synchronous, no task).
+
+func haStatusCurrentPath() string { return "/cluster/ha/status/current" }
+
+func haStatusManagerPath() string { return "/cluster/ha/status/manager_status" }
+
+func haStatusArmPath() string { return "/cluster/ha/status/arm-ha" }
+
+func haStatusDisarmPath() string { return "/cluster/ha/status/disarm-ha" }
 
 // Storage/ZFS replication jobs. Job IDs are "<vmid>-<jobnum>" (e.g. "100-0") —
 // a hyphen, not a colon, so url.PathEscape is effectively a no-op, but it is

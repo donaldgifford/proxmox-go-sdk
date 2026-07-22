@@ -72,9 +72,6 @@ func (c Capabilities) MeetsMinimum() bool {
 	return c.AtLeast(MinimumMajor, MinimumMinor)
 }
 
-// DynamicLoadBalancer gates the continuous CRS rebalancing controls (9.2+).
-func (c Capabilities) DynamicLoadBalancer() bool { return c.AtLeast(9, 2) }
-
 // OCITemplates gates pulling OCI images as LXC templates (9.1+).
 func (c Capabilities) OCITemplates() bool { return c.AtLeast(9, 1) }
 

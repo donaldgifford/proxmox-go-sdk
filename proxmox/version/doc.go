@@ -7,13 +7,13 @@
 // from GET /version and hands to every service. Services consult it before
 // attempting a minor-gated operation:
 //
-//	if !caps.DynamicLoadBalancer() {
-//		return caps.Require("dynamic load balancer", "9.2") // -> pverr.ErrUnsupported
+//	if !caps.HAClusterSwitch() {
+//		return caps.Require("HA arm/disarm", "9.2") // -> pverr.ErrUnsupported
 //	}
 //
 // [Capabilities.AtLeast] is the primitive (major.minor comparison; patch is not
 // considered, matching how PVE gates features). The named gates
-// ([Capabilities.OCITemplates] 9.1+, [Capabilities.DynamicLoadBalancer] and
+// ([Capabilities.OCITemplates] 9.1+, [Capabilities.HAClusterSwitch] and
 // [Capabilities.TokenSecretRotation] 9.2+) are thin wrappers over it, and
 // [Capabilities.Require] produces a uniform pverr.ErrUnsupported-wrapped error
 // for ad-hoc gates.

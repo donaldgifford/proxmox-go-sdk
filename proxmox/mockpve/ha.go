@@ -10,13 +10,23 @@ import (
 // haState is the HA slice of the mock model, embedded in state and guarded by
 // state.mu. HA is cluster-scoped, so records are not keyed by node.
 type haState struct {
-	resources  map[string]*haResourceRecord // keyed by SID, e.g. "vm:100".
-	rules      map[string]*haRuleRecord     // keyed by rule name.
-	crs        string                       // the datacenter "crs" property-string.
-	dlbEnabled bool                         // Dynamic Load Balancer toggle (9.2+).
-	dlbMode    string                       // Dynamic Load Balancer scheduler mode.
-	repl       map[string]*haReplRecord     // keyed by replication job ID.
+	resources map[string]*haResourceRecord // keyed by SID, e.g. "vm:100".
+	rules     map[string]*haRuleRecord     // keyed by rule name.
+	crs       string                       // the datacenter "crs" property-string.
+	// armed is the 9.2 cluster-wide HA switch; New() starts it true (real
+	// PVE default). resourceMode holds the mode chosen at disarm time.
+	armed        bool
+	resourceMode string
+	repl         map[string]*haReplRecord // keyed by replication job ID.
 }
+
+// haDefaultNode is the node the synthesized HA status rows report when a
+// seeded resource carries no node (the mock's canonical node from New).
+const haDefaultNode = "pve"
+
+// haMockTimestamp is the fixed unix timestamp the synthesized status rows
+// carry, keeping mock responses deterministic.
+const haMockTimestamp = 1752000000
 
 // haReplRecord is one storage/ZFS replication job.
 type haReplRecord struct {
@@ -45,6 +55,7 @@ type haResourceRecord struct {
 	SID         string
 	Type        string
 	State       string
+	Node        string // where the CRM currently places it; migrate/relocate move it.
 	MaxRestart  int
 	MaxRelocate int
 	Comment     string
@@ -141,8 +152,12 @@ func (s *Server) registerHARoutes() {
 	s.mux.HandleFunc("DELETE /api2/json/cluster/ha/rules/{rule}", s.handleHARuleDelete)
 	s.mux.HandleFunc("GET /api2/json/cluster/options", s.handleClusterOptionsGet)
 	s.mux.HandleFunc("PUT /api2/json/cluster/options", s.handleClusterOptionsSet)
-	s.mux.HandleFunc("GET /api2/json/cluster/ha/lbalancer", s.handleDLBGet)
-	s.mux.HandleFunc("PUT /api2/json/cluster/ha/lbalancer", s.handleDLBSet)
+	s.mux.HandleFunc("GET /api2/json/cluster/ha/status/current", s.handleHAStatusCurrent)
+	s.mux.HandleFunc("GET /api2/json/cluster/ha/status/manager_status", s.handleHAManagerStatus)
+	s.mux.HandleFunc("POST /api2/json/cluster/ha/status/arm-ha", s.handleHAArm)
+	s.mux.HandleFunc("POST /api2/json/cluster/ha/status/disarm-ha", s.handleHADisarm)
+	s.mux.HandleFunc("POST /api2/json/cluster/ha/resources/{sid}/migrate", s.handleHAResourceMove)
+	s.mux.HandleFunc("POST /api2/json/cluster/ha/resources/{sid}/relocate", s.handleHAResourceMove)
 	s.mux.HandleFunc("GET /api2/json/cluster/replication", s.handleReplList)
 	s.mux.HandleFunc("POST /api2/json/cluster/replication", s.handleReplCreate)
 	s.mux.HandleFunc("GET /api2/json/cluster/replication/{id}", s.handleReplGet)
@@ -289,35 +304,155 @@ func haReplToPayload(rec *haReplRecord) haReplPayload {
 	return p
 }
 
-// handleDLBGet returns the Dynamic Load Balancer status (the provisional 9.2
-// endpoint the SDK targets).
-func (s *Server) handleDLBGet(w http.ResponseWriter, r *http.Request) {
+// haStatusPayload mirrors one GET /cluster/ha/status/current row. The real
+// endpoint returns a heterogeneous array (quorum/master/lrm/service rows);
+// the mock synthesizes quorum + master + one service row per seeded resource.
+type haStatusPayload struct {
+	ID           string `json:"id"`
+	Type         string `json:"type"`
+	SID          string `json:"sid,omitempty"`
+	Node         string `json:"node,omitempty"`
+	State        string `json:"state,omitempty"`
+	Status       string `json:"status,omitempty"`
+	RequestState string `json:"request_state,omitempty"`
+	Quorate      int    `json:"quorate,omitempty"`
+	ArmedState   string `json:"armed-state,omitempty"`
+	ResourceMode string `json:"resource_mode,omitempty"`
+	MaxRestart   int    `json:"max_restart,omitempty"`
+	MaxRelocate  int    `json:"max_relocate,omitempty"`
+	Timestamp    int64  `json:"timestamp,omitempty"`
+}
+
+// haArmedState renders the armed flag as the 9.2 armed-state enum. The caller
+// holds st.mu.
+func (s *Server) haArmedState() string {
+	if s.st.ha.armed {
+		return "armed"
+	}
+	return "disarmed"
+}
+
+// handleHAStatusCurrent synthesizes the live HA manager view: a quorum row, a
+// master row reporting armed-state from the cluster switch, and one service
+// row per seeded resource. The mock does not schedule — rows reflect seeded
+// state, and migrate/relocate handlers move a resource's node.
+func (s *Server) handleHAStatusCurrent(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
 	}
 	s.st.mu.Lock()
-	payload := map[string]any{"enabled": boolToInt(s.st.ha.dlbEnabled), "mode": s.st.ha.dlbMode}
+	out := []haStatusPayload{
+		{ID: "quorum", Type: "quorum", Node: haDefaultNode, Status: "OK", Quorate: 1},
+		{
+			ID: "master", Type: "master", Node: haDefaultNode, Status: "active",
+			ArmedState: s.haArmedState(), Timestamp: haMockTimestamp,
+		},
+	}
+	for _, rec := range s.st.ha.resources {
+		row := haStatusPayload{
+			ID: "service:" + rec.SID, Type: "service", SID: rec.SID,
+			Node: rec.Node, State: rec.State, Status: rec.State,
+			RequestState: rec.State, MaxRestart: rec.MaxRestart,
+			MaxRelocate: rec.MaxRelocate, ResourceMode: s.st.ha.resourceMode,
+		}
+		if row.Node == "" {
+			row.Node = haDefaultNode
+		}
+		out = append(out, row)
+	}
 	s.st.mu.Unlock()
+	s.writeData(w, out)
+}
+
+// handleHAManagerStatus returns a plausible CRM master state blob built from
+// the seeded resources (the real endpoint publishes the pve-ha-manager state
+// file, which the apidoc leaves as a bare object).
+func (s *Server) handleHAManagerStatus(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	s.st.mu.Lock()
+	services := make(map[string]map[string]string, len(s.st.ha.resources))
+	for _, rec := range s.st.ha.resources {
+		node := rec.Node
+		if node == "" {
+			node = haDefaultNode
+		}
+		services[rec.SID] = map[string]string{
+			"node": node, "state": rec.State, "uid": "mock-" + rec.SID,
+		}
+	}
+	s.st.mu.Unlock()
+	payload := map[string]any{
+		"master_node":    haDefaultNode,
+		"node_status":    map[string]string{haDefaultNode: "online"},
+		"service_status": services,
+		"timestamp":      haMockTimestamp,
+	}
 	s.writeData(w, payload)
 }
 
-// handleDLBSet writes the Dynamic Load Balancer config. Synchronous.
-func (s *Server) handleDLBSet(w http.ResponseWriter, r *http.Request) {
+// handleHAArm flips the cluster-wide HA switch on. Synchronous, no params.
+func (s *Server) handleHAArm(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxFormBytes)
-	if err := r.ParseForm(); err != nil {
-		s.writeError(w, http.StatusBadRequest, msgInvalidForm)
+	s.st.mu.Lock()
+	s.st.ha.armed = true
+	s.st.ha.resourceMode = ""
+	s.st.mu.Unlock()
+	s.writeData(w, nil)
+}
+
+// handleHADisarm flips the cluster-wide HA switch off. The resource-mode
+// parameter is required on real PVE (enum freeze|ignore), so the mock rejects
+// a missing or unknown value.
+func (s *Server) handleHADisarm(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	if !s.parseForm(w, r) {
+		return
+	}
+	mode := r.PostForm.Get("resource-mode")
+	if mode != "freeze" && mode != "ignore" {
+		s.writeError(w, http.StatusBadRequest, "missing or invalid resource-mode")
 		return
 	}
 	s.st.mu.Lock()
-	s.st.ha.dlbEnabled = r.PostForm.Get("enabled") == "1"
-	if v := r.PostForm.Get("mode"); v != "" {
-		s.st.ha.dlbMode = v
-	}
+	s.st.ha.armed = false
+	s.st.ha.resourceMode = mode
 	s.st.mu.Unlock()
 	s.writeData(w, nil)
+}
+
+// handleHAResourceMove serves both migrate and relocate: it records the
+// requested node as the resource's placement and echoes the accepted intent
+// (the mock evaluates no affinity rules, so blocking-resources is never set).
+func (s *Server) handleHAResourceMove(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	sid := r.PathValue("sid")
+	if !s.parseForm(w, r) {
+		return
+	}
+	node := r.PostForm.Get("node")
+	if node == "" {
+		s.writeError(w, http.StatusBadRequest, "missing node")
+		return
+	}
+	s.st.mu.Lock()
+	rec := s.st.ha.resources[sid]
+	if rec != nil {
+		rec.Node = node
+	}
+	s.st.mu.Unlock()
+	if rec == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchHAResource)
+		return
+	}
+	s.writeData(w, map[string]string{"sid": sid, "requested-node": node})
 }
 
 // handleClusterOptionsGet returns the datacenter options block. HA owns the

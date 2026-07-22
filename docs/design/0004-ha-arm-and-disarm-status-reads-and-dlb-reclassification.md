@@ -225,6 +225,27 @@ needed).
 Consumers: `pegaprox-go` does not call the affected ops; the DLB behavior change
 converts a would-be live 404 into a typed error — strictly less surprising.
 
+## Implementation Corrections (2026-07-22)
+
+Recorded at IMPL-0005 Phase-1 landing, per the DESIGN-0003 precedent — the
+2026-07-21 apidoc mining post-dated this design and firmed up two surfaces:
+
+1. **`DisarmHA` takes a required mode, not a variadic option.** The apidoc marks
+   `resource-mode` (enum `freeze` | `ignore`) as **required** — there is no
+   server-side default to lean on, so the illustrative
+   `DisarmHA(ctx, opts ...DisarmHAOption)` sketch above (and the "variadic
+   options, source-compatible" line under API / Interface Changes) is superseded
+   by `DisarmHA(ctx, mode ResourceMode) error` (IMPL-0005 OQ-1 decision a).
+   Freeze-vs-ignore is a real semantic choice the caller must make; an empty
+   mode is refused client-side. Whether PVE truly rejects the param's absence is
+   double-checked on the Phase-3 live run.
+2. **`current` has 16 item fields, not twelve.** The full apidoc-confirmed set
+   (including `crm_state`, `request_state`, `auto-rebalance`, `failback`) is
+   modelled on `HAStatusEntry`; `armed-state` is the four-value enum
+   `armed`/`standby`/`disarming`/`disarmed` (typed `ArmedState`), and
+   `resource_mode` mirrors the disarm enum. See IMPL-0005's Confirmed wire
+   facts.
+
 ## Open Questions
 
 1. **Does the live run actually disarm HA on the nested cluster?** **Decision

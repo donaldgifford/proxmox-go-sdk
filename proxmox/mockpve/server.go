@@ -48,6 +48,7 @@ func New(opts ...Option) *Server {
 			nodes:   map[string]*nodeState{"pve": {tasks: make(map[string]*taskRecord)}},
 			tickets: make(map[string]ticketRecord),
 			users:   make(map[string]string),
+			ha:      haState{armed: true}, // real PVE default: HA armed.
 		},
 	}
 	for _, opt := range opts {

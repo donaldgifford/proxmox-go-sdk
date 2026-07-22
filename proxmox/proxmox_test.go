@@ -35,8 +35,8 @@ func TestNewClientSeedsCapabilities(t *testing.T) {
 	if got := c.Capabilities().String(); got != "9.2.1" {
 		t.Errorf("Capabilities() = %s, want 9.2.1", got)
 	}
-	if !c.Capabilities().DynamicLoadBalancer() {
-		t.Error("9.2.1 DynamicLoadBalancer() = false, want true")
+	if !c.Capabilities().HAClusterSwitch() {
+		t.Error("9.2.1 HAClusterSwitch() = false, want true")
 	}
 }
 

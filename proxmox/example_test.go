@@ -25,7 +25,7 @@ func ExampleNewClient() {
 		return
 	}
 	fmt.Println(c.Capabilities().String())
-	fmt.Println(c.Capabilities().DynamicLoadBalancer())
+	fmt.Println(c.Capabilities().HAClusterSwitch())
 	// Output:
 	// 9.2.1
 	// true

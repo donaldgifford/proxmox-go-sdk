@@ -473,15 +473,27 @@ scheduler config lives inside datacenter options (`GET`/`PUT /cluster/options`,
 the `crs` **compound property-string** `ha=static,ha-rebalance-on-start=1`).
 `GetCRSSettings`/`SetCRSSettings` parse/encode that string to typed `Mode` +
 `HARebalanceOnStart` (no `Extra` — the body is one `crs=` param, not a flat
-form). Task 4 (Dynamic Load Balancer, 9.2+) landed `GetDLBStatus`/
-`SetDLBConfig` gated on `caps.Require("Dynamic Load Balancer","9.2")` — the
-REST-with-caveat approach: provisional path `/cluster/ha/lbalancer`, lossless
-`DLBStatus` read (hedges the unconfirmed shape), gate + round-trip
-mock-verified. Task 5 (Arm/Disarm) added `ArmHA`/`DisarmHA` + the new
-`HAClusterSwitch` (9.2) capability, but there is no confirmed PVE REST endpoint
-(a GUI/pvecm action), so both return a documented `pverr.ErrUnsupported` — the
-`storage.ExpandRAIDZ` precedent, kept in the interface so test doubles can stub
-them. Task 6 (replication jobs) added CRUD over `/cluster/replication`
+form). Task 4 originally landed a REST-with-caveat Dynamic Load Balancer on the
+provisional `/cluster/ha/lbalancer` path and Task 5 landed `ArmHA`/ `DisarmHA`
+as `ErrUnsupported` stubs — **both were reversed by IMPL-0005 (DESIGN-0004,
+2026-07-22) after apidoc mining**: the DLB path does not exist on real 9.2
+(INV-0004 F4), so `GetDLBStatus`/`SetDLBConfig` are now documented
+`ErrUnsupported` (types retained; `version.Capabilities.DynamicLoadBalancer()`
+**removed** — pre-v1 break) pointing at the CRS settings, while arm/disarm
+**graduated to real ops**: `ArmHA(ctx)` / `DisarmHA(ctx, mode)` drive the
+confirmed `POST /cluster/ha/status/{arm,disarm}-ha` (sync, gated on
+`HAClusterSwitch` 9.2; disarm's `ResourceMode` freeze/ignore is REQUIRED on the
+wire — the design's optional-param sketch was corrected). IMPL-0005 also added
+the status reads — `HAStatusCurrent` (16-field lossless `HAStatusEntry`,
+`ArmedState` enum: the arm/disarm observable) and `GetManagerStatus`
+(provisional typed fields + Extra; apidoc pins nothing) — and synchronous
+`MigrateResource`/`RelocateResource` → `*MigrateResult` (lossless;
+`BlockingResource.Cause` typed `node-affinity`/`resource-affinity`; never a
+`tasks.Ref`). mockpve emulates the armed switch + status rows + node moves (no
+affinity evaluation) and dropped the fabricated lbalancer routes;
+`TestHAStatusPathsReal` pins the literal paths (which also exposed that
+`url.PathEscape` leaves `:` intact — the wire path is `/resources/vm:100`). Task
+6 (replication jobs) added CRUD over `/cluster/replication`
 (`ListReplicationJobs`/`Get`/`Create`/`Update`/`DeleteReplicationJob`), lossless
 `ReplicationJob` (IDs `<vmid>-<jobnum>`), requires the 9.x `VM.Replicate`
 privilege (noted in docs). Task 7 promoted `ha/doc.go` (full overview) and added
@@ -720,9 +732,11 @@ environment.** This shapes how we test and what "done" means:
   (`PVE_TEST_STORAGE` + `PVE_TEST_VMID`), LXC lifecycle (`+PVE_TEST_LXC_VMID` +
   `PVE_TEST_LXC_TEMPLATE`), ISO upload (`PVE_TEST_ISO_STORAGE` +
   `PVE_TEST_ISO_PATH`), console mint + RFB read (`PVE_TEST_STORAGE` +
-  `PVE_TEST_CONSOLE_VMID`, each spins up its own scratch VM), HA placement
-  (`PVE_TEST_PLACEMENT_VMID_1/2`, needs the quorate pvelab cluster). They are
-  **not runnable here** — they `t.Skip` without a node. The harness is
+  `PVE_TEST_CONSOLE_VMID`, each spins up its own scratch VM), HA placement + HA
+  migrate (`PVE_TEST_PLACEMENT_VMID_1/2`, need the quorate pvelab cluster), and
+  the cluster-wide HA arm/disarm cycle (`PVE_TEST_HA_ARM=1`, an explicit opt-in
+  for DISPOSABLE clusters only — never set it on a real node). They are **not
+  runnable here** — they `t.Skip` without a node. The harness is
   compile-verified (`go vet -tags=integration ./proxmox/integration/`) but its
   execution + the go-vcr cassette capture are live-only. The package keeps an
   untagged `doc.go` so the default `go build ./...` sees a non-empty package.

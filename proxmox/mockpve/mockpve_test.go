@@ -36,8 +36,8 @@ func TestVersionDefaultAndSeed(t *testing.T) {
 	if caps.String() != "9.2.1" {
 		t.Errorf("version = %s, want 9.2.1", caps)
 	}
-	if !caps.DynamicLoadBalancer() {
-		t.Error("9.2.1 DynamicLoadBalancer() = false, want true")
+	if !caps.HAClusterSwitch() {
+		t.Error("9.2.1 HAClusterSwitch() = false, want true")
 	}
 }
 

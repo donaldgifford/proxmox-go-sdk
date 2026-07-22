@@ -9,7 +9,7 @@ import (
 func ExampleCapabilities() {
 	caps, _ := version.Parse("9.2.1")
 	fmt.Println(caps.AtLeast(9, 1))
-	fmt.Println(caps.DynamicLoadBalancer()) // gated at 9.2+
+	fmt.Println(caps.HAClusterSwitch()) // gated at 9.2+
 	// Output:
 	// true
 	// true

@@ -74,7 +74,6 @@ func TestAtLeast(t *testing.T) {
 func TestGates(t *testing.T) {
 	tests := []struct {
 		ver string
-		dlb bool // DynamicLoadBalancer 9.2+
 		oci bool // OCITemplates 9.1+
 		tsr bool // TokenSecretRotation 9.2+
 		tpm bool // TPMStateSnapshots 9.1+
@@ -82,16 +81,13 @@ func TestGates(t *testing.T) {
 		rzx bool // ZFSRAIDZExpansion 9.2+
 		hcs bool // HAClusterSwitch 9.2+
 	}{
-		{ver: "9.0.0", dlb: false, oci: false, tsr: false, tpm: false, vcs: false, rzx: false, hcs: false},
-		{ver: "9.1.0", dlb: false, oci: true, tsr: false, tpm: true, vcs: true, rzx: false, hcs: false},
-		{ver: "9.2.0", dlb: true, oci: true, tsr: true, tpm: true, vcs: true, rzx: true, hcs: true},
+		{ver: "9.0.0", oci: false, tsr: false, tpm: false, vcs: false, rzx: false, hcs: false},
+		{ver: "9.1.0", oci: true, tsr: false, tpm: true, vcs: true, rzx: false, hcs: false},
+		{ver: "9.2.0", oci: true, tsr: true, tpm: true, vcs: true, rzx: true, hcs: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.ver, func(t *testing.T) {
 			caps := mustParse(t, tt.ver)
-			if got := caps.DynamicLoadBalancer(); got != tt.dlb {
-				t.Errorf("DynamicLoadBalancer() = %v, want %v", got, tt.dlb)
-			}
 			if got := caps.OCITemplates(); got != tt.oci {
 				t.Errorf("OCITemplates() = %v, want %v", got, tt.oci)
 			}

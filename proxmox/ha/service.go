@@ -7,12 +7,13 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/version"
 )
 
-// Service wraps PVE high availability: HA resources, the 9.x HA rules
-// (node-affinity and resource-affinity — never the deprecated groups), the CRS
-// scheduler settings, the 9.2 Dynamic Load Balancer, and storage replication
-// jobs. HA is cluster-scoped: unlike the compute services it binds no node —
-// every endpoint lives under /cluster. It is safe for concurrent use; construct
-// it with NewService or via the root client's HA accessor.
+// Service wraps PVE high availability: HA resources with migrate/relocate,
+// the 9.x HA rules (node-affinity and resource-affinity — never the
+// deprecated groups), the live status reads, the 9.2 cluster-wide arm/disarm
+// switch, the CRS scheduler settings, and storage replication jobs. HA is
+// cluster-scoped: unlike the compute services it binds no node — every
+// endpoint lives under /cluster. It is safe for concurrent use; construct it
+// with NewService or via the root client's HA accessor.
 type Service struct {
 	c    api.Client
 	caps version.Capabilities
@@ -28,8 +29,7 @@ func NewService(c api.Client, caps version.Capabilities) *Service {
 // API is the HA service contract, published so consumers can stand in a test
 // double for *Service. Every operation is cluster-scoped (no node argument).
 // HA config writes are synchronous in PVE — they return an error, not a
-// tasks.Ref; reads return typed data directly. The interface grows as later
-// Phase 4 tasks land.
+// tasks.Ref; reads return typed data directly.
 type API interface {
 	// HA resources (task 1). A resource is identified by its SID, e.g.
 	// "vm:100" or "ct:101". Adds/updates/removes are synchronous.
@@ -38,6 +38,11 @@ type API interface {
 	AddResource(ctx context.Context, spec *HAResourceSpec) error
 	UpdateResource(ctx context.Context, sid string, update *HAResourceUpdate) error
 	RemoveResource(ctx context.Context, sid string) error
+
+	// CRM placement requests (synchronous, typed result — an accepted
+	// intent, not a completed move; observe convergence via HAStatusCurrent).
+	MigrateResource(ctx context.Context, sid, node string) (*MigrateResult, error)
+	RelocateResource(ctx context.Context, sid, node string) (*MigrateResult, error)
 
 	// HA rules (task 2) — the 9.x replacement for HA groups: node-affinity and
 	// resource-affinity, with enable/disable. Writes are synchronous.
@@ -52,15 +57,22 @@ type API interface {
 	GetCRSSettings(ctx context.Context) (*CRSSettings, error)
 	SetCRSSettings(ctx context.Context, update *CRSSettingsUpdate) error
 
-	// Dynamic Load Balancer (task 4, 9.2+). Gated on DynamicLoadBalancer; the
-	// REST path is provisional (see GetDLBStatus).
+	// Dynamic Load Balancer. PVE exposes no DLB REST endpoint (INV-0004),
+	// so both always return pverr.ErrUnsupported without issuing a request;
+	// use the CRS settings instead (see GetDLBStatus).
 	GetDLBStatus(ctx context.Context) (*DLBStatus, error)
 	SetDLBConfig(ctx context.Context, cfg *DLBConfig) error
 
-	// Arm/Disarm cluster-wide HA switch (task 5, 9.2+). No confirmed PVE REST
-	// endpoint — these return pverr.ErrUnsupported (see ArmHA).
+	// HA status reads: the live per-row manager view and the CRM master's
+	// internal state. Lossless; no version gate (baseline endpoints).
+	HAStatusCurrent(ctx context.Context) ([]HAStatusEntry, error)
+	GetManagerStatus(ctx context.Context) (*ManagerStatus, error)
+
+	// Arm/Disarm cluster-wide HA switch (9.2+, gated on HAClusterSwitch).
+	// Both are synchronous POSTs to /cluster/ha/status/{arm,disarm}-ha; the
+	// disarm resource-mode is required (see DisarmHA).
 	ArmHA(ctx context.Context) error
-	DisarmHA(ctx context.Context) error
+	DisarmHA(ctx context.Context, mode ResourceMode) error
 
 	// Storage/ZFS replication jobs (task 6). Requires the 9.x VM.Replicate
 	// privilege. Writes are synchronous.
