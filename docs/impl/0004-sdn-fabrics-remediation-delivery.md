@@ -152,8 +152,13 @@ actually decoding the subdir index) — then merge.
      2026-07-22: scan clean — all hosts `pve.example`, Authorization `REDACTED`,
      no real IPs/hostnames; full `just test-replay` green locally before
      commit.)_
-- [ ] 3. All CI jobs green including `Test Replay (cassettes)`; merge. The
-     `minor` label auto-mints the next tag — no manual tagging.
+- [x] 3. All CI jobs green including `Test Replay (cassettes)`; merge. The
+     `minor` label auto-mints the next tag — no manual tagging. _(Done
+     2026-07-22: PR #21 merged with every job green; the release workflow minted
+     and published `v0.7.0` (10 assets). `just test-replay` re-verified green on
+     post-merge `main`. Superseded branch `feat/sdn-fabrics-remediation`
+     deleted. Phase 2 complete — Phase 3 (the shared pvelab live run with
+     IMPL-0005) is the remaining work.)_
 
 #### Success Criteria
 
