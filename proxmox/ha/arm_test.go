@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ha"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/internal/svcutil"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/mockpve"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/pverr"
 )
@@ -31,7 +32,7 @@ func TestDisarmHAValidation(t *testing.T) {
 	if err := newCappedService(t, mock, "9.1").DisarmHA(ctx, ha.ResourceModeFreeze); !errors.Is(err, pverr.ErrUnsupported) {
 		t.Errorf("DisarmHA on 9.1 = %v, want ErrUnsupported", err)
 	}
-	if err := newCappedService(t, mock, "9.2").DisarmHA(ctx, ""); err == nil {
-		t.Error("DisarmHA with empty mode = nil, want missing-field error")
+	if err := newCappedService(t, mock, "9.2").DisarmHA(ctx, ""); !errors.Is(err, svcutil.ErrMissingField) {
+		t.Errorf("DisarmHA with empty mode = %v, want ErrMissingField", err)
 	}
 }

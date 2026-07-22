@@ -7,12 +7,13 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/version"
 )
 
-// Service wraps PVE high availability: HA resources, the 9.x HA rules
-// (node-affinity and resource-affinity — never the deprecated groups), the CRS
-// scheduler settings, the 9.2 Dynamic Load Balancer, and storage replication
-// jobs. HA is cluster-scoped: unlike the compute services it binds no node —
-// every endpoint lives under /cluster. It is safe for concurrent use; construct
-// it with NewService or via the root client's HA accessor.
+// Service wraps PVE high availability: HA resources with migrate/relocate,
+// the 9.x HA rules (node-affinity and resource-affinity — never the
+// deprecated groups), the live status reads, the 9.2 cluster-wide arm/disarm
+// switch, the CRS scheduler settings, and storage replication jobs. HA is
+// cluster-scoped: unlike the compute services it binds no node — every
+// endpoint lives under /cluster. It is safe for concurrent use; construct it
+// with NewService or via the root client's HA accessor.
 type Service struct {
 	c    api.Client
 	caps version.Capabilities
@@ -28,8 +29,7 @@ func NewService(c api.Client, caps version.Capabilities) *Service {
 // API is the HA service contract, published so consumers can stand in a test
 // double for *Service. Every operation is cluster-scoped (no node argument).
 // HA config writes are synchronous in PVE — they return an error, not a
-// tasks.Ref; reads return typed data directly. The interface grows as later
-// Phase 4 tasks land.
+// tasks.Ref; reads return typed data directly.
 type API interface {
 	// HA resources (task 1). A resource is identified by its SID, e.g.
 	// "vm:100" or "ct:101". Adds/updates/removes are synchronous.

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/internal/svcutil"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/pverr"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/types"
 )
@@ -33,24 +34,11 @@ func (d *DLBStatus) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("decode dlb status: %w", err)
 	}
 	*d = DLBStatus(a)
-
-	var all map[string]json.RawMessage
-	if err := json.Unmarshal(data, &all); err != nil {
-		return fmt.Errorf("decode dlb status map: %w", err)
+	extra, err := svcutil.DecodeExtra(data, dlbStatusKnownFields)
+	if err != nil {
+		return fmt.Errorf("decode dlb status: %w", err)
 	}
-	for key, raw := range all {
-		if dlbStatusKnownFields[key] {
-			continue
-		}
-		var s string
-		if err := json.Unmarshal(raw, &s); err != nil {
-			s = string(raw)
-		}
-		if d.Extra == nil {
-			d.Extra = make(map[string]string)
-		}
-		d.Extra[key] = s
-	}
+	d.Extra = extra
 	return nil
 }
 

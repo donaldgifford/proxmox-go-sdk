@@ -49,6 +49,11 @@ func TestResourceAffinityPlacement(t *testing.T) {
 	h := c.HA()
 	const rule = "sdk-itest-placement"
 
+	// Register cleanup before the first create: placementCleanup tolerates
+	// missing entities, so a Fatal on the second create cannot strand the
+	// first VM.
+	t.Cleanup(func() { placementCleanup(t, c, rule, vmid1, vmid2) })
+
 	// Two diskless dummies: nothing to boot is fine — QEMU still runs and the
 	// HA manager still places them.
 	for i, vmid := range []int{vmid1, vmid2} {
@@ -63,7 +68,6 @@ func TestResourceAffinityPlacement(t *testing.T) {
 		}
 		mustSucceed(t, ts, ref, "create")
 	}
-	t.Cleanup(func() { placementCleanup(t, c, rule, vmid1, vmid2) })
 
 	// HA-manage both (state=started: the HA manager starts and places them).
 	for _, vmid := range []int{vmid1, vmid2} {

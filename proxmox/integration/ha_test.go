@@ -67,14 +67,6 @@ func TestHAArmDisarmCycle(t *testing.T) {
 	}
 	h := c.HA()
 
-	entries, err := h.HAStatusCurrent(testCtx(t))
-	if err != nil {
-		t.Fatalf("HAStatusCurrent(baseline): %v", err)
-	}
-	if got := liveArmedState(entries); got != ha.ArmedStateArmed {
-		t.Fatalf("baseline armed-state = %q, want %q (is the lab healthy?)", got, ha.ArmedStateArmed)
-	}
-
 	// Re-arm no matter how the test exits — never leave a cluster disarmed.
 	t.Cleanup(func() {
 		ctx, cancel := cleanupCtx()
@@ -83,6 +75,20 @@ func TestHAArmDisarmCycle(t *testing.T) {
 			t.Logf("cleanup ArmHA: %v", err)
 		}
 	})
+
+	entries, err := h.HAStatusCurrent(testCtx(t))
+	if err != nil {
+		t.Fatalf("HAStatusCurrent(baseline): %v", err)
+	}
+	if got := liveArmedState(entries); got != ha.ArmedStateArmed {
+		// A prior run killed before its cleanup (no t.Cleanup on SIGKILL)
+		// leaves the lab disarmed — recover rather than fail permanently.
+		t.Logf("baseline armed-state = %q — recovering a wedged lab with ArmHA", got)
+		if err := h.ArmHA(testCtx(t)); err != nil {
+			t.Fatalf("recovery ArmHA: %v", err)
+		}
+		waitArmedState(t, h, ha.ArmedStateArmed)
+	}
 
 	if err := h.DisarmHA(testCtx(t), ha.ResourceModeFreeze); err != nil {
 		t.Fatalf("DisarmHA(freeze): %v", err)
@@ -114,6 +120,10 @@ func TestHAResourceMigrate(t *testing.T) {
 	h := c.HA()
 	const rule = "sdk-itest-migrate"
 
+	// Register cleanup before the first create: placementCleanup tolerates
+	// missing entities, so a Fatal on the second create cannot strand the
+	// first VM.
+	t.Cleanup(func() { placementCleanup(t, c, rule, vmid1, vmid2) })
 	for i, vmid := range []int{vmid1, vmid2} {
 		ref, err := q.Create(testCtx(t), &qemu.CreateSpec{
 			VMID:   types.VMID(vmid),
@@ -126,7 +136,6 @@ func TestHAResourceMigrate(t *testing.T) {
 		}
 		mustSucceed(t, ts, ref, "create")
 	}
-	t.Cleanup(func() { placementCleanup(t, c, rule, vmid1, vmid2) })
 
 	for _, vmid := range []int{vmid1, vmid2} {
 		if err := h.AddResource(testCtx(t), &ha.HAResourceSpec{
@@ -206,7 +215,7 @@ func waitArmedState(t *testing.T, h ha.API, want ha.ArmedState) {
 	defer cancel()
 	var last ha.ArmedState
 	for {
-		entries, err := h.HAStatusCurrent(testCtx(t))
+		entries, err := h.HAStatusCurrent(ctx)
 		if err == nil {
 			if last = liveArmedState(entries); last == want {
 				return
@@ -233,7 +242,7 @@ func waitServiceNode(t *testing.T, h ha.API, sid, node string) {
 	defer cancel()
 	var last string
 	for {
-		entries, err := h.HAStatusCurrent(testCtx(t))
+		entries, err := h.HAStatusCurrent(ctx)
 		if err == nil {
 			last = ""
 			for i := range entries {
@@ -254,8 +263,9 @@ func waitServiceNode(t *testing.T, h ha.API, sid, node string) {
 	}
 }
 
-// freeNode returns an online cluster node that is neither n1 nor n2, or ""
-// when the cluster has no third node.
+// freeNode returns an ONLINE cluster node that is neither n1 nor n2, or ""
+// when the cluster has no such third node (a downed node would burn the full
+// convergence ceiling before failing).
 func freeNode(t *testing.T, c *proxmox.Client, n1, n2 string) string {
 	t.Helper()
 	resources, err := c.Cluster().ListResources(testCtx(t), cluster.WithResourceType(cluster.ResourceTypeNode))
@@ -263,7 +273,8 @@ func freeNode(t *testing.T, c *proxmox.Client, n1, n2 string) string {
 		t.Fatalf("ListResources(nodes): %v", err)
 	}
 	for i := range resources {
-		if name := resources[i].Node; name != "" && name != n1 && name != n2 {
+		name := resources[i].Node
+		if name != "" && name != n1 && name != n2 && resources[i].Status == "online" {
 			return name
 		}
 	}
