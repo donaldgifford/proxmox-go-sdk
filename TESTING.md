@@ -129,6 +129,8 @@ export PVE_TEST_LXC_TEMPLATE="local:vztmpl/debian-13-standard_13.1-2_amd64.tar.z
 export PVE_TEST_ISO_PATH="/path/to/tiny.iso"
 export PVE_TEST_PLACEMENT_VMID_1=9301   # HA placement pair (needs a quorate
 export PVE_TEST_PLACEMENT_VMID_2=9302   # multi-node cluster, e.g. the pvelab lab)
+export PVE_TEST_FABRIC_NODES="pvelab-1,pvelab-2,pvelab-3"  # SDN fabric lifecycle (>= 2 pvelab nodes)
+export PVE_TEST_FABRIC_IFACE="ens19"    # fabric-facing interface on every fabric node
 ```
 
 Every variable:
@@ -154,6 +156,8 @@ Every variable:
 | `PVE_TEST_ISO_PATH`         | gate     | local path to a small ISO to upload                        |
 | `PVE_TEST_PLACEMENT_VMID_1` | gate     | scratch VMID for the HA placement pair (multi-node)        |
 | `PVE_TEST_PLACEMENT_VMID_2` | gate     | the pair's second scratch VMID                             |
+| `PVE_TEST_FABRIC_NODES`     | gate     | CSV of >= 2 node names for the SDN fabric lifecycle        |
+| `PVE_TEST_FABRIC_IFACE`     | gate     | fabric-facing interface name on every fabric node          |
 | `PVE_SCRUB_EXTRA`           | no       | extra `live=placeholder` recording-scrub pairs (CSV)       |
 
 \* one credential pair is required: `PVE_TOKEN_ID`+`PVE_TOKEN_SECRET` (wins when
@@ -269,9 +273,15 @@ go test -tags=integration ./proxmox/integration/... -run TestResourceAffinityPla
 
 ### Network / SDN (Phase 5)
 
-Enumeration is covered by `TestNetworkReads` (Step 4). Note that **SDN live
-status** (`SDNStatus`/`VNetStatus`) currently returns `pverr.ErrUnsupported` —
-part of what you are confirming is whether a real endpoint exists on your node.
+Enumeration is covered by `TestNetworkReads` (Step 4). **SDN live status** is
+node-scoped (`SDNStatus(ctx, node)` reads `/nodes/{node}/sdn/zones`; zone
+content, bridges, VRF tables, and the fabric runtime reads hang off the same
+surface) — the paths are confirmed against the real 9.2 apidoc (INV-0004).
+`TestSDNStatusReads` exercises the zone-status reads against any node (safe,
+read-only); `TestSDNFabricLifecycle` (gated on `PVE_TEST_FABRIC_NODES` +
+`PVE_TEST_FABRIC_IFACE`) runs DESIGN-0003's live criterion on the pvelab nested
+cluster: create an OpenFabric fabric, enroll every lab node, apply, poll
+`FabricNeighbors` until FRR converges, read interfaces/routes, tear down.
 
 ### Console / access (Phase 6)
 

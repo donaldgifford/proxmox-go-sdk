@@ -1,7 +1,7 @@
 ---
 id: IMPL-0004
 title: "SDN fabrics remediation delivery"
-status: Draft
+status: In Progress
 author: Donald Gifford
 created: 2026-07-21
 ---
@@ -10,8 +10,8 @@ created: 2026-07-21
 
 # IMPL 0004: SDN fabrics remediation delivery
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-07-21 (OQs decided
-2026-07-21: all a)
+**Status:** In Progress **Author:** Donald Gifford **Date:** 2026-07-21 (OQs
+decided 2026-07-21: all a)
 
 <!--toc:start-->
 
@@ -93,22 +93,33 @@ Bring the parked implementation back to a mergeable state on top of current
 
 #### Tasks
 
-- [ ] 1. Rebase `feat/sdn-fabrics-remediation` onto `main` (per OQ-1). The only
+- [x] 1. Rebase `feat/sdn-fabrics-remediation` onto `main` (per OQ-1). The only
      expected conflict is `CHANGELOG.md` — resolve by regenerating
      (`git fetch --tags origin` first, then `git-cliff -o CHANGELOG.md`; the
      tags fetch is load-bearing, see the PR-CI gotchas), keeping
-     `chore(changelog): Auto-sync` as the branch's final commit.
-- [ ] 2. Re-run the gates: `just fmt`, `just lint` (0 issues), `just test`
+     `chore(changelog): Auto-sync` as the branch's final commit. _(Done
+     2026-07-21: delivered as the OQ-1a revival with 1b's mechanics — Donald
+     asked for a fresh branch `feat/impl-0004-sdn-fabrics-delivery`, so the
+     three content commits were cherry-picked onto post-#20 `main` (zero
+     conflicts; the stale changelog commit was skipped and regenerates fresh as
+     the final commit). Identical content, tidier history.)_
+- [x] 2. Re-run the gates: `just fmt`, `just lint` (0 issues), `just test`
      (race), `go vet -tags=integration ./proxmox/integration/`. Confirm the
      branch content still matches DESIGN-0003 + its Implementation Corrections
      (nested fabric paths; fabric-node sub-collection with property-string
      `interfaces` and bare-IPv4 `ip`; the eight status reads with
      `ports`/`nexthops`/`via` in `Extra`; mockpve mirroring only real routes;
      `TestFabricPathsReal`/`TestNodeSDNStatusPaths` pinning the literal paths).
-- [ ] 3. Open the PR: `minor` label, BREAKING interface note in the description
+     _(Done 2026-07-21: all four gates green on the revived branch; grep
+     confirms the nested `fabrics/fabric`/`fabrics/node` paths, both
+     path-pinning tests, and zero flat-path remnants.)_
+- [x] 3. Open the PR: `minor` label, BREAKING interface note in the description
      and changelog (`SDNStatus`/`VNetStatus` signature changes, the `VNetStatus`
      _method_ replaced by `ZoneContent`/`VNetMACVRF`, `Fabric` field removals),
-     and the Phase-2 cassette caveat stated up front.
+     and the Phase-2 cassette caveat stated up front. _(Done 2026-07-21: PR #21
+     open with `minor`; CI landed exactly as predicted — every job green except
+     `Test Replay (cassettes)`, whose log shows the expected stale-cassette 404
+     on `…/cluster/sdn/fabrics/fabric`. Phase 1 complete.)_
 
 #### Success Criteria
 
@@ -127,13 +138,20 @@ actually decoding the subdir index) — then merge.
 
 #### Tasks
 
-- [ ] 1. Re-record `TestNetworkReads` against `r740a` (Donald; reads-only, no
+- [x] 1. Re-record `TestNetworkReads` against `r740a` (Donald; reads-only, no
      pvelab, no destructive gates needed):
      `PVE_RECORD=1 go test -tags=integration -run 'TestNetworkReads' ./proxmox/integration/`
-     with the usual `.env.local` environment.
-- [ ] 2. Leak-review the new cassette (credentials redacted to `REDACTED`,
+     with the usual `.env.local` environment. _(Done 2026-07-22: recorded via
+     `op run --env-file=.env` — first attempt used the stale `.pvelab.env` and
+     dialed a torn-down nested-lab address; the r740a token env is the right
+     one. Four interactions; the fabrics read now hits the nested
+     `…/fabrics/fabric` path and honestly returns the empty list.)_
+- [x] 2. Leak-review the new cassette (credentials redacted to `REDACTED`,
      endpoint/node rewritten to the `pve.example`/`pve` placeholders) and commit
-     it on the PR branch, changelog re-synced as the final commit.
+     it on the PR branch, changelog re-synced as the final commit. _(Done
+     2026-07-22: scan clean — all hosts `pve.example`, Authorization `REDACTED`,
+     no real IPs/hostnames; full `just test-replay` green locally before
+     commit.)_
 - [ ] 3. All CI jobs green including `Test Replay (cassettes)`; merge. The
      `minor` label auto-mints the next tag — no manual tagging.
 

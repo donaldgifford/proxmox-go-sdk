@@ -507,13 +507,27 @@ cluster-scoped `sdn` package — `Zone`/`VNet`/`Subnet` lossless reads with full
 CRUD and a cluster-wide `ApplySDN` (all config writes synchronous), the `SDN()`
 accessor, and `svcutil.DecodeExtra` (the shared lossless-read tail, extracted so
 the fabrics read type in task 3 reuses it). Task 3 landed SDN **fabrics**
-(`Fabric` lossless read + CRUD over the provisional `/cluster/sdn/fabrics`,
-REST-with-caveat) with `SDNFabrics`/`SDNAdvancedFabrics` gates — openfabric/ospf
-are 9.0 baseline, `FabricProtocolBGP` is refused below 9.2. Task 4 landed SDN
-status (`SDNStatus`/`VNetStatus`): fixed forward-compatible return types but a
-documented `pverr.ErrUnsupported` stub — no confirmed REST endpoint (like
-`ha.ArmHA`), no mock handlers. Task 5 landed the `firewall` package with the
-**scope model**: ONE `Service{c,caps,scope}` + three constructors
+(`Fabric` lossless read + CRUD) with `SDNFabrics`/`SDNAdvancedFabrics` gates —
+openfabric/ospf are 9.0 baseline, `FabricProtocolBGP` is refused below 9.2.
+**DESIGN-0003 (2026-07-21) remediated the fabric surface**: the original flat
+`/cluster/sdn/fabrics` path was a guess that would 404 live — CRUD now targets
+the real nested `/cluster/sdn/fabrics/fabric[/{id}]` (INV-0004), `Fabric`
+dropped the nonexistent `Nodes`/`Comment` fields and gained
+`IPPrefix`/`IP6Prefix`/`RouteFilter` (`redistribute` deliberately unmodelled —
+array wire form unverified → `Extra`), and node membership landed as its own
+sub-collection (`FabricNode` + `ListFabricNodes`/`Get`/`Create`/`Update`/
+`DeleteFabricNode` over `/cluster/sdn/fabrics/node/{fabric}`;
+`FabricNodeSpec.Interfaces` sent as repeated form values). Task 4's
+`ErrUnsupported` SDN-status stubs were **replaced by real node-scoped reads**
+(the runtime surface lives under `/nodes/{node}/sdn`, found via INV-0004):
+`SDNStatus(ctx,node)` (zones), `ZoneContent` (per-VNet health — there is NO
+per-VNet status endpoint; the `…/{vnet}` path is a subdir index),
+`ZoneBridges`/`ZoneIPVRF`/`VNetMACVRF` + fabric runtime
+`FabricInterfaces`/`FabricNeighbors`/`FabricRoutes` — all lossless, array-valued
+fields (`ports`/`nexthops`/`via`) kept in `Extra` as raw JSON;
+`TestFabricPathsReal`/`TestNodeSDNStatusPaths` pin every literal path in-repo.
+Task 5 landed the `firewall` package with the **scope model**: ONE
+`Service{c,caps,scope}` + three constructors
 (`NewClusterScope`/`NewNodeScope`/`NewGuestScope`); rule/IPSet/options methods
 written once, `scope.path()` switches the prefix. `RenameIPSet` gated 9.1
 (`OverlappingIPSets`); `IPSetEntry` (read) is split from `IPSetEntrySpec`
@@ -524,9 +538,11 @@ and `nodes` `doc.go` overviews (skeletons → real package docs) and added a
 runnable nodes networking `Example`; all render under `go doc ./...`.
 
 **Phase 5 (network + SDN) is COMPLETE** — all 6 tasks checked; enumeration of
-zones/VNets/fabrics + full CRUD across every scope is mock-verified. The only
-written-but-unsupported piece is SDN live status (`SDNStatus`/`VNetStatus` →
-`ErrUnsupported`, no confirmed REST endpoint).
+zones/VNets/fabrics + full CRUD across every scope is mock-verified. The former
+"SDN live status unsupported" caveat is gone: DESIGN-0003 landed the real
+node-scoped status reads (paths + shapes confirmed via the 9.2 apidoc); fabric
+lifecycle semantics + status-read contents await the shared pvelab live run
+(with DESIGN-0004).
 
 **Phase 6 (cluster, access, nodes-admin, Ceph, PBS, console, metrics) is
 underway** — go-architect designed it (see the phase6-module-architecture
