@@ -27,6 +27,8 @@ func clusterOptionsPath() string { return "/cluster/options" }
 
 func haStatusArmPath() string { return "/cluster/ha/status/arm-ha" }
 
+func haStatusDisarmPath() string { return "/cluster/ha/status/disarm-ha" }
+
 // dlbPath is the Dynamic Load Balancer endpoint (9.2+). The path is provisional
 // — it mirrors PVE's ha-manager "lbalancer" naming and is unconfirmed without a
 // live 9.2 node (see ha.GetDLBStatus).

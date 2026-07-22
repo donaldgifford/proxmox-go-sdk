@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ha"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/mockpve"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/pverr"
 )
@@ -20,13 +21,17 @@ func TestArmHAGateRefusal(t *testing.T) {
 	}
 }
 
-// DisarmHA still reports ErrUnsupported regardless of version until the real
-// disarm op lands (IMPL-0005 task 2).
-func TestDisarmUnsupported(t *testing.T) {
+// DisarmHA shares the ArmHA gate and additionally requires a resource-mode:
+// an empty mode is refused client-side before any request.
+func TestDisarmHAValidation(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()
-	svc := newCappedService(t, mock, "9.2")
-	if err := svc.DisarmHA(context.Background()); !errors.Is(err, pverr.ErrUnsupported) {
-		t.Errorf("DisarmHA = %v, want ErrUnsupported", err)
+	ctx := context.Background()
+
+	if err := newCappedService(t, mock, "9.1").DisarmHA(ctx, ha.ResourceModeFreeze); !errors.Is(err, pverr.ErrUnsupported) {
+		t.Errorf("DisarmHA on 9.1 = %v, want ErrUnsupported", err)
+	}
+	if err := newCappedService(t, mock, "9.2").DisarmHA(ctx, ""); err == nil {
+		t.Error("DisarmHA with empty mode = nil, want missing-field error")
 	}
 }

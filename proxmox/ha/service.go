@@ -57,10 +57,11 @@ type API interface {
 	GetDLBStatus(ctx context.Context) (*DLBStatus, error)
 	SetDLBConfig(ctx context.Context, cfg *DLBConfig) error
 
-	// Arm/Disarm cluster-wide HA switch (task 5, 9.2+). No confirmed PVE REST
-	// endpoint — these return pverr.ErrUnsupported (see ArmHA).
+	// Arm/Disarm cluster-wide HA switch (9.2+, gated on HAClusterSwitch).
+	// Both are synchronous POSTs to /cluster/ha/status/{arm,disarm}-ha; the
+	// disarm resource-mode is required (see DisarmHA).
 	ArmHA(ctx context.Context) error
-	DisarmHA(ctx context.Context) error
+	DisarmHA(ctx context.Context, mode ResourceMode) error
 
 	// Storage/ZFS replication jobs (task 6). Requires the 9.x VM.Replicate
 	// privilege. Writes are synchronous.
