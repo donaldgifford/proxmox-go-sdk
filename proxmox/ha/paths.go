@@ -27,6 +27,8 @@ func clusterOptionsPath() string { return "/cluster/options" }
 
 func haStatusCurrentPath() string { return "/cluster/ha/status/current" }
 
+func haStatusManagerPath() string { return "/cluster/ha/status/manager_status" }
+
 func haStatusArmPath() string { return "/cluster/ha/status/arm-ha" }
 
 func haStatusDisarmPath() string { return "/cluster/ha/status/disarm-ha" }

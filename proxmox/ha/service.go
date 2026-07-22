@@ -57,9 +57,10 @@ type API interface {
 	GetDLBStatus(ctx context.Context) (*DLBStatus, error)
 	SetDLBConfig(ctx context.Context, cfg *DLBConfig) error
 
-	// HA status reads: the live per-row manager view. Lossless; no version
-	// gate (baseline endpoints).
+	// HA status reads: the live per-row manager view and the CRM master's
+	// internal state. Lossless; no version gate (baseline endpoints).
 	HAStatusCurrent(ctx context.Context) ([]HAStatusEntry, error)
+	GetManagerStatus(ctx context.Context) (*ManagerStatus, error)
 
 	// Arm/Disarm cluster-wide HA switch (9.2+, gated on HAClusterSwitch).
 	// Both are synchronous POSTs to /cluster/ha/status/{arm,disarm}-ha; the

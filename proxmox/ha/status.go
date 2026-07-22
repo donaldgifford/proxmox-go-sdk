@@ -84,6 +84,88 @@ func (e *HAStatusEntry) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// ManagerServiceStatus is one resource's entry in the manager's service_status
+// map. Lossless: unknown keys are preserved in Extra.
+type ManagerServiceStatus struct {
+	Node  string `json:"node,omitempty"`
+	State string `json:"state,omitempty"`
+	UID   string `json:"uid,omitempty"`
+	// Extra carries fields the SDK does not model.
+	Extra map[string]string `json:"-"`
+}
+
+// managerServiceKnownFields lists the JSON keys ManagerServiceStatus models
+// directly; keep it in sync with the struct.
+var managerServiceKnownFields = map[string]bool{"node": true, "state": true, "uid": true}
+
+// UnmarshalJSON decodes the modelled fields and routes any unknown keys into
+// Extra so the read round-trips losslessly.
+func (m *ManagerServiceStatus) UnmarshalJSON(data []byte) error {
+	type alias ManagerServiceStatus
+	var a alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return fmt.Errorf("decode manager service status: %w", err)
+	}
+	*m = ManagerServiceStatus(a)
+	extra, err := svcutil.DecodeExtra(data, managerServiceKnownFields)
+	if err != nil {
+		return fmt.Errorf("decode manager service status: %w", err)
+	}
+	m.Extra = extra
+	return nil
+}
+
+// ManagerStatus is the CRM master's internal state
+// (GET /cluster/ha/status/manager_status). The PVE apidoc pins no shape for
+// this endpoint (a bare object), so the typed fields are provisional — they
+// mirror the pve-ha-manager state file as observed — and everything else
+// round-trips losslessly through Extra. Treat the typed fields as best-effort
+// until confirmed live (IMPL-0005 Phase 3).
+type ManagerStatus struct {
+	MasterNode string `json:"master_node,omitempty"`
+	// NodeStatus maps node name to its CRM node state (e.g. "online").
+	NodeStatus map[string]string `json:"node_status,omitempty"`
+	// ServiceStatus maps resource SID to its manager-side state.
+	ServiceStatus map[string]ManagerServiceStatus `json:"service_status,omitempty"`
+	Timestamp     int64                           `json:"timestamp,omitempty"` // unix seconds.
+	// Extra carries fields the SDK does not model.
+	Extra map[string]string `json:"-"`
+}
+
+// managerStatusKnownFields lists the JSON keys ManagerStatus models directly;
+// keep it in sync with the struct.
+var managerStatusKnownFields = map[string]bool{
+	"master_node": true, "node_status": true, "service_status": true, "timestamp": true,
+}
+
+// UnmarshalJSON decodes the modelled fields and routes any unknown keys into
+// Extra so the read round-trips losslessly.
+func (m *ManagerStatus) UnmarshalJSON(data []byte) error {
+	type alias ManagerStatus
+	var a alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return fmt.Errorf("decode manager status: %w", err)
+	}
+	*m = ManagerStatus(a)
+	extra, err := svcutil.DecodeExtra(data, managerStatusKnownFields)
+	if err != nil {
+		return fmt.Errorf("decode manager status: %w", err)
+	}
+	m.Extra = extra
+	return nil
+}
+
+// GetManagerStatus reads the CRM master's internal state
+// (GET /cluster/ha/status/manager_status). No version gate (baseline
+// endpoint). The shape is provisional — see ManagerStatus.
+func (s *Service) GetManagerStatus(ctx context.Context) (*ManagerStatus, error) {
+	var ms ManagerStatus
+	if err := s.c.DoRequest(ctx, http.MethodGet, haStatusManagerPath(), nil, &ms); err != nil {
+		return nil, fmt.Errorf("ha.GetManagerStatus: %w", err)
+	}
+	return &ms, nil
+}
+
 // HAStatusCurrent reads the live HA manager status
 // (GET /cluster/ha/status/current): quorum, master, per-node lrm, and
 // per-resource service rows. It is the observable for ArmHA/DisarmHA (the
