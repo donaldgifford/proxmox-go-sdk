@@ -39,6 +39,11 @@ type API interface {
 	UpdateResource(ctx context.Context, sid string, update *HAResourceUpdate) error
 	RemoveResource(ctx context.Context, sid string) error
 
+	// CRM placement requests (synchronous, typed result — an accepted
+	// intent, not a completed move; observe convergence via HAStatusCurrent).
+	MigrateResource(ctx context.Context, sid, node string) (*MigrateResult, error)
+	RelocateResource(ctx context.Context, sid, node string) (*MigrateResult, error)
+
 	// HA rules (task 2) — the 9.x replacement for HA groups: node-affinity and
 	// resource-affinity, with enable/disable. Writes are synchronous.
 	ListRules(ctx context.Context) ([]HARule, error)

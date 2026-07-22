@@ -12,6 +12,10 @@ func haResourcePath(sid string) string {
 	return haResourcesPath() + "/" + url.PathEscape(sid)
 }
 
+func haResourceMigratePath(sid string) string { return haResourcePath(sid) + "/migrate" }
+
+func haResourceRelocatePath(sid string) string { return haResourcePath(sid) + "/relocate" }
+
 func haRulesPath() string { return "/cluster/ha/rules" }
 
 func haRulePath(rule string) string {
