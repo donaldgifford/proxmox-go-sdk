@@ -1,7 +1,7 @@
 ---
 id: IMPL-0005
 title: "HA arm disarm status and migrate delivery"
-status: Draft
+status: In Progress
 author: Donald Gifford
 created: 2026-07-21
 ---
@@ -10,8 +10,8 @@ created: 2026-07-21
 
 # IMPL 0005: HA arm disarm status and migrate delivery
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-07-21 (OQs decided
-2026-07-21: all a)
+**Status:** In Progress **Author:** Donald Gifford **Date:** 2026-07-21 (OQs
+decided 2026-07-21: all a)
 
 <!--toc:start-->
 
@@ -103,27 +103,30 @@ environment.
 
 #### Tasks
 
-- [ ] 1. `ArmHA(ctx) error` → real `POST /cluster/ha/status/arm-ha` (sync),
+- [x] 1. `ArmHA(ctx) error` → real `POST /cluster/ha/status/arm-ha` (sync),
      gated on `s.caps.Require("HA arm/disarm", "9.2")` (the existing
      `HAClusterSwitch` capability, now load-bearing; gate fires before any
      request). The `ErrUnsupported` stub body is replaced; the signature is
-     unchanged.
-- [ ] 2. `DisarmHA` → real `POST /cluster/ha/status/disarm-ha` (sync), same
+     unchanged. _(Done 2026-07-22.)_
+- [x] 2. `DisarmHA` → real `POST /cluster/ha/status/disarm-ha` (sync), same
      gate, with `resource-mode` per the OQ-1 signature decision. New
      `ResourceMode` string type + `ResourceModeFreeze`/`ResourceModeIgnore`
-     constants (apidoc-confirmed enum).
-- [ ] 3. `HAStatusCurrent(ctx) ([]HAStatusEntry, error)` — lossless read
+     constants (apidoc-confirmed enum). _(Done 2026-07-22: OQ-1a signature
+     `DisarmHA(ctx, mode ResourceMode)`; empty mode refused client-side with
+     `ErrMissingField`.)_
+- [x] 3. `HAStatusCurrent(ctx) ([]HAStatusEntry, error)` — lossless read
      modelling all 16 confirmed fields (supersedes the design's twelve);
      `ArmedState` typed with the four-value enum constants (the observable for
      arm/disarm). Wire keys with hyphens (`armed-state`, `auto-rebalance`)
-     handled in the JSON tags; `haStatusEntryKnownFields` kept in sync.
-- [ ] 4. `GetManagerStatus(ctx) (*ManagerStatus, error)` — the house lossless
+     handled in the JSON tags; `haStatusEntryKnownFields` kept in sync. _(Done
+     2026-07-22.)_
+- [x] 4. `GetManagerStatus(ctx) (*ManagerStatus, error)` — the house lossless
      pattern per OQ-2's decision: typed `MasterNode`/`Timestamp`/`NodeStatus`
      (node → state map)/`ServiceStatus` (sid → typed lossless entry) + the
      standard `Extra` tail. The apidoc pins nothing, so the typed fields are
      provisional until the Phase-3 live run confirms them (documented on the
-     type).
-- [ ] 5. `MigrateResource(ctx, sid, node)` / `RelocateResource(ctx, sid, node)`
+     type). _(Done 2026-07-22: `ManagerServiceStatus` is itself lossless.)_
+- [x] 5. `MigrateResource(ctx, sid, node)` / `RelocateResource(ctx, sid, node)`
      → `(*MigrateResult, error)` — synchronous CRM requests to
      `POST /cluster/ha/resources/{sid}/{migrate,relocate}` (`url.PathEscape` on
      sids); `MigrateResult` lossless with `SID`, `RequestedNode`,
@@ -132,13 +135,17 @@ environment.
      No version gate (baseline endpoints; the affinity-aware body is
      9.2-observed and hedged by lossless decode). Docs state convergence is
      observed via `HAStatusCurrent`, and the migrate-vs-relocate distinction.
-- [ ] 6. DLB reclassification: `GetDLBStatus`/`SetDLBConfig` keep their
+     _(Done 2026-07-22: shared unexported `resourceAction` helper;
+     `BlockingCause` enum constants.)_
+- [x] 6. DLB reclassification: `GetDLBStatus`/`SetDLBConfig` keep their
      signatures but always return documented `pverr.ErrUnsupported` with docs
      pointing at `GetCRSSettings`/`SetCRSSettings`; no request is ever issued;
      the `DLBStatus`/`DLBConfig` types are retained (the `VolumeSnapshot`
      precedent). Remove `version.Capabilities.DynamicLoadBalancer()` (OQ-3
-     decision b) and its tests; note the break in the changelog.
-- [ ] 7. mockpve (`ha.go`): `haState` gains `armed` (default true) +
+     decision b) and its tests; note the break in the changelog. _(Done
+     2026-07-22: examples/docs that demonstrated the removed gate now use
+     `HAClusterSwitch`.)_
+- [x] 7. mockpve (`ha.go`): `haState` gains `armed` (default true) +
      `resourceMode`; arm/disarm handlers flip them (disarm rejects a missing
      `resource-mode` to mirror the required param); `/status/current`
      synthesizes one entry per seeded HA resource plus the manager row,
@@ -146,21 +153,28 @@ environment.
      plausible blob; migrate/relocate handlers echo `sid`/`requested-node` and
      move the resource's `current` entry to the target node (no affinity
      evaluation — the mock does not schedule). The fabricated `lbalancer` routes
-     are **removed**.
-- [ ] 8. Unit tests: gate refusal below 9.2 (arm + disarm); arm→disarm→arm
+     are **removed**. _(Done 2026-07-22: `New()` seeds
+     `ha: haState{armed: true}`; disarm 400s on a missing/unknown resource-mode;
+     one `handleHAResourceMove` serves migrate + relocate.)_
+- [x] 8. Unit tests: gate refusal below 9.2 (arm + disarm); arm→disarm→arm
      observable through the mock's `current` (`armed-state` transitions); the
      disarm `resource-mode` wire form; migrate/relocate wire form + the
      `current`-entry node move; `TestDLBUnsupported` asserting
      `pverr.ErrUnsupported` **and zero HTTP traffic** (the
      `TestVolumeSnapshotsUnsupported` pattern); an in-package paths test pinning
      the literal `/cluster/ha/status/*` and `/cluster/ha/resources/{sid}/*`
-     strings (the IMPL-0004 `TestFabricPathsReal` pattern).
-- [ ] 9. Doc surfaces: `ha/doc.go` + interface comments reflect the upgraded ops
+     strings (the IMPL-0004 `TestFabricPathsReal` pattern). _(Done 2026-07-22:
+     zero-HTTP proven with a nil transport — any request would panic. The paths
+     pin surfaced a stale claim: `url.PathEscape` leaves `:` intact, so the wire
+     path is `/resources/vm:100`, now pinned + comment corrected.)_
+- [x] 9. Doc surfaces: `ha/doc.go` + interface comments reflect the upgraded ops
      and the DLB reclassification; `version` docs drop the removed gate;
      DEVELOPMENT.md's unverified list moves arm/disarm out of the "no confirmed
      endpoint" bucket; the integration live tests for Phase 3 are written now
      (env-gated, compile-verified via `go vet -tags=integration`) so the pvelab
-     run needs no code changes.
+     run needs no code changes. _(Done 2026-07-22: `TestHAStatusReads` +
+     `TestHAArmDisarmCycle` (re-arms in cleanup) + `TestHAResourceMigrate`;
+     TESTING.md/CLAUDE.md document the new `PVE_TEST_HA_ARM` opt-in.)_
 
 #### Success Criteria
 
