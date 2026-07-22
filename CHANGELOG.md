@@ -24,6 +24,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 - *(impl)* Check off IMPL-0004 Phase-2 task 3 — PR #21 merged, v0.7.0 released
 - *(impl)* Check off IMPL-0005 Phase-1 tasks 1-9; DESIGN-0004 Implementation Corrections
+- *(impl)* Check off IMPL-0005 Phase-2 tasks 1-2 — PR #23 open, CI fully green
 
 ### Testing
 
