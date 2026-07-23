@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [unreleased]
+
+### Bug Fixes
+
+- *(ha)* Reconcile HA status shapes to the live 9.2.2 wire
+
+### Documentation
+
+- *(impl)* Record the 2026-07-23 pvelab live-run results in both ledgers
+- Close out the INV-0004 remediation wave (IMPL-0004/0005 Phase 3)
+
+### Testing
+
+- *(integration)* Commit the 2026-07-23 pvelab live-run cassettes + replay wiring
+
 ## [0.8.0] - 2026-07-22
 
 ### Features
