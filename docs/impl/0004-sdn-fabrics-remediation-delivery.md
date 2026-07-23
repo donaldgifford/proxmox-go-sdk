@@ -180,17 +180,17 @@ IMPL-0005 Phase 3 (see OQ-3). All lab-touching steps are Donald's.
      path, quorate(3) — after restoring the `template:` block in pvelab.yaml;
      the ISO path is currently unusable because the baked-in answer-server
      address predates the workstation's move off the lab subnet.)_
-- [ ] 2. Run `TestSDNStatusReads` (read-only zone status) and
+- [x] 2. Run `TestSDNStatusReads` (read-only zone status) and
      `TestSDNFabricLifecycle` (OpenFabric fabric across the lab nodes → enroll
      each node → `ApplySDN` → poll `FabricNeighbors` until FRR converges → read
-     interfaces/routes → teardown) with `PVE_RECORD=1`. _(2026-07-23:
-     `TestSDNStatusReads` PASSED. `TestSDNFabricLifecycle` half-passed: fabric
-     create on the nested path, all three node enrollments, `ApplySDN`, and
-     teardown all succeeded live, but FRR convergence FAILED —
-     `FabricInterfaces` reported 0 interfaces for the full 3-minute ceiling,
-     i.e. openfabric never bound the enrolled NIC. Diagnosis in flight (wrong
-     guest NIC name vs bridge-enslaved port); re-run + re-record of this one
-     test pending.)_
+     interfaces/routes → teardown) with `PVE_RECORD=1`. _(Done 2026-07-23, both
+     PASSED. The first fabric attempt enrolled the raw guest NIC (`ens18`) and
+     burned the 3-minute ceiling at 0 interfaces — openfabric never binds an
+     address-less bridge-enslaved port. Re-run enrolling the addressed bridge
+     (`PVE_TEST_FABRIC_IFACE=vmbr0`) converged in ~10s (neighbor
+     `0100.9909.9002`, Initializing) and tore down clean; the failed-run
+     cassette was overwritten by the passing re-record. The mgmt-bridge
+     enrollment perturbation never materialized.)_
 - [x] 3. Reconcile any live divergence into the SDK/mock **before** committing
      cassettes — the known watch-list: fabric-node `ip` bare-IPv4 acceptance,
      the property-string `interfaces` form, whether `redistribute`'s wire form
@@ -201,13 +201,22 @@ IMPL-0005 Phase 3 (see OQ-3). All lab-touching steps are Donald's.
      (stays in `Extra`). Status-read shapes matched the mock for the zone reads;
      the fabric runtime reads returned empty pending the convergence fix, so
      their field contents remain the only open item.)_
-- [ ] 4. Scrub + commit the two cassettes; add both tests to the
+- [x] 4. Scrub + commit the two cassettes; add both tests to the
      `just test-replay` `-run` list; changelog-final; PR (label `patch` unless
-     reconciliation changed public surface).
+     reconciliation changed public surface). _(Done 2026-07-23 on
+     `feat/phase3-live-reconcile`, shared with IMPL-0005's Phase-3 closure —
+     label `minor` (the HA reconciliation changed public surface). Leak review
+     found + fixed a real harness gap: `topologyScrub` rewrote the raw request
+     body but not go-vcr's parsed `Form` map (pinned in `TestScrubTopology`).
+     Full 16-test `just test-replay` green locally.)_
 - [ ] 5. Closure: cassette `certification.yaml` batch entry for the run;
      IMPL-0001 Phase-5 status note updated (fabric lifecycle + status reads →
      live-verified); DESIGN-0003 status → Implemented; tear down the lab
-     (`just dogfood-down`), `r740a` clean check.
+     (`just dogfood-down`), `r740a` clean check. _(Doc closure done 2026-07-23 —
+     9.2.2 batch entry (plus a retroactive 9.2.4 entry for the Phase-2
+     `TestNetworkReads` re-record), IMPL-0001 Phase-5 live-verified note,
+     DESIGN-0003 → Implemented. Remaining: the lab teardown + `r740a` clean
+     check (Donald), after the closure PR merges.)_
 
 #### Success Criteria
 

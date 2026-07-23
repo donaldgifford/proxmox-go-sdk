@@ -484,13 +484,17 @@ as `ErrUnsupported` stubs — **both were reversed by IMPL-0005 (DESIGN-0004,
 confirmed `POST /cluster/ha/status/{arm,disarm}-ha` (sync, gated on
 `HAClusterSwitch` 9.2; disarm's `ResourceMode` freeze/ignore is REQUIRED on the
 wire — the design's optional-param sketch was corrected). IMPL-0005 also added
-the status reads — `HAStatusCurrent` (16-field lossless `HAStatusEntry`,
-`ArmedState` enum: the arm/disarm observable) and `GetManagerStatus`
-(provisional typed fields + Extra; apidoc pins nothing) — and synchronous
-`MigrateResource`/`RelocateResource` → `*MigrateResult` (lossless;
+the status reads — `HAStatusCurrent` (17-field lossless `HAStatusEntry`;
+`ArmedState` enum, the arm/disarm observable, rides the **`fencing` row** —
+never master, and an idle cluster has no master row at all, reporting `standby`
+as its NORMAL fresh state; both live-confirmed 2026-07-23) and
+`GetManagerStatus` (the response NESTS: `ManagerStatus` is the live-confirmed
+envelope `Manager ManagerState` + `Quorum ManagerQuorum` — quorate arrives as
+string "1"; only the inner active-master fields stay provisional) — and
+synchronous `MigrateResource`/`RelocateResource` → `*MigrateResult` (lossless;
 `BlockingResource.Cause` typed `node-affinity`/`resource-affinity`; never a
-`tasks.Ref`). mockpve emulates the armed switch + status rows + node moves (no
-affinity evaluation) and dropped the fabricated lbalancer routes;
+`tasks.Ref`). mockpve emulates the armed switch (fencing row) + status rows +
+node moves (no affinity evaluation) and dropped the fabricated lbalancer routes;
 `TestHAStatusPathsReal` pins the literal paths (which also exposed that
 `url.PathEscape` leaves `:` intact — the wire path is `/resources/vm:100`). Task
 6 (replication jobs) added CRUD over `/cluster/replication`
@@ -552,9 +556,13 @@ runnable nodes networking `Example`; all render under `go doc ./...`.
 **Phase 5 (network + SDN) is COMPLETE** — all 6 tasks checked; enumeration of
 zones/VNets/fabrics + full CRUD across every scope is mock-verified. The former
 "SDN live status unsupported" caveat is gone: DESIGN-0003 landed the real
-node-scoped status reads (paths + shapes confirmed via the 9.2 apidoc); fabric
-lifecycle semantics + status-read contents await the shared pvelab live run
-(with DESIGN-0004).
+node-scoped status reads (paths + shapes confirmed via the 9.2 apidoc), and the
+fabric lifecycle is **live-verified** (2026-07-23, pvelab 9.2.2): create +
+3-node enrollment (bare-IPv4 `ip`, property-string `interfaces`) + `ApplySDN` +
+FRR convergence + teardown. Operational finding: openfabric never binds an
+address-less bridge-enslaved port — enroll the addressed bridge (`vmbr0`), not
+the raw NIC (the first attempt on `ens18` sat at 0 interfaces for the full poll
+ceiling).
 
 **Phase 6 (cluster, access, nodes-admin, Ceph, PBS, console, metrics) is
 underway** — go-architect designed it (see the phase6-module-architecture
@@ -667,17 +675,21 @@ environment.** This shapes how we test and what "done" means:
   record→redact→replay end-to-end against `mockpve` (server closed before
   replay) and run in CI — real verification here, no node. **Capturing real
   cassettes is still live-only** (I cannot reach a node); the harness records to
-  `proxmox/integration/testdata/cassettes/` under `PVE_RECORD=1`. **Ten reviewed
-  cassettes are now committed** (force-added past the dir's `*.yaml` gitignore):
-  version + per-phase reads, QEMU/LXC lifecycles, ISO upload, console mint —
-  each scrubbed of secrets (Authorization/token, console VNC ticket+password,
-  LXC password) **and** lab topology (endpoint host/IP + node name rewritten to
-  `pve.example`/`pve`; the ISO body truncated). **CI replay is now wired in**: a
-  `PVE_REPLAY=1` mode in the harness (`newReplayClient`) backs each test with
-  its committed cassette in `ModeReplayOnly` against the placeholder endpoint,
-  the matcher is host-agnostic (method + path+query, renamed
-  `matchMethodURL`→`matchReplayRequest`), and `just test-replay` (the new
-  `Test Replay (cassettes)` CI job) runs the 10 cassette-backed tests with no
+  `proxmox/integration/testdata/cassettes/` under `PVE_RECORD=1`. **Sixteen
+  reviewed cassettes are now committed** (force-added past the dir's `*.yaml`
+  gitignore): version + per-phase reads, QEMU/LXC lifecycles, ISO upload,
+  console mint, HA placement, and the 2026-07-23 pvelab batch (HA status/
+  arm-disarm/migrate + SDN status/fabric lifecycle) — each scrubbed of secrets
+  (Authorization/token, console VNC ticket+password, LXC password) **and** lab
+  topology (endpoint host/IP + node name rewritten to `pve.example`/`pve`; the
+  ISO body truncated; the scrub also rewrites go-vcr's parsed `Form` map, a gap
+  found in the 2026-07-23 leak review). Batch provenance lives in
+  `certification.yaml` (mixed-version corpus by design). **CI replay is now
+  wired in**: a `PVE_REPLAY=1` mode in the harness (`newReplayClient`) backs
+  each test with its committed cassette in `ModeReplayOnly` against the
+  placeholder endpoint, the matcher is host-agnostic (method + path+query,
+  renamed `matchMethodURL`→`matchReplayRequest`), and `just test-replay` (the
+  `Test Replay (cassettes)` CI job) runs the 16 cassette-backed tests with no
   live node. Recording collapses two identical `/version` fetches into one
   interaction, so `TestVersionRoundTrip` asserts on `NewClient`'s cached caps
   rather than re-fetching (else replay 404s on the second). `TestConsoleRFB` has
@@ -703,16 +715,16 @@ environment.** This shapes how we test and what "done" means:
   **QEMU** lifecycle (create → start → snapshot → rollback-while-running → stop
   → delete) **and P2 LXC** lifecycle; P3 **ISO upload** (drove out the
   chunked-body 501 + redundant-multipart-field 400 bugs); and P6 **VNC ticket
-  mint** (`TestConsoleMint`, spins up its own scratch VM). **Still
-  written-but-unverified (genuinely live-only here):** P4 scheduler-observed
-  resource-affinity placement (`TestResourceAffinityPlacement`, which superseded
-  the retired rule-only `TestResourceAffinityRule` per DESIGN-0002 OQ-9 — needs
-  the quorate pvelab nested cluster) and the P6 **VNC (RFB) wire payload**
-  (`TestConsoleRFB` reads the greeting over `console.Connect`; the ticket mint
-  is verified, the live RFB byte stream is not). Both run from `just dogfood`
-  (IMPL-0002 Phase 3). Volume-chain snapshots are **not** a gap — confirmed via
-  `r740a`'s own `apidoc.js` that PVE has no storage-level snapshot endpoint, so
-  they were honestly reclassified to `pverr.ErrUnsupported`.
+  mint** (`TestConsoleMint`, spins up its own scratch VM). The formerly
+  live-only criteria are ALL closed on the pvelab nested cluster: P4
+  scheduler-observed resource-affinity placement + the P6 VNC (RFB) wire payload
+  (both 2026-07-12, IMPL-0002 Phase 3), and the INV-0004 remediation wave
+  (2026-07-23, IMPL-0004/0005 Phase 3): the HA arm/disarm cycle, blocked migrate
+  with cause `resource-affinity`, HA/SDN status reads, and the OpenFabric fabric
+  lifecycle with FRR convergence. **Nothing on the SDK surface remains
+  written-but-unverified.** Volume-chain snapshots are **not** a gap — confirmed
+  via `r740a`'s own `apidoc.js` that PVE has no storage-level snapshot endpoint,
+  so they were honestly reclassified to `pverr.ErrUnsupported`.
 - **Task exit status `WARNINGS: N` is success, not failure.** PVE finishes some
   tasks (routinely an LXC create on a modern-systemd template — e.g. debian-13's
   "Systemd 257 detected. You may need to enable nesting.") with exit status
@@ -733,9 +745,11 @@ environment.** This shapes how we test and what "done" means:
   `PVE_TEST_LXC_TEMPLATE`), ISO upload (`PVE_TEST_ISO_STORAGE` +
   `PVE_TEST_ISO_PATH`), console mint + RFB read (`PVE_TEST_STORAGE` +
   `PVE_TEST_CONSOLE_VMID`, each spins up its own scratch VM), HA placement + HA
-  migrate (`PVE_TEST_PLACEMENT_VMID_1/2`, need the quorate pvelab cluster), and
-  the cluster-wide HA arm/disarm cycle (`PVE_TEST_HA_ARM=1`, an explicit opt-in
-  for DISPOSABLE clusters only — never set it on a real node). They are **not
+  migrate (`PVE_TEST_PLACEMENT_VMID_1/2`, need the quorate pvelab cluster), the
+  cluster-wide HA arm/disarm cycle (`PVE_TEST_HA_ARM=1`, an explicit opt-in for
+  DISPOSABLE clusters only — never set it on a real node), and the SDN fabric
+  lifecycle (`PVE_TEST_FABRIC_NODES` ≥2 + `PVE_TEST_FABRIC_IFACE` — enroll the
+  addressed bridge, e.g. `vmbr0`, never an IP-less enslaved NIC). They are **not
   runnable here** — they `t.Skip` without a node. The harness is
   compile-verified (`go vet -tags=integration ./proxmox/integration/`) but its
   execution + the go-vcr cassette capture are live-only. The package keeps an

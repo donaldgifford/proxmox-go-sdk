@@ -245,12 +245,17 @@ radius (DESIGN-0004 OQ-1 decision a). All lab-touching steps are Donald's.
      2026-07-23, 54.5s: blocked migrate returned exactly
      `[{SID:vm:9302 Cause:resource-affinity}]`; accepted migrate to the free
      third node converged via `HAStatusCurrent` in ~30s.)_
-- [ ] 4. Scrub + commit the three cassettes; wire them into the
+- [x] 4. Scrub + commit the three cassettes; wire them into the
      `just test-replay` `-run` list; changelog-final; PR (label `patch` unless
-     reconciliation changed public surface).
-- [ ] 5. Closure: cassette `certification.yaml` batch entry (shared with
+     reconciliation changed public surface). _(Done 2026-07-23 on
+     `feat/phase3-live-reconcile`, shared with IMPL-0004's Phase-3 closure —
+     label `minor`: the `ManagerStatus` restructure to the live nested envelope
+     is a public-surface change. All five run cassettes committed after leak
+     review; full 16-test `just test-replay` green locally.)_
+- [x] 5. Closure: cassette `certification.yaml` batch entry (shared with
      IMPL-0004's run); IMPL-0001 Phase-4 margin note (arm/disarm + status +
-     migrate live-verified); DESIGN-0004 status → Implemented.
+     migrate live-verified); DESIGN-0004 status → Implemented. _(Done
+     2026-07-23.)_
 
 #### Success Criteria
 
