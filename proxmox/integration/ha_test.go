@@ -43,11 +43,15 @@ func TestHAStatusReads(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetManagerStatus: %v", err)
 	}
-	// The typed fields are provisional (the apidoc pins a bare object) — the
-	// live run reconciles them (IMPL-0005 Phase 3). Log rather than assert so
-	// a shape divergence is visible without failing the read itself.
-	t.Logf("manager_status: master_node=%q nodes=%d services=%d extra-keys=%d",
-		ms.MasterNode, len(ms.NodeStatus), len(ms.ServiceStatus), len(ms.Extra))
+	// The envelope (manager_status + quorum) is live-confirmed (2026-07-23);
+	// the inner active-master fields stay provisional. Assert the envelope,
+	// log the rest so a divergence is visible without failing the read.
+	if !bool(ms.Quorum.Quorate) {
+		t.Errorf("manager_status quorum.quorate = false, want true (lab is quorate)")
+	}
+	t.Logf("manager_status: quorum-node=%q master_node=%q nodes=%d services=%d extra-keys=%d",
+		ms.Quorum.Node, ms.Manager.MasterNode, len(ms.Manager.NodeStatus),
+		len(ms.Manager.ServiceStatus), len(ms.Extra))
 }
 
 // TestHAArmDisarmCycle flips the cluster-wide HA switch (9.2+):
@@ -81,11 +85,13 @@ func TestHAArmDisarmCycle(t *testing.T) {
 		t.Fatalf("HAStatusCurrent(baseline): %v", err)
 	}
 	if got := liveArmedState(entries); got != ha.ArmedStateArmed {
-		// A prior run killed before its cleanup (no t.Cleanup on SIGKILL)
-		// leaves the lab disarmed — recover rather than fail permanently.
-		t.Logf("baseline armed-state = %q — recovering a wedged lab with ArmHA", got)
+		// "standby" is the NORMAL state of a fresh idle lab (no HA resources
+		// yet — live-confirmed 2026-07-23); "disarmed" means a prior run was
+		// killed before its cleanup (no t.Cleanup on SIGKILL). Either way,
+		// ArmHA normalizes the baseline rather than failing permanently.
+		t.Logf("baseline armed-state = %q — normalizing with ArmHA", got)
 		if err := h.ArmHA(testCtx(t)); err != nil {
-			t.Fatalf("recovery ArmHA: %v", err)
+			t.Fatalf("baseline ArmHA: %v", err)
 		}
 		waitArmedState(t, h, ha.ArmedStateArmed)
 	}
@@ -186,12 +192,12 @@ func TestHAResourceMigrate(t *testing.T) {
 	t.Logf("migrate converged: %s on %s", sid(vmid1), target)
 }
 
-// liveArmedState extracts the cluster's armed-state from a status read —
-// the master row's value, falling back to any row that carries one (the
-// field's row placement is a live-verify item).
+// liveArmedState extracts the cluster's armed-state from a status read — the
+// fencing row's value (where live 9.2.2 carries it; confirmed 2026-07-23),
+// falling back to any row that carries one.
 func liveArmedState(entries []ha.HAStatusEntry) ha.ArmedState {
 	for i := range entries {
-		if entries[i].Type == "master" && entries[i].ArmedState != "" {
+		if entries[i].Type == "fencing" && entries[i].ArmedState != "" {
 			return entries[i].ArmedState
 		}
 	}

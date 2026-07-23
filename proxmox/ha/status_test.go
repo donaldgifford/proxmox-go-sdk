@@ -9,16 +9,16 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/mockpve"
 )
 
-// masterEntry returns the master row of a status read, failing the test when
-// it is absent.
-func masterEntry(t *testing.T, entries []ha.HAStatusEntry) ha.HAStatusEntry {
+// fencingEntry returns the fencing row of a status read — the row that
+// carries armed-state on live 9.2.2 — failing the test when it is absent.
+func fencingEntry(t *testing.T, entries []ha.HAStatusEntry) ha.HAStatusEntry {
 	t.Helper()
 	for i := range entries {
-		if entries[i].Type == "master" {
+		if entries[i].Type == "fencing" {
 			return entries[i]
 		}
 	}
-	t.Fatal("status current: no master row")
+	t.Fatal("status current: no fencing row")
 	return ha.HAStatusEntry{}
 }
 
@@ -35,7 +35,7 @@ func serviceEntry(t *testing.T, entries []ha.HAStatusEntry, sid string) ha.HASta
 }
 
 // The arm -> disarm -> arm cycle is observable end-to-end through the mock's
-// /status/current: the master row's armed-state transitions, and the disarm
+// /status/current: the fencing row's armed-state transitions, and the disarm
 // resource-mode is mirrored on the service rows while disarmed.
 func TestArmDisarmCycleObservable(t *testing.T) {
 	t.Parallel()
@@ -48,7 +48,7 @@ func TestArmDisarmCycleObservable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HAStatusCurrent: %v", err)
 	}
-	if got := masterEntry(t, entries).ArmedState; got != ha.ArmedStateArmed {
+	if got := fencingEntry(t, entries).ArmedState; got != ha.ArmedStateArmed {
 		t.Fatalf("baseline armed-state = %q, want %q", got, ha.ArmedStateArmed)
 	}
 
@@ -59,7 +59,7 @@ func TestArmDisarmCycleObservable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HAStatusCurrent after disarm: %v", err)
 	}
-	if got := masterEntry(t, entries).ArmedState; got != ha.ArmedStateDisarmed {
+	if got := fencingEntry(t, entries).ArmedState; got != ha.ArmedStateDisarmed {
 		t.Errorf("disarmed armed-state = %q, want %q", got, ha.ArmedStateDisarmed)
 	}
 	if got := serviceEntry(t, entries, "vm:100").ResourceMode; got != ha.ResourceModeFreeze {
@@ -73,7 +73,7 @@ func TestArmDisarmCycleObservable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HAStatusCurrent after re-arm: %v", err)
 	}
-	if got := masterEntry(t, entries).ArmedState; got != ha.ArmedStateArmed {
+	if got := fencingEntry(t, entries).ArmedState; got != ha.ArmedStateArmed {
 		t.Errorf("re-armed armed-state = %q, want %q", got, ha.ArmedStateArmed)
 	}
 	if got := serviceEntry(t, entries, "vm:100").ResourceMode; got != "" {
@@ -102,8 +102,8 @@ func TestDisarmResourceModeWire(t *testing.T) {
 	}
 }
 
-// GetManagerStatus decodes the mock's CRM blob into the provisional typed
-// fields.
+// GetManagerStatus decodes the live-confirmed nested envelope: the CRM state
+// blob under manager_status and the quorum summary alongside.
 func TestManagerStatusRead(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()
@@ -114,26 +114,32 @@ func TestManagerStatusRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetManagerStatus: %v", err)
 	}
-	if ms.MasterNode == "" {
-		t.Error("MasterNode empty, want the mock node")
+	if ms.Manager.MasterNode == "" {
+		t.Error("Manager.MasterNode empty, want the mock node")
 	}
-	if ms.NodeStatus[ms.MasterNode] != "online" {
-		t.Errorf("NodeStatus[%s] = %q, want online", ms.MasterNode, ms.NodeStatus[ms.MasterNode])
+	if got := ms.Manager.NodeStatus[ms.Manager.MasterNode]; got != "online" {
+		t.Errorf("NodeStatus[%s] = %q, want online", ms.Manager.MasterNode, got)
 	}
-	entry, found := ms.ServiceStatus["vm:100"]
+	entry, found := ms.Manager.ServiceStatus["vm:100"]
 	if !found {
 		t.Fatal("ServiceStatus missing vm:100")
 	}
 	if entry.State != "started" {
 		t.Errorf("service state = %q, want started", entry.State)
 	}
-	if ms.Timestamp == 0 {
-		t.Error("Timestamp = 0, want set")
+	if ms.Manager.Timestamp == 0 {
+		t.Error("Manager.Timestamp = 0, want set")
+	}
+	if !bool(ms.Quorum.Quorate) {
+		t.Error("Quorum.Quorate = false, want true (string \"1\" on the wire)")
+	}
+	if ms.Quorum.Node == "" {
+		t.Error("Quorum.Node empty, want the answering node")
 	}
 }
 
-// HAStatusEntry models all 16 apidoc-confirmed fields and routes unknown keys
-// into Extra (hyphenated wire keys included).
+// HAStatusEntry models the 16 apidoc-confirmed fields plus the live-observed
+// comment, and routes unknown keys into Extra (hyphenated wire keys included).
 func TestHAStatusEntryLossless(t *testing.T) {
 	t.Parallel()
 	raw := `{
@@ -142,7 +148,7 @@ func TestHAStatusEntryLossless(t *testing.T) {
 		"crm_state": "started", "request_state": "started", "quorate": 1,
 		"armed-state": "standby", "auto-rebalance": 1, "failback": 0,
 		"max_relocate": 2, "max_restart": 3, "resource_mode": "freeze",
-		"timestamp": 1752000000, "future-key": 42
+		"timestamp": 1752000000, "comment": "dogfood", "future-key": 42
 	}`
 	var e ha.HAStatusEntry
 	if err := json.Unmarshal([]byte(raw), &e); err != nil {
@@ -152,7 +158,8 @@ func TestHAStatusEntryLossless(t *testing.T) {
 		e.RequestState != "started" || !bool(e.Quorate) ||
 		e.ArmedState != ha.ArmedStateStandby || !bool(e.AutoRebalance) ||
 		bool(e.Failback) || e.MaxRelocate != 2 || e.MaxRestart != 3 ||
-		e.ResourceMode != ha.ResourceModeFreeze || e.Timestamp != 1752000000 {
+		e.ResourceMode != ha.ResourceModeFreeze || e.Timestamp != 1752000000 ||
+		e.Comment != "dogfood" {
 		t.Errorf("typed fields mis-decoded: %+v", e)
 	}
 	if e.Extra["future-key"] != "42" {
@@ -160,29 +167,44 @@ func TestHAStatusEntryLossless(t *testing.T) {
 	}
 }
 
-// ManagerStatus keeps unmodelled keys — including nested objects — in Extra.
+// ManagerStatus decodes the nested live envelope and keeps unmodelled keys —
+// at every level — in the respective Extra. The raw body mirrors the
+// 2026-07-23 cassette shape (quorate as string "1") plus injected unknowns.
 func TestManagerStatusLossless(t *testing.T) {
 	t.Parallel()
 	raw := `{
-		"master_node": "pve", "timestamp": 1752000000,
-		"node_status": {"pve": "online"},
-		"service_status": {"vm:100": {"node": "pve", "state": "started", "uid": "u1", "flags": "x"}},
-		"queue": {"depth": 0}
+		"manager_status": {
+			"master_node": "pve", "timestamp": 1752000000,
+			"node_status": {"pve": "online"},
+			"service_status": {"vm:100": {"node": "pve", "state": "started", "uid": "u1", "flags": "x"}},
+			"queue": {"depth": 0}
+		},
+		"quorum": {"node": "pve", "quorate": "1", "epoch": 3},
+		"future-top": true
 	}`
 	var ms ha.ManagerStatus
 	if err := json.Unmarshal([]byte(raw), &ms); err != nil {
 		t.Fatalf("Unmarshal: %v", err)
 	}
-	if ms.MasterNode != "pve" || ms.Timestamp != 1752000000 {
-		t.Errorf("typed fields mis-decoded: %+v", ms)
+	if ms.Manager.MasterNode != "pve" || ms.Manager.Timestamp != 1752000000 {
+		t.Errorf("manager typed fields mis-decoded: %+v", ms.Manager)
 	}
-	if ms.ServiceStatus["vm:100"].UID != "u1" {
-		t.Errorf("service uid = %q, want u1", ms.ServiceStatus["vm:100"].UID)
+	if ms.Manager.ServiceStatus["vm:100"].UID != "u1" {
+		t.Errorf("service uid = %q, want u1", ms.Manager.ServiceStatus["vm:100"].UID)
 	}
-	if ms.ServiceStatus["vm:100"].Extra["flags"] != "x" {
-		t.Errorf("service Extra[flags] = %q, want x", ms.ServiceStatus["vm:100"].Extra["flags"])
+	if ms.Manager.ServiceStatus["vm:100"].Extra["flags"] != "x" {
+		t.Errorf("service Extra[flags] = %q, want x", ms.Manager.ServiceStatus["vm:100"].Extra["flags"])
 	}
-	if _, found := ms.Extra["queue"]; !found {
-		t.Error("Extra missing unmodelled queue key")
+	if _, found := ms.Manager.Extra["queue"]; !found {
+		t.Error("Manager.Extra missing unmodelled queue key")
+	}
+	if !bool(ms.Quorum.Quorate) || ms.Quorum.Node != "pve" {
+		t.Errorf("quorum mis-decoded: %+v", ms.Quorum)
+	}
+	if ms.Quorum.Extra["epoch"] != "3" {
+		t.Errorf("Quorum.Extra[epoch] = %q, want 3", ms.Quorum.Extra["epoch"])
+	}
+	if _, found := ms.Extra["future-top"]; !found {
+		t.Error("Extra missing unmodelled future-top key")
 	}
 }

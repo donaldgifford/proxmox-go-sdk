@@ -305,8 +305,10 @@ func haReplToPayload(rec *haReplRecord) haReplPayload {
 }
 
 // haStatusPayload mirrors one GET /cluster/ha/status/current row. The real
-// endpoint returns a heterogeneous array (quorum/master/lrm/service rows);
-// the mock synthesizes quorum + master + one service row per seeded resource.
+// endpoint returns a heterogeneous array (quorum/master/fencing/lrm/service
+// rows); the mock synthesizes quorum + master + fencing + one service row per
+// seeded resource. Live 9.2.2 carries armed-state on the fencing row, not the
+// master row (2026-07-23).
 type haStatusPayload struct {
 	ID           string `json:"id"`
 	Type         string `json:"type"`
@@ -321,6 +323,7 @@ type haStatusPayload struct {
 	MaxRestart   int    `json:"max_restart,omitempty"`
 	MaxRelocate  int    `json:"max_relocate,omitempty"`
 	Timestamp    int64  `json:"timestamp,omitempty"`
+	Comment      string `json:"comment,omitempty"`
 }
 
 // haArmedState renders the armed flag as the 9.2 armed-state enum. The caller
@@ -333,9 +336,10 @@ func (s *Server) haArmedState() string {
 }
 
 // handleHAStatusCurrent synthesizes the live HA manager view: a quorum row, a
-// master row reporting armed-state from the cluster switch, and one service
-// row per seeded resource. The mock does not schedule — rows reflect seeded
-// state, and migrate/relocate handlers move a resource's node.
+// master row, a fencing row reporting armed-state from the cluster switch
+// (where live 9.2.2 puts it — never the master row), and one service row per
+// seeded resource. The mock does not schedule — rows reflect seeded state,
+// and migrate/relocate handlers move a resource's node.
 func (s *Server) handleHAStatusCurrent(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
@@ -345,7 +349,11 @@ func (s *Server) handleHAStatusCurrent(w http.ResponseWriter, r *http.Request) {
 		{ID: "quorum", Type: "quorum", Node: haDefaultNode, Status: "OK", Quorate: 1},
 		{
 			ID: "master", Type: "master", Node: haDefaultNode, Status: "active",
-			ArmedState: s.haArmedState(), Timestamp: haMockTimestamp,
+			Timestamp: haMockTimestamp,
+		},
+		{
+			ID: "fencing", Type: "fencing", Node: haDefaultNode,
+			Status: "watchdog", ArmedState: s.haArmedState(),
 		},
 	}
 	for _, rec := range s.st.ha.resources {
@@ -354,6 +362,7 @@ func (s *Server) handleHAStatusCurrent(w http.ResponseWriter, r *http.Request) {
 			Node: rec.Node, State: rec.State, Status: rec.State,
 			RequestState: rec.State, MaxRestart: rec.MaxRestart,
 			MaxRelocate: rec.MaxRelocate, ResourceMode: s.st.ha.resourceMode,
+			Comment: rec.Comment,
 		}
 		if row.Node == "" {
 			row.Node = haDefaultNode
@@ -364,9 +373,10 @@ func (s *Server) handleHAStatusCurrent(w http.ResponseWriter, r *http.Request) {
 	s.writeData(w, out)
 }
 
-// handleHAManagerStatus returns a plausible CRM master state blob built from
-// the seeded resources (the real endpoint publishes the pve-ha-manager state
-// file, which the apidoc leaves as a bare object).
+// handleHAManagerStatus returns a CRM master state blob built from the seeded
+// resources, in the live-confirmed 9.2.2 envelope: the state file nests under
+// manager_status and a quorum summary rides alongside (quorate is the string
+// "1" there, mirroring real PVE).
 func (s *Server) handleHAManagerStatus(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
@@ -384,10 +394,13 @@ func (s *Server) handleHAManagerStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	s.st.mu.Unlock()
 	payload := map[string]any{
-		"master_node":    haDefaultNode,
-		"node_status":    map[string]string{haDefaultNode: "online"},
-		"service_status": services,
-		"timestamp":      haMockTimestamp,
+		"manager_status": map[string]any{
+			"master_node":    haDefaultNode,
+			"node_status":    map[string]string{haDefaultNode: "online"},
+			"service_status": services,
+			"timestamp":      haMockTimestamp,
+		},
+		"quorum": map[string]string{"node": haDefaultNode, "quorate": "1"},
 	}
 	s.writeData(w, payload)
 }
