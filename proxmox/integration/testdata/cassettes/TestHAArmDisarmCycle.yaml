@@ -1,0 +1,578 @@
+---
+version: 2
+interactions:
+    - id: 0
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 41
+        host: pve.example:8006
+        body: password=REDACTED&username=root%40pam
+        form:
+            password:
+                - REDACTED
+            username:
+                - root@pam
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/access/ticket
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: -1
+        uncompressed: true
+        body: '{"data":{"CSRFPreventionToken":"REDACTED","clustername":"dogfood","cap":{"storage":{"Datastore.Audit":1,"Permissions.Modify":1,"Datastore.Allocate":1,"Datastore.AllocateSpace":1,"Datastore.AllocateTemplate":1},"nodes":{"Permissions.Modify":1,"Sys.AccessNetwork":1,"Sys.PowerMgmt":1,"Sys.Modify":1,"Sys.Incoming":1,"Sys.Syslog":1,"Sys.Audit":1,"Sys.Console":1},"dc":{"Sys.Modify":1,"SDN.Audit":1,"SDN.Use":1,"Sys.Audit":1,"SDN.Allocate":1},"vms":{"VM.Config.Disk":1,"VM.Config.Options":1,"VM.Snapshot.Rollback":1,"VM.Replicate":1,"VM.Config.Memory":1,"VM.Migrate":1,"VM.Allocate":1,"VM.Config.CPU":1,"VM.Audit":1,"VM.GuestAgent.FileWrite":1,"VM.GuestAgent.Audit":1,"VM.GuestAgent.FileRead":1,"Permissions.Modify":1,"VM.Backup":1,"VM.PowerMgmt":1,"VM.Config.Network":1,"VM.Snapshot":1,"VM.Config.CDROM":1,"VM.Config.HWType":1,"VM.Config.Cloudinit":1,"VM.GuestAgent.FileSystemMgmt":1,"VM.Clone":1,"VM.GuestAgent.Unrestricted":1,"VM.Console":1},"sdn":{"SDN.Allocate":1,"Permissions.Modify":1,"SDN.Use":1,"SDN.Audit":1},"access":{"Permissions.Modify":1,"User.Modify":1,"Group.Allocate":1},"mapping":{"Mapping.Audit":1,"Mapping.Modify":1,"Permissions.Modify":1,"Mapping.Use":1}},"username":"root@pam","ticket":"REDACTED"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 12:36:06 GMT
+            Expires:
+                - Thu, 23 Jul 2026 12:36:06 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 196.0825ms
+    - id: 1
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/version
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 72
+        body: '{"data":{"version":"9.2.2","repoid":"b9984c6d90a4bd80","release":"9.2"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "72"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 12:36:06 GMT
+            Expires:
+                - Thu, 23 Jul 2026 12:36:06 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 28.409667ms
+    - id: 2
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/ha/status/current
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 212
+        body: '{"data":[{"quorate":1,"id":"quorum","node":"pve","type":"quorum","status":"OK"},{"type":"fencing","armed-state":"standby","status":"standby (CRM watchdog standby)","id":"fencing","node":"pve"}]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "212"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 12:36:06 GMT
+            Expires:
+                - Thu, 23 Jul 2026 12:36:06 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 8.443875ms
+    - id: 3
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/ha/status/arm-ha
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 13
+        body: '{"data":null}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "13"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 12:36:06 GMT
+            Expires:
+                - Thu, 23 Jul 2026 12:36:06 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 23.689208ms
+    - id: 4
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/ha/status/current
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 212
+        body: '{"data":[{"status":"OK","type":"quorum","node":"pve","id":"quorum","quorate":1},{"type":"fencing","armed-state":"standby","status":"standby (CRM watchdog standby)","node":"pve","id":"fencing"}]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "212"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 12:36:06 GMT
+            Expires:
+                - Thu, 23 Jul 2026 12:36:06 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 20.396958ms
+    - id: 5
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/ha/status/current
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 820
+        body: '{"data":[{"node":"pve","id":"quorum","quorate":1,"status":"OK","type":"quorum"},{"node":"pve3-dogfood","id":"master","status":"pve3-dogfood (active, Thu Jul 23 12:36:06 2026)","timestamp":1784810166,"type":"master"},{"id":"fencing","node":"pve3-dogfood","type":"fencing","armed-state":"armed","status":"armed (CRM watchdog active)"},{"status":"pve (idle, watchdog standby, Thu Jul 23 12:36:14 2026)","timestamp":1784810174,"type":"lrm","id":"lrm:pve","node":"pve"},{"id":"lrm:pve2-dogfood","node":"pve2-dogfood","timestamp":1784810176,"status":"pve2-dogfood (idle, watchdog standby, Thu Jul 23 12:36:16 2026)","type":"lrm"},{"timestamp":1784810172,"status":"pve3-dogfood (idle, watchdog standby, Thu Jul 23 12:36:12 2026)","type":"lrm","id":"lrm:pve3-dogfood","node":"pve3-dogfood"}]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "820"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 12:36:16 GMT
+            Expires:
+                - Thu, 23 Jul 2026 12:36:16 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 25.431208ms
+    - id: 6
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 20
+        host: pve.example:8006
+        body: resource-mode=freeze
+        form:
+            resource-mode:
+                - freeze
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/ha/status/disarm-ha
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 13
+        body: '{"data":null}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "13"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 12:36:16 GMT
+            Expires:
+                - Thu, 23 Jul 2026 12:36:16 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 25.778416ms
+    - id: 7
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/ha/status/current
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 820
+        body: '{"data":[{"quorate":1,"node":"pve","id":"quorum","type":"quorum","status":"OK"},{"type":"master","timestamp":1784810166,"status":"pve3-dogfood (active, Thu Jul 23 12:36:06 2026)","id":"master","node":"pve3-dogfood"},{"node":"pve3-dogfood","id":"fencing","status":"armed (CRM watchdog active)","type":"fencing","armed-state":"armed"},{"node":"pve","id":"lrm:pve","status":"pve (idle, watchdog standby, Thu Jul 23 12:36:14 2026)","timestamp":1784810174,"type":"lrm"},{"timestamp":1784810176,"status":"pve2-dogfood (idle, watchdog standby, Thu Jul 23 12:36:16 2026)","type":"lrm","id":"lrm:pve2-dogfood","node":"pve2-dogfood"},{"id":"lrm:pve3-dogfood","node":"pve3-dogfood","timestamp":1784810172,"status":"pve3-dogfood (idle, watchdog standby, Thu Jul 23 12:36:12 2026)","type":"lrm"}]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "820"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 12:36:16 GMT
+            Expires:
+                - Thu, 23 Jul 2026 12:36:16 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 20.067ms
+    - id: 8
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/ha/status/current
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 935
+        body: '{"data":[{"quorate":1,"node":"pve","id":"quorum","type":"quorum","status":"OK"},{"id":"master","node":"pve3-dogfood","status":"pve3-dogfood (active, Thu Jul 23 12:36:16 2026) - disarming, resource mode: freeze","timestamp":1784810176,"type":"master"},{"status":"disarming, resource mode: freeze (CRM watchdog active)","resource_mode":"freeze","id":"fencing","node":"pve3-dogfood","armed-state":"disarming","type":"fencing"},{"status":"pve (disarm mode, watchdog released, Thu Jul 23 12:36:24 2026)","timestamp":1784810184,"type":"lrm","id":"lrm:pve","node":"pve"},{"node":"pve2-dogfood","id":"lrm:pve2-dogfood","type":"lrm","status":"pve2-dogfood (disarm mode, watchdog released, Thu Jul 23 12:36:26 2026)","timestamp":1784810186},{"node":"pve3-dogfood","id":"lrm:pve3-dogfood","status":"pve3-dogfood (disarm mode, watchdog released, Thu Jul 23 12:36:22 2026)","timestamp":1784810182,"type":"lrm"}]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "935"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 12:36:26 GMT
+            Expires:
+                - Thu, 23 Jul 2026 12:36:26 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 24.704583ms
+    - id: 9
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/ha/status/current
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 934
+        body: '{"data":[{"type":"quorum","status":"OK","quorate":1,"id":"quorum","node":"pve"},{"id":"master","node":"pve3-dogfood","status":"pve3-dogfood (active, Thu Jul 23 12:36:26 2026) - disarmed, resource mode: freeze","timestamp":1784810186,"type":"master"},{"resource_mode":"freeze","status":"disarmed, resource mode: freeze (CRM watchdog released)","id":"fencing","node":"pve3-dogfood","armed-state":"disarmed","type":"fencing"},{"id":"lrm:pve","node":"pve","type":"lrm","status":"pve (disarm mode, watchdog released, Thu Jul 23 12:36:34 2026)","timestamp":1784810194},{"status":"pve2-dogfood (disarm mode, watchdog released, Thu Jul 23 12:36:36 2026)","timestamp":1784810196,"type":"lrm","node":"pve2-dogfood","id":"lrm:pve2-dogfood"},{"node":"pve3-dogfood","id":"lrm:pve3-dogfood","type":"lrm","timestamp":1784810192,"status":"pve3-dogfood (disarm mode, watchdog released, Thu Jul 23 12:36:32 2026)"}]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "934"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 12:36:36 GMT
+            Expires:
+                - Thu, 23 Jul 2026 12:36:36 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 27.17625ms
+    - id: 10
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/ha/status/arm-ha
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 13
+        body: '{"data":null}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "13"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 12:36:36 GMT
+            Expires:
+                - Thu, 23 Jul 2026 12:36:36 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 22.355166ms
+    - id: 11
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/ha/status/current
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 934
+        body: '{"data":[{"quorate":1,"id":"quorum","node":"pve","type":"quorum","status":"OK"},{"id":"master","node":"pve3-dogfood","type":"master","status":"pve3-dogfood (active, Thu Jul 23 12:36:26 2026) - disarmed, resource mode: freeze","timestamp":1784810186},{"armed-state":"disarmed","type":"fencing","node":"pve3-dogfood","id":"fencing","resource_mode":"freeze","status":"disarmed, resource mode: freeze (CRM watchdog released)"},{"timestamp":1784810194,"status":"pve (disarm mode, watchdog released, Thu Jul 23 12:36:34 2026)","type":"lrm","node":"pve","id":"lrm:pve"},{"status":"pve2-dogfood (disarm mode, watchdog released, Thu Jul 23 12:36:36 2026)","timestamp":1784810196,"type":"lrm","id":"lrm:pve2-dogfood","node":"pve2-dogfood"},{"type":"lrm","timestamp":1784810192,"status":"pve3-dogfood (disarm mode, watchdog released, Thu Jul 23 12:36:32 2026)","id":"lrm:pve3-dogfood","node":"pve3-dogfood"}]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "934"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 12:36:36 GMT
+            Expires:
+                - Thu, 23 Jul 2026 12:36:36 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 26.993125ms
+    - id: 12
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/ha/status/current
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 820
+        body: '{"data":[{"id":"quorum","node":"pve","quorate":1,"status":"OK","type":"quorum"},{"id":"master","node":"pve3-dogfood","type":"master","status":"pve3-dogfood (active, Thu Jul 23 12:36:36 2026)","timestamp":1784810196},{"id":"fencing","node":"pve3-dogfood","status":"armed (CRM watchdog active)","type":"fencing","armed-state":"armed"},{"type":"lrm","status":"pve (idle, watchdog standby, Thu Jul 23 12:36:44 2026)","timestamp":1784810204,"node":"pve","id":"lrm:pve"},{"type":"lrm","status":"pve2-dogfood (idle, watchdog standby, Thu Jul 23 12:36:46 2026)","timestamp":1784810206,"node":"pve2-dogfood","id":"lrm:pve2-dogfood"},{"type":"lrm","timestamp":1784810202,"status":"pve3-dogfood (idle, watchdog standby, Thu Jul 23 12:36:42 2026)","id":"lrm:pve3-dogfood","node":"pve3-dogfood"}]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "820"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 12:36:46 GMT
+            Expires:
+                - Thu, 23 Jul 2026 12:36:46 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 28.660375ms
+    - id: 13
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/ha/status/arm-ha
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 13
+        body: '{"data":null}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "13"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 12:36:46 GMT
+            Expires:
+                - Thu, 23 Jul 2026 12:36:46 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 23.529084ms

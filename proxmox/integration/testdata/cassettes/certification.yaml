@@ -73,3 +73,42 @@
     (provenance per batch entry). First fully-automated scrub batch — the
     Request.Host topology fix held with zero hand-edits. TestConsoleRFB ran
     live in the batch (cassette-less by design).
+- pve_version: 9.2.4
+  recorded: 2026-07-22 # TestNetworkReads re-record on the nested fabrics path
+  commit: c8f17cf # feat/impl-0004-sdn-fabrics-delivery (PR #21)
+  harness: r740a # reads-only, no lab needed
+  cassettes:
+    - TestNetworkReads
+  notes: >-
+    Single-cassette re-record (IMPL-0004 Phase 2): the previously committed
+    TestNetworkReads interaction hit the old flat /cluster/sdn/fabrics guess,
+    whose "passing" read was actually the subdir index. The re-record drives
+    the real nested /cluster/sdn/fabrics/fabric path and honestly returns the
+    empty fabric list. r740a had moved to 9.2.4 by this recording; the corpus
+    stays mixed-version by design.
+- pve_version: 9.2.2
+  recorded: 2026-07-23 # shared IMPL-0004 + IMPL-0005 Phase-3 pvelab run
+  commit: 217fa44 # post-#23 main (HA/SDN-status); fabric re-recorded on fe70f56
+  harness: pvelab # 3-node nested cluster via linked clones, quorate
+  cassettes:
+    - TestHAStatusReads
+    - TestHAArmDisarmCycle
+    - TestHAResourceMigrate
+    - TestSDNStatusReads
+    - TestSDNFabricLifecycle
+  notes: >-
+    The DESIGN-0003/0004 live-verification batch. HA findings reconciled into
+    the SDK/mock before this entry: armed-state rides a dedicated "fencing"
+    row (never master; a fresh idle cluster has NO master row and reports
+    "standby" — the normal state, not a wedged lab), and manager_status NESTS
+    its state blob under a manager_status key with a quorum summary alongside
+    (quorate as string "1") — ManagerStatus was restructured to the envelope
+    and mockpve now emits both shapes. PVE does require disarm's
+    resource-mode; a blocked migrate returned blocking-resources with cause
+    resource-affinity exactly as apidoc-mined. Fabric: bare-IPv4 ip and
+    property-string interfaces both accepted; openfabric NEVER binds an
+    address-less bridge-enslaved port (ens18) — enrolling the addressed
+    bridge (vmbr0) converged in ~10s (first attempt burned the 3-min ceiling
+    at 0 interfaces). Harness fix from the leak review: topologyScrub now
+    rewrites go-vcr's parsed Request.Form map (the raw body was scrubbed but
+    the form kept the live node name).
