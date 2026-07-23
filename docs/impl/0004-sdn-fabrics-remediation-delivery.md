@@ -174,18 +174,33 @@ IMPL-0005 Phase 3 (see OQ-3). All lab-touching steps are Donald's.
 
 #### Tasks
 
-- [ ] 1. Bring up the pvelab cluster (`just dogfood-up`, clone path) and source
+- [x] 1. Bring up the pvelab cluster (`just dogfood-up`, clone path) and source
      `.pvelab.env`; set the fabric gates (`PVE_TEST_FABRIC_NODES` = the ≥2 lab
-     node names, `PVE_TEST_FABRIC_IFACE` per OQ-4).
+     node names, `PVE_TEST_FABRIC_IFACE` per OQ-4). _(Done 2026-07-23: clone
+     path, quorate(3) — after restoring the `template:` block in pvelab.yaml;
+     the ISO path is currently unusable because the baked-in answer-server
+     address predates the workstation's move off the lab subnet.)_
 - [ ] 2. Run `TestSDNStatusReads` (read-only zone status) and
      `TestSDNFabricLifecycle` (OpenFabric fabric across the lab nodes → enroll
      each node → `ApplySDN` → poll `FabricNeighbors` until FRR converges → read
-     interfaces/routes → teardown) with `PVE_RECORD=1`.
-- [ ] 3. Reconcile any live divergence into the SDK/mock **before** committing
+     interfaces/routes → teardown) with `PVE_RECORD=1`. _(2026-07-23:
+     `TestSDNStatusReads` PASSED. `TestSDNFabricLifecycle` half-passed: fabric
+     create on the nested path, all three node enrollments, `ApplySDN`, and
+     teardown all succeeded live, but FRR convergence FAILED —
+     `FabricInterfaces` reported 0 interfaces for the full 3-minute ceiling,
+     i.e. openfabric never bound the enrolled NIC. Diagnosis in flight (wrong
+     guest NIC name vs bridge-enslaved port); re-run + re-record of this one
+     test pending.)_
+- [x] 3. Reconcile any live divergence into the SDK/mock **before** committing
      cassettes — the known watch-list: fabric-node `ip` bare-IPv4 acceptance,
      the property-string `interfaces` form, whether `redistribute`'s wire form
      justifies promoting it out of `Extra` (DESIGN-0003 Correction 2), and the
-     status-read field contents against the mock's synthesis.
+     status-read field contents against the mock's synthesis. _(2026-07-23:
+     bare-IPv4 `ip` and the property-string `interfaces` form both ACCEPTED live
+     — no divergence, no SDK change needed. `redistribute` was not exercised
+     (stays in `Extra`). Status-read shapes matched the mock for the zone reads;
+     the fabric runtime reads returned empty pending the convergence fix, so
+     their field contents remain the only open item.)_
 - [ ] 4. Scrub + commit the two cassettes; add both tests to the
      `just test-replay` `-run` list; changelog-final; PR (label `patch` unless
      reconciliation changed public surface).

@@ -200,10 +200,12 @@ environment.
      `Capabilities.DynamicLoadBalancer()` (pre-v1 break). _(Done 2026-07-22: PR
      #23, `minor`, all breaks noted up front; a pre-PR review pass returned
      MERGEABLE and its findings were folded in.)_
-- [ ] 3. CI fully green — no existing cassette touches this surface
+- [x] 3. CI fully green — no existing cassette touches this surface
      (`TestClusterAndHAReads` only lists resources), so
      `Test Replay (cassettes)` stays green; merge → the label auto-mints the
-     next tag.
+     next tag. _(Done 2026-07-23: PR #23 merged by Donald, `v0.8.0` auto-minted
+     and published — mockpve archives + SBOMs + signed checksums all present on
+     the release.)_
 
 #### Success Criteria
 
@@ -220,17 +222,29 @@ radius (DESIGN-0004 OQ-1 decision a). All lab-touching steps are Donald's.
 
 #### Tasks
 
-- [ ] 1. `TestHAArmDisarmCycle` (gated per OQ-2): `HAStatusCurrent` baseline →
+- [x] 1. `TestHAArmDisarmCycle` (gated per OQ-2): `HAStatusCurrent` baseline →
      `DisarmHA` → observe `armed-state` transition → `ArmHA` → observe again;
-     verifies the `resource-mode` semantics live.
-- [ ] 2. `TestHAStatusReads`: `current` + `manager_status` against the live
+     verifies the `resource-mode` semantics live. _(PASSED live 2026-07-23,
+     pvelab 9.2.2, 40.5s: full disarm(freeze)→observe→arm cycle; PVE does
+     require `resource-mode` (OQ-1 double-check confirmed). Live findings:
+     `armed-state` rides the dedicated `fencing` row (never master), and a fresh
+     idle cluster reports `standby` with no master row — the baseline ArmHA is a
+     normalization, not a wedged-lab recovery.)_
+- [x] 2. `TestHAStatusReads`: `current` + `manager_status` against the live
      cluster; **reconcile `ManagerStatus`'s provisional typed fields against the
      real blob before committing cassettes** (the design's stated source of
-     truth for OQ-2's typed shape).
-- [ ] 3. `TestHAResourceMigrate` (shape per OQ-3): migrate an HA resource
+     truth for OQ-2's typed shape). _(PASSED live 2026-07-23; reconciled
+     2026-07-23: the real response nests the state blob under a `manager_status`
+     key with a `quorum` summary alongside — `ManagerStatus` restructured to the
+     envelope (`Manager`/`Quorum`), mockpve + tests updated, all four passing
+     cassettes replay green against the reconciled code.)_
+- [x] 3. `TestHAResourceMigrate` (shape per OQ-3): migrate an HA resource
      between nested nodes, watch convergence via `HAStatusCurrent`; with a
      negative-affinity pair in place, assert a conflicting migrate returns
-     `blocking-resources` with cause `resource-affinity`.
+     `blocking-resources` with cause `resource-affinity`. _(PASSED live
+     2026-07-23, 54.5s: blocked migrate returned exactly
+     `[{SID:vm:9302 Cause:resource-affinity}]`; accepted migrate to the free
+     third node converged via `HAStatusCurrent` in ~30s.)_
 - [ ] 4. Scrub + commit the three cassettes; wire them into the
      `just test-replay` `-run` list; changelog-final; PR (label `patch` unless
      reconciliation changed public surface).
