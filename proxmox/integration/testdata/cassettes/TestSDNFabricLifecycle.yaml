@@ -1,0 +1,776 @@
+---
+version: 2
+interactions:
+    - id: 0
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 41
+        host: pve.example:8006
+        body: password=REDACTED&username=root%40pam
+        form:
+            password:
+                - REDACTED
+            username:
+                - root@pam
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/access/ticket
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: -1
+        uncompressed: true
+        body: '{"data":{"ticket":"REDACTED","username":"root@pam","clustername":"dogfood","CSRFPreventionToken":"REDACTED","cap":{"storage":{"Datastore.Audit":1,"Permissions.Modify":1,"Datastore.Allocate":1,"Datastore.AllocateSpace":1,"Datastore.AllocateTemplate":1},"dc":{"Sys.Audit":1,"SDN.Use":1,"SDN.Audit":1,"Sys.Modify":1,"SDN.Allocate":1},"nodes":{"Permissions.Modify":1,"Sys.Modify":1,"Sys.PowerMgmt":1,"Sys.AccessNetwork":1,"Sys.Syslog":1,"Sys.Incoming":1,"Sys.Console":1,"Sys.Audit":1},"vms":{"VM.Config.Network":1,"VM.Config.Memory":1,"Permissions.Modify":1,"VM.Replicate":1,"VM.PowerMgmt":1,"VM.Migrate":1,"VM.Backup":1,"VM.Config.Options":1,"VM.Config.Disk":1,"VM.Snapshot.Rollback":1,"VM.Audit":1,"VM.GuestAgent.Unrestricted":1,"VM.GuestAgent.Audit":1,"VM.GuestAgent.FileRead":1,"VM.GuestAgent.FileWrite":1,"VM.Console":1,"VM.Config.HWType":1,"VM.Config.Cloudinit":1,"VM.Clone":1,"VM.GuestAgent.FileSystemMgmt":1,"VM.Config.CDROM":1,"VM.Snapshot":1,"VM.Config.CPU":1,"VM.Allocate":1},"sdn":{"SDN.Use":1,"SDN.Audit":1,"Permissions.Modify":1,"SDN.Allocate":1},"access":{"User.Modify":1,"Permissions.Modify":1,"Group.Allocate":1},"mapping":{"Mapping.Modify":1,"Mapping.Audit":1,"Mapping.Use":1,"Permissions.Modify":1}}}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 213.549125ms
+    - id: 1
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/version
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 72
+        body: '{"data":{"repoid":"b9984c6d90a4bd80","version":"9.2.2","release":"9.2"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "72"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 25.845666ms
+    - id: 2
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 56
+        host: pve.example:8006
+        body: id=sdkfab0&ip_prefix=10.99.99.0%2F24&protocol=openfabric
+        form:
+            id:
+                - sdkfab0
+            ip_prefix:
+                - 10.99.99.0/24
+            protocol:
+                - openfabric
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/sdn/fabrics/fabric
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 11
+        body: '{"data":""}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "11"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 25.920458ms
+    - id: 3
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 78
+        host: pve.example:8006
+        body: interfaces=name%3Dvmbr0&ip=10.99.99.1&node_id=pve&protocol=openfabric
+        form:
+            interfaces:
+                - name=vmbr0
+            ip:
+                - 10.99.99.1
+            node_id:
+                - pve
+            protocol:
+                - openfabric
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/sdn/fabrics/node/sdkfab0
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 11
+        body: '{"data":""}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "11"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 42.559708ms
+    - id: 4
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 78
+        host: pve.example:8006
+        body: interfaces=name%3Dvmbr0&ip=10.99.99.2&node_id=pve2-dogfood&protocol=openfabric
+        form:
+            interfaces:
+                - name=vmbr0
+            ip:
+                - 10.99.99.2
+            node_id:
+                - pve2-dogfood
+            protocol:
+                - openfabric
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/sdn/fabrics/node/sdkfab0
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 11
+        body: '{"data":""}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "11"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 42.18025ms
+    - id: 5
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 78
+        host: pve.example:8006
+        body: interfaces=name%3Dvmbr0&ip=10.99.99.3&node_id=pve3-dogfood&protocol=openfabric
+        form:
+            interfaces:
+                - name=vmbr0
+            ip:
+                - 10.99.99.3
+            node_id:
+                - pve3-dogfood
+            protocol:
+                - openfabric
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/sdn/fabrics/node/sdkfab0
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 11
+        body: '{"data":""}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "11"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 40.80275ms
+    - id: 6
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/sdn/fabrics/node/sdkfab0
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 595
+        body: '{"data":[{"digest":"cbe927b08360a837b54ce0155a8b1c932b48bb7d809cc8e13cc4edd5373e75ff","node_id":"pve","interfaces":["name=vmbr0"],"protocol":"openfabric","ip":"10.99.99.1","fabric_id":"sdkfab0"},{"protocol":"openfabric","ip":"10.99.99.2","fabric_id":"sdkfab0","digest":"cbe927b08360a837b54ce0155a8b1c932b48bb7d809cc8e13cc4edd5373e75ff","node_id":"pve2-dogfood","interfaces":["name=vmbr0"]},{"fabric_id":"sdkfab0","ip":"10.99.99.3","protocol":"openfabric","digest":"cbe927b08360a837b54ce0155a8b1c932b48bb7d809cc8e13cc4edd5373e75ff","interfaces":["name=vmbr0"],"node_id":"pve3-dogfood"}]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "595"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 29.955459ms
+    - id: 7
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/sdn/fabrics/node/sdkfab0/pve
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 203
+        body: '{"data":{"digest":"cbe927b08360a837b54ce0155a8b1c932b48bb7d809cc8e13cc4edd5373e75ff","node_id":"pve","interfaces":["name=vmbr0"],"fabric_id":"sdkfab0","protocol":"openfabric","ip":"10.99.99.1"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "203"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 7.535333ms
+    - id: 8
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/sdn
+        method: PUT
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 83
+        body: '{"data":"UPID:pve:00007CFE:000A79BF:6A621758:reloadnetworkall::root@pam:"}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "83"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 44.306458ms
+    - id: 9
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/sdn/fabrics/sdkfab0/interfaces
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 11
+        body: '{"data":[]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "11"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 50.952042ms
+    - id: 10
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/sdn/fabrics/sdkfab0/neighbors
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 11
+        body: '{"data":[]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "11"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:00 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 56.200917ms
+    - id: 11
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/sdn/fabrics/sdkfab0/neighbors
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 77
+        body: '{"data":[{"uptime":"-","neighbor":"0100.9909.9002","status":"Initializing"}]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "77"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:10 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:10 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 63.389667ms
+    - id: 12
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/sdn/fabrics/sdkfab0/routes
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 11
+        body: '{"data":[]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "11"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:10 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:10 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 89.740958ms
+    - id: 13
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/sdn/fabrics/node/sdkfab0/pve
+        method: DELETE
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 11
+        body: '{"data":""}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "11"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:10 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:10 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 43.380541ms
+    - id: 14
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/sdn/fabrics/node/sdkfab0/pve2-dogfood
+        method: DELETE
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 11
+        body: '{"data":""}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "11"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:10 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:10 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 39.371916ms
+    - id: 15
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/sdn/fabrics/node/sdkfab0/pve3-dogfood
+        method: DELETE
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 11
+        body: '{"data":""}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "11"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:10 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:10 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 36.830333ms
+    - id: 16
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/sdn/fabrics/fabric/sdkfab0
+        method: DELETE
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 11
+        body: '{"data":""}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "11"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:10 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:10 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 34.261333ms
+    - id: 17
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/sdn
+        method: PUT
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 83
+        body: '{"data":"UPID:pve:00007DF3:000A7DD6:6A621762:reloadnetworkall::root@pam:"}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "83"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 23 Jul 2026 13:30:10 GMT
+            Expires:
+                - Thu, 23 Jul 2026 13:30:10 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 55.337125ms

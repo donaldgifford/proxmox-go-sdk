@@ -180,6 +180,15 @@ func (s topologyScrub) apply(i *cassette.Interaction) {
 	// the automated gap). Scrub it and every header value (Location and
 	// friends can carry the endpoint too).
 	i.Request.Host = rep(i.Request.Host)
+	// go-vcr stores the parsed form alongside the raw body; scrubbing one but
+	// not the other leaves the live value in the cassette — found in review of
+	// the 2026-07-23 pvelab batch (`node=pve` in the body next to the live
+	// node name in the form map).
+	for _, vals := range i.Request.Form {
+		for idx := range vals {
+			vals[idx] = rep(vals[idx])
+		}
+	}
 	for _, h := range []http.Header{i.Request.Headers, i.Response.Headers} {
 		for _, vals := range h {
 			for idx := range vals {
@@ -348,6 +357,10 @@ func TestScrubTopology(t *testing.T) {
 			URL:     "https://10.10.11.20:8006/api2/json/nodes/r740a/qemu/100/status/start",
 			Host:    "10.10.11.20:8006",
 			Headers: http.Header{"Referer": {"https://10.10.11.20:8006/"}},
+			// go-vcr stores the parsed form next to the raw body; both must
+			// scrub (found 2026-07-23: a migrate's form kept the live node).
+			Body: "node=r740a",
+			Form: url.Values{"node": {"r740a"}},
 		},
 		Response: cassette.Response{
 			Body:    `{"data":"UPID:r740a:0005:...:qmstart:100:root@pam!sdk:"}`,
@@ -365,6 +378,13 @@ func TestScrubTopology(t *testing.T) {
 			strings.Contains(i.Response.Headers.Get("Location"), leak) {
 			t.Errorf("topology %q survived scrub in Host/headers: host=%q", leak, i.Request.Host)
 		}
+		if strings.Contains(i.Request.Body, leak) || strings.Contains(i.Request.Form.Get("node"), leak) {
+			t.Errorf("topology %q survived scrub in body/form: body=%q form=%q",
+				leak, i.Request.Body, i.Request.Form.Get("node"))
+		}
+	}
+	if got := i.Request.Form.Get("node"); got != placeholderNode {
+		t.Errorf("scrubbed form node = %q, want %q", got, placeholderNode)
 	}
 	if i.Request.Host != placeholderHost {
 		t.Errorf("scrubbed Host = %q, want %q", i.Request.Host, placeholderHost)

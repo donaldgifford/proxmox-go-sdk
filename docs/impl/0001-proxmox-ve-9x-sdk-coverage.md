@@ -268,6 +268,25 @@ The 9.x-reworked area — model rules, never the deprecated groups.
   written-but-unverified without a real ≥2-node 9.2 cluster — tracked in
   [Outstanding live verification](#outstanding-live-verification).
 
+> **Reclassified (2026-07-22, DESIGN-0004 / INV-0004) + live-verified
+> (2026-07-23, pvelab 9.2.2 — IMPL-0005 Phase 3):** the two hedged bullets above
+> were resolved by the real 9.2 apidoc, in opposite directions. The DLB path
+> guess was **wrong** — `/cluster/ha/lbalancer` does not exist, so
+> `GetDLBStatus`/`SetDLBConfig` now return documented `pverr.ErrUnsupported`
+> (pointing at the CRS settings) and `Capabilities.DynamicLoadBalancer()` was
+> removed. Arm/disarm **does exist** — `ArmHA`/`DisarmHA` graduated to real ops
+> over `POST /cluster/ha/status/{arm,disarm}-ha` (gated `HAClusterSwitch` 9.2;
+> disarm's `resource-mode` freeze/ignore is REQUIRED on the wire), and the
+> status reads (`HAStatusCurrent`, `GetManagerStatus`) + synchronous
+> `MigrateResource`/`RelocateResource` landed alongside. All of it PASSED live
+> on the quorate nested cluster: the full disarm(freeze)→observe→arm cycle, a
+> blocked migrate reporting `blocking-resources` with cause `resource-affinity`,
+> and an accepted migrate converging via `HAStatusCurrent`. Live wire findings
+> reconciled before the cassettes landed: `armed-state` rides a dedicated
+> `fencing` row (an idle cluster has no master row and reports `standby`), and
+> `manager_status` nests its state blob under a `manager_status` key beside a
+> `quorum` summary. Cassettes committed + replay in CI.
+
 ---
 
 ### Phase 5: Network + SDN
@@ -336,6 +355,14 @@ The 9.x-reworked area — model rules, never the deprecated groups.
 > literal paths pinned in-repo (`TestFabricPathsReal`/`TestNodeSDNStatusPaths`).
 > Fabric lifecycle semantics + status contents are live-verified on the pvelab
 > run (`TestSDNFabricLifecycle`/`TestSDNStatusReads`, DESIGN-0003).
+>
+> **Live-verified (2026-07-23, pvelab 9.2.2 — IMPL-0004 Phase 3):** both tests
+> PASSED on the quorate nested cluster. Fabric create on the nested path, all
+> three node enrollments (bare-IPv4 `ip` + property-string `interfaces` both
+> accepted as mined), `ApplySDN`, FRR convergence (~10s, neighbor visible via
+> `FabricNeighbors`), and clean teardown. Operational finding: openfabric never
+> binds an address-less bridge-enslaved port — enroll the addressed bridge
+> (`vmbr0`), not the raw NIC. Cassettes committed + replay in CI.
 
 ---
 

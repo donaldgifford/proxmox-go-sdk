@@ -12,13 +12,18 @@ import (
 
 // ArmedState is the cluster-wide HA arm switch position reported by the
 // armed-state field of HAStatusEntry (9.2+) — the observable for
-// ArmHA/DisarmHA transitions.
+// ArmHA/DisarmHA transitions. Live-confirmed (9.2.2, 2026-07-23): the field
+// rides the dedicated "fencing" row, not the master row.
 type ArmedState string
 
 const (
 	// ArmedStateArmed — HA is active; the CRM applies state changes.
 	ArmedStateArmed ArmedState = "armed"
-	// ArmedStateStandby — the reporting CRM is idle (no manager lock).
+	// ArmedStateStandby — the CRM watchdog is on standby: no active manager,
+	// which is the NORMAL state of an armed-but-idle cluster (no HA resources
+	// defined yet). Live-confirmed 9.2.2: a fresh cluster reports "standby"
+	// with no master row at all; the first ArmHA/resource activity moves it
+	// to "armed".
 	ArmedStateStandby ArmedState = "standby"
 	// ArmedStateDisarming — a disarm was requested and is settling.
 	ArmedStateDisarming ArmedState = "disarming"
@@ -29,21 +34,24 @@ const (
 
 // HAStatusEntry is one row of the HA manager status read
 // (GET /cluster/ha/status/current). The endpoint returns a heterogeneous
-// array — quorum, master, per-node lrm, and per-resource service rows share
-// this shape with most fields optional; Type discriminates. Reads are
-// lossless: keys outside the typed set are preserved in Extra.
+// array — quorum, master, fencing, per-node lrm, and per-resource service
+// rows share this shape with most fields optional; Type discriminates. The
+// master row only appears while a CRM master is active (an idle cluster has
+// none — live-confirmed 9.2.2, 2026-07-23). Reads are lossless: keys outside
+// the typed set are preserved in Extra.
 type HAStatusEntry struct {
 	ID           string `json:"id,omitempty"`
 	SID          string `json:"sid,omitempty"`  // service rows: the resource SID, e.g. "vm:100".
 	Node         string `json:"node,omitempty"` // the node the row reports on/for.
-	Type         string `json:"type,omitempty"` // "quorum" | "master" | "lrm" | "service".
+	Type         string `json:"type,omitempty"` // "quorum" | "master" | "fencing" | "lrm" | "service".
 	State        string `json:"state,omitempty"`
 	Status       string `json:"status,omitempty"`
 	CRMState     string `json:"crm_state,omitempty"`
 	RequestState string `json:"request_state,omitempty"`
 	// Quorate is set on the quorum row; PVE encodes it 0/1.
 	Quorate types.PVEBool `json:"quorate,omitempty"`
-	// ArmedState is the 9.2 cluster-wide arm switch position.
+	// ArmedState is the 9.2 cluster-wide arm switch position, reported by the
+	// fencing row (live-confirmed: the master row does not carry it).
 	ArmedState    ArmedState    `json:"armed-state,omitempty"`
 	AutoRebalance types.PVEBool `json:"auto-rebalance,omitempty"`
 	Failback      types.PVEBool `json:"failback,omitempty"`
@@ -52,6 +60,9 @@ type HAStatusEntry struct {
 	// ResourceMode mirrors the mode chosen at disarm time (see DisarmHA).
 	ResourceMode ResourceMode `json:"resource_mode,omitempty"`
 	Timestamp    int64        `json:"timestamp,omitempty"` // unix seconds.
+	// Comment echoes the HA resource's comment on service rows
+	// (live-observed 9.2.2, 2026-07-23).
+	Comment string `json:"comment,omitempty"`
 	// Extra carries fields the SDK does not model.
 	Extra map[string]string `json:"-"`
 }
@@ -64,7 +75,7 @@ var haStatusEntryKnownFields = map[string]bool{
 	"status": true, "crm_state": true, "request_state": true, "quorate": true,
 	"armed-state": true, "auto-rebalance": true, "failback": true,
 	"max_relocate": true, "max_restart": true, "resource_mode": true,
-	"timestamp": true,
+	"timestamp": true, "comment": true,
 }
 
 // UnmarshalJSON decodes the modelled fields and routes any unknown keys into
@@ -115,13 +126,12 @@ func (m *ManagerServiceStatus) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// ManagerStatus is the CRM master's internal state
-// (GET /cluster/ha/status/manager_status). The PVE apidoc pins no shape for
-// this endpoint (a bare object), so the typed fields are provisional — they
-// mirror the pve-ha-manager state file as observed — and everything else
-// round-trips losslessly through Extra. Treat the typed fields as best-effort
-// until confirmed live (IMPL-0005 Phase 3).
-type ManagerStatus struct {
+// ManagerState is the pve-ha-manager state blob nested under the
+// manager_status key of the endpoint's response. Live-confirmed (9.2.2,
+// 2026-07-23): an idle cluster publishes only an empty node_status; the
+// remaining typed fields mirror the state file and stay provisional for the
+// active-master case. Unknown keys round-trip losslessly through Extra.
+type ManagerState struct {
 	MasterNode string `json:"master_node,omitempty"`
 	// NodeStatus maps node name to its CRM node state (e.g. "online").
 	NodeStatus map[string]string `json:"node_status,omitempty"`
@@ -132,10 +142,78 @@ type ManagerStatus struct {
 	Extra map[string]string `json:"-"`
 }
 
+// managerStateKnownFields lists the JSON keys ManagerState models directly;
+// keep it in sync with the struct.
+var managerStateKnownFields = map[string]bool{
+	"master_node": true, "node_status": true, "service_status": true, "timestamp": true,
+}
+
+// UnmarshalJSON decodes the modelled fields and routes any unknown keys into
+// Extra so the read round-trips losslessly.
+func (m *ManagerState) UnmarshalJSON(data []byte) error {
+	type alias ManagerState
+	var a alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return fmt.Errorf("decode manager state: %w", err)
+	}
+	*m = ManagerState(a)
+	extra, err := svcutil.DecodeExtra(data, managerStateKnownFields)
+	if err != nil {
+		return fmt.Errorf("decode manager state: %w", err)
+	}
+	m.Extra = extra
+	return nil
+}
+
+// ManagerQuorum is the quorum summary in the manager status read. PVE encodes
+// quorate as the string "1"/"0" here (unlike the 0/1 integers elsewhere);
+// PVEBool accepts both.
+type ManagerQuorum struct {
+	Node    string        `json:"node,omitempty"` // the node that answered the read.
+	Quorate types.PVEBool `json:"quorate,omitempty"`
+	// Extra carries fields the SDK does not model.
+	Extra map[string]string `json:"-"`
+}
+
+// managerQuorumKnownFields lists the JSON keys ManagerQuorum models directly;
+// keep it in sync with the struct.
+var managerQuorumKnownFields = map[string]bool{"node": true, "quorate": true}
+
+// UnmarshalJSON decodes the modelled fields and routes any unknown keys into
+// Extra so the read round-trips losslessly.
+func (q *ManagerQuorum) UnmarshalJSON(data []byte) error {
+	type alias ManagerQuorum
+	var a alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return fmt.Errorf("decode manager quorum: %w", err)
+	}
+	*q = ManagerQuorum(a)
+	extra, err := svcutil.DecodeExtra(data, managerQuorumKnownFields)
+	if err != nil {
+		return fmt.Errorf("decode manager quorum: %w", err)
+	}
+	q.Extra = extra
+	return nil
+}
+
+// ManagerStatus is the CRM master's internal state
+// (GET /cluster/ha/status/current's sibling manager_status endpoint). The
+// response envelope nests everything: the pve-ha-manager state blob under the
+// manager_status key and a quorum summary under quorum — live-confirmed on
+// 9.2.2 (2026-07-23; the pre-reconciliation SDK expected the state fields at
+// the top level, which decoded empty). Unknown top-level keys round-trip
+// losslessly through Extra.
+type ManagerStatus struct {
+	Manager ManagerState  `json:"manager_status"`
+	Quorum  ManagerQuorum `json:"quorum"`
+	// Extra carries fields the SDK does not model.
+	Extra map[string]string `json:"-"`
+}
+
 // managerStatusKnownFields lists the JSON keys ManagerStatus models directly;
 // keep it in sync with the struct.
 var managerStatusKnownFields = map[string]bool{
-	"master_node": true, "node_status": true, "service_status": true, "timestamp": true,
+	"manager_status": true, "quorum": true,
 }
 
 // UnmarshalJSON decodes the modelled fields and routes any unknown keys into
@@ -157,7 +235,8 @@ func (m *ManagerStatus) UnmarshalJSON(data []byte) error {
 
 // GetManagerStatus reads the CRM master's internal state
 // (GET /cluster/ha/status/manager_status). No version gate (baseline
-// endpoint). The shape is provisional — see ManagerStatus.
+// endpoint). The envelope (manager_status + quorum) is live-confirmed; the
+// inner active-master fields stay provisional — see ManagerStatus.
 func (s *Service) GetManagerStatus(ctx context.Context) (*ManagerStatus, error) {
 	var ms ManagerStatus
 	if err := s.c.DoRequest(ctx, http.MethodGet, haStatusManagerPath(), nil, &ms); err != nil {

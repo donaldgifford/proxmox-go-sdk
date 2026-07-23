@@ -1,7 +1,7 @@
 ---
 id: DESIGN-0003
 title: "SDN fabrics real paths, node membership, and live status"
-status: Approved
+status: Implemented
 author: Donald Gifford
 created: 2026-07-19
 ---
@@ -10,8 +10,11 @@ created: 2026-07-19
 
 # DESIGN 0003: SDN fabrics real paths, node membership, and live status
 
-**Status:** Approved **Author:** Donald Gifford **Date:** 2026-07-19 (OQs
-decided 2026-07-21: all a)
+**Status:** Implemented **Author:** Donald Gifford **Date:** 2026-07-19 (OQs
+decided 2026-07-21: all a; implemented 2026-07-23 — merged as v0.7.0 via
+IMPL-0004, live-verified on the 9.2.2 pvelab cluster: fabric CRUD + node
+enrollment on the nested paths, FRR convergence on the addressed bridge, and the
+node-scoped status reads; cassettes replay in CI)
 
 <!--toc:start-->
 

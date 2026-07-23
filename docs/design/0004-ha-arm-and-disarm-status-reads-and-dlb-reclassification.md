@@ -1,7 +1,7 @@
 ---
 id: DESIGN-0004
 title: "HA arm and disarm, status reads, and DLB reclassification"
-status: Approved
+status: Implemented
 author: Donald Gifford
 created: 2026-07-19
 ---
@@ -10,8 +10,12 @@ created: 2026-07-19
 
 # DESIGN 0004: HA arm and disarm, status reads, and DLB reclassification
 
-**Status:** Approved **Author:** Donald Gifford **Date:** 2026-07-19 (OQs
-decided 2026-07-21: 1a, 2b-as-lossless, 3b)
+**Status:** Implemented **Author:** Donald Gifford **Date:** 2026-07-19 (OQs
+decided 2026-07-21: 1a, 2b-as-lossless, 3b; implemented 2026-07-23 — merged as
+v0.8.0 via IMPL-0005, live-verified on the 9.2.2 pvelab cluster: arm/disarm
+cycle with required resource-mode, fencing-row armed-state, the nested
+manager_status envelope, and blocked-migrate cause resource-affinity; cassettes
+replay in CI)
 
 <!--toc:start-->
 
@@ -30,6 +34,7 @@ decided 2026-07-21: 1a, 2b-as-lossless, 3b)
 - [Data Model](#data-model)
 - [Testing Strategy](#testing-strategy)
 - [Migration / Rollout Plan](#migration--rollout-plan)
+- [Implementation Corrections (2026-07-22)](#implementation-corrections-2026-07-22)
 - [Open Questions](#open-questions)
 - [References](#references)
 <!--toc:end-->
