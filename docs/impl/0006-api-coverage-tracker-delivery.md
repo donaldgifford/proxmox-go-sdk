@@ -224,10 +224,43 @@ package (the `schema`-package precedent).
      loading. Baseline cross-checks — a stub or allowlist entry naming an
      endpoint the baseline does not hold — are deliberately NOT here: they need
      the baseline, so they land with the checks in task 5.)_
-- [ ] 4. Report renderer: per-service tables (method, path, state = covered /
+- [x] 4. Report renderer: per-service tables (method, path, state = covered /
      stub-with-reason / gap), header with totals, per-service percentages, and
      the baseline's PVE version + provenance; golden-file test against a small
-     fixture baseline + fixture routes + fixture annotations.
+     fixture baseline + fixture routes + fixture annotations. _(Done 2026-07-25,
+     split in two: `report.go` computes (`Build` → `Report` with `Services`,
+     `Totals`, `Findings`) and `render.go` formats (`Report.Markdown`). Four
+     states, not three — `out of scope` joins covered/stub/gap, since an
+     annotated non-goal is neither implemented nor debt. Precedence is
+     documented and tested: **covered beats every annotation** (a route that
+     exists is a fact; an annotation claiming otherwise is stale), then stub
+     beats out-of-scope (per-endpoint beats family-wide). `Build` errors only
+     when the arithmetic would be meaningless — a malformed route pattern, or a
+     baseline that **collides under normalization** (two endpoints reducing to
+     one `{}`-shape, which would mean placeholder erasure is lossy; measured 0
+     collisions on the real baseline, and the guard fails loudly if a future
+     minor introduces one). Everything else is a `Findings` field so the caller
+     picks what is fatal: `UnmatchedRoutes` (the fabrication guard's offenders),
+     `AllowedRoutes` (rendered in the report, so exemptions stay uncomfortable),
+     and three **stale-annotation** sets — a stub, allowlist entry, or
+     out-of-scope prefix that no longer describes anything, so the exceptions
+     file cannot rot into the hand-maintained API knowledge this tracker
+     replaces. Rendering is byte-stable by construction (every section and row
+     from a sorted slice, never a map walk) and pinned two ways: five renders
+     compared byte-for-byte, plus a reversed-input render that must match — the
+     drift check diffs bytes, so nondeterminism would fail CI at random. Table
+     cells are unpadded on purpose (a padded table reflows every row when one
+     long path is added, burying the real change in the diff). Header states the
+     provenance and that **the percentage is not a target**. Golden fixture
+     covers all four states, both extra sections, and the `{vmid}`-vs-`{id}`
+     match; it is `testdata/report.golden` — **not** `.md`, because the repo's
+     prettier and markdownlint globs cover every `.md` file and a reformatted
+     golden would no longer be what the renderer emits (`docs/COVERAGE.md` needs
+     the same treatment via ignore lists, Phase 3 task 4). Regenerate with
+     `go test ./cmd/pve-schemadiff/coverage -run TestMarkdownGolden -args -update-golden`.
+     Sanity-checked at real scale: 835 lines / 36 KB from the committed
+     baseline + live mock routes, and `Findings.UnmatchedRoutes` came back as
+     exactly the 26 pre-triaged routes below.)_
 - [ ] 5. The two checks as tool behavior: `-coverage -out docs/COVERAGE.md`
      writes the report; `-coverage -check` regenerates in memory, diffs against
      the committed file, and exits non-zero on drift ("regenerate and commit") —
