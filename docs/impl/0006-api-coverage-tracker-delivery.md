@@ -151,11 +151,18 @@ package (the `schema`-package precedent).
 
 #### Tasks
 
-- [ ] 1. New importable package `cmd/pve-schemadiff/coverage`: normalization
+- [x] 1. New importable package `cmd/pve-schemadiff/coverage`: normalization
      (strip the `/api2/json` prefix, rewrite every `{name}` wildcard to `{}` on
      **both** sides, split `"METHOD /path"` patterns into `(method, path)`
      pairs) — table-driven tests including the placeholder-name mismatches
-     (`{vmid}` vs `{id}`, `{fabric}` vs `{fabric_id}`).
+     (`{vmid}` vs `{id}`, `{fabric}` vs `{fabric_id}`). _(Done 2026-07-24:
+     `Key`/`NormalizePath`/`ParsePattern`/`ParsePatterns`/`EndpointKey` in
+     `normalize.go`; 7 tests including the three real placeholder mismatches, a
+     no-collision check, and malformed-pattern rejection (a method-less pattern
+     is an error, never silently dropped — dropping it would inflate coverage).
+     Verified against the real data: 205 of 231 mock routes match the baseline,
+     and the 26 that do not are the pre-triage findings recorded under Phase 3
+     task 2 below — i.e. the guard works.)_
 - [ ] 2. Service mapping: the static prefix → service table (`/cluster/ha` →
      `ha`, `/nodes/{}/qemu` → `qemu`, …); anything unmapped lands in an
      "unassigned" section so new API families surface loudly. A test runs the
@@ -209,6 +216,34 @@ checks.
      **fixing the mock path** (the mock mirrors real PVE) rather than
      allowlisting — any surviving allowlist entry needs a written reason in the
      annotations file and a matching note in the PR.
+
+     **Pre-triage (2026-07-24, from the Phase-2 task-1 normalization probe):**
+     26 of 231 mock routes do not match the baseline, in four groups — all real
+     mock defects, none a tracker artifact:
+     1. **Guest-firewall `{kind}` collapse (14 routes).** The mock registers
+        `/nodes/{node}/{kind}/{vmid}/firewall/…` with `{kind}` as a wildcard;
+        real PVE serves the literal `qemu`/`lxc` prefixes as separate paths. The
+        mock therefore answers `…/foo/100/firewall/rules`, which real PVE 404s.
+        Fix: call `registerFirewallScope` once per literal kind.
+     2. **Node-scope firewall IPSet does not exist on real PVE (7 routes).**
+        PVE's node firewall is only `/firewall`, `/log`, `/options`, `/rules`,
+        `/rules/{pos}` — IPSet lives at cluster and guest scope only. The scope
+        model's write-once route set over-registers it. This is an **SDK-surface
+        finding too**: `firewall.NewNodeScope(...).ListIPSets` and friends would
+        404 live.
+     3. **Ceph pool path is singular (5 routes).** Real PVE:
+        `/nodes/{node}/ceph/pool[/{name}]` (+ `/pool/{name}/status`); the mock
+        (and the SDK's provisional `ceph/paths.go`) use `/ceph/pools`. Also
+        `/nodes/{node}/ceph/config` does not exist. Phase 6 flagged these paths
+        provisional — the guard proved them wrong.
+     4. **`status/{action}` collapse (2 routes).** The mock registers one
+        wildcard route for the power verbs; real PVE has literal
+        `/status/{start,stop,shutdown,reboot,suspend,resume,reset}`. Fix:
+        register the literals.
+
+     Groups 2 and 3 change SDK behavior, so this task is not mock-only — scope
+     note goes in the PR.
+
 - [ ] 3. Generate and commit the first `docs/COVERAGE.md`; sanity-review the
      totals (the ~196 covered routes against 675 endpoints — the number is the
      baseline for the group-5 triage conversation, not a target).
