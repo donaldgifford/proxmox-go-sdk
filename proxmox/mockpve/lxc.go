@@ -75,7 +75,9 @@ func (s *Server) registerLXCRoutes() {
 	s.handle("PUT /api2/json/nodes/{node}/lxc/{vmid}/config", s.handleLXCSetConfig)
 	s.handle("POST /api2/json/nodes/{node}/lxc/{vmid}/clone", s.handleLXCClone)
 	s.handle("DELETE /api2/json/nodes/{node}/lxc/{vmid}", s.handleLXCDelete)
-	s.handle("POST /api2/json/nodes/{node}/lxc/{vmid}/status/{action}", s.handleLXCPower)
+	for _, verb := range powerVerbs {
+		s.handle("POST /api2/json/nodes/{node}/lxc/{vmid}/status/"+verb, s.handleLXCPower(verb))
+	}
 	s.handle("GET /api2/json/nodes/{node}/lxc/{vmid}/snapshot", s.handleLXCSnapshotList)
 	s.handle("POST /api2/json/nodes/{node}/lxc/{vmid}/snapshot", s.handleLXCSnapshotCreate)
 	s.handle("POST /api2/json/nodes/{node}/lxc/{vmid}/snapshot/{snap}/rollback", s.handleLXCSnapshotRollback)
@@ -277,33 +279,32 @@ func (s *Server) handleLXCDelete(w http.ResponseWriter, r *http.Request) {
 	s.writeData(w, s.finishedTask(node, "vzdestroy", strconv.Itoa(vmid)))
 }
 
-func (s *Server) handleLXCPower(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
-		return
+// handleLXCPower serves one power verb, like handleQEMUPower. Containers share
+// the guest power verbs and their resulting states (qemuPowerStatus); PVE's
+// qemu-only /status/reset has no container equivalent.
+func (s *Server) handleLXCPower(action string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !s.checkAuth(w, r) {
+			return
+		}
+		node := r.PathValue("node")
+		vmid, err := strconv.Atoi(r.PathValue("vmid"))
+		if err != nil {
+			s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+			return
+		}
+		s.st.mu.Lock()
+		rec := s.lookupCT(node, vmid)
+		if rec != nil {
+			rec.Status = qemuPowerStatus[action]
+		}
+		s.st.mu.Unlock()
+		if rec == nil {
+			s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+			return
+		}
+		s.writeData(w, s.finishedTask(node, "vz"+action, strconv.Itoa(vmid)))
 	}
-	node := r.PathValue("node")
-	action := r.PathValue("action")
-	newStatus, ok := qemuPowerStatus[action]
-	if !ok {
-		s.writeError(w, http.StatusBadRequest, "unknown power action")
-		return
-	}
-	vmid, err := strconv.Atoi(r.PathValue("vmid"))
-	if err != nil {
-		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
-		return
-	}
-	s.st.mu.Lock()
-	rec := s.lookupCT(node, vmid)
-	if rec != nil {
-		rec.Status = newStatus
-	}
-	s.st.mu.Unlock()
-	if rec == nil {
-		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
-		return
-	}
-	s.writeData(w, s.finishedTask(node, "vz"+action, strconv.Itoa(vmid)))
 }
 
 func (s *Server) handleLXCSnapshotList(w http.ResponseWriter, r *http.Request) {
