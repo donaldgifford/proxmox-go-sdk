@@ -6,11 +6,31 @@ import (
 	"net/http"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/internal/svcutil"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/pverr"
 )
+
+// requireIPSets refuses the IPSet surface at node scope, where PVE does not
+// serve it: a node's firewall is only /firewall, /log, /options and /rules, so
+// IPSets exist at cluster and guest scope only. Without this the calls would
+// reach the network and come back a bare 404 (confirmed against the real 9.2
+// apidoc by the IMPL-0006 fabrication guard), which reads like a broken node
+// rather than an operation that cannot exist. Refusing before the request keeps
+// one Service type for all three scopes — the scope model of DESIGN-0003 — while
+// still being honest about what each scope has.
+func (s *Service) requireIPSets(op string) error {
+	if s.scope.kind != ScopeNode {
+		return nil
+	}
+	return fmt.Errorf("firewall.%s: PVE serves no IPSet API at node scope "+
+		"(cluster and guest scope only): %w", op, pverr.ErrUnsupported)
+}
 
 // ListIPSets returns the scoped IPSets (names + comments), without their
 // entries; use ListIPSetEntries for a set's contents.
 func (s *Service) ListIPSets(ctx context.Context) ([]IPSet, error) {
+	if err := s.requireIPSets("ListIPSets"); err != nil {
+		return nil, err
+	}
 	var sets []IPSet
 	if err := s.c.DoRequest(ctx, http.MethodGet, s.ipsetsPath(), nil, &sets); err != nil {
 		return nil, fmt.Errorf("firewall.ListIPSets: %w", err)
@@ -20,6 +40,9 @@ func (s *Service) ListIPSets(ctx context.Context) ([]IPSet, error) {
 
 // CreateIPSet defines a new empty IPSet. The write is synchronous (no task).
 func (s *Service) CreateIPSet(ctx context.Context, spec *IPSetSpec) error {
+	if err := s.requireIPSets("CreateIPSet"); err != nil {
+		return err
+	}
 	if spec == nil {
 		return fmt.Errorf("firewall.CreateIPSet: %w", svcutil.ErrNilSpec)
 	}
@@ -42,6 +65,9 @@ func (s *Service) CreateIPSet(ctx context.Context, spec *IPSetSpec) error {
 // pverr.ErrUnsupported-wrapped error before making any request. The write is
 // synchronous (no task).
 func (s *Service) RenameIPSet(ctx context.Context, name, newName string) error {
+	if err := s.requireIPSets("RenameIPSet"); err != nil {
+		return err
+	}
 	switch {
 	case name == "":
 		return fmt.Errorf("firewall.RenameIPSet: name: %w", svcutil.ErrMissingField)
@@ -60,6 +86,9 @@ func (s *Service) RenameIPSet(ctx context.Context, name, newName string) error {
 
 // DeleteIPSet removes an IPSet. The write is synchronous (no task).
 func (s *Service) DeleteIPSet(ctx context.Context, name string) error {
+	if err := s.requireIPSets("DeleteIPSet"); err != nil {
+		return err
+	}
 	if name == "" {
 		return fmt.Errorf("firewall.DeleteIPSet: name: %w", svcutil.ErrMissingField)
 	}
@@ -71,6 +100,9 @@ func (s *Service) DeleteIPSet(ctx context.Context, name string) error {
 
 // ListIPSetEntries returns the CIDRs in an IPSet.
 func (s *Service) ListIPSetEntries(ctx context.Context, name string) ([]IPSetEntry, error) {
+	if err := s.requireIPSets("ListIPSetEntries"); err != nil {
+		return nil, err
+	}
 	if name == "" {
 		return nil, fmt.Errorf("firewall.ListIPSetEntries: name: %w", svcutil.ErrMissingField)
 	}
@@ -83,6 +115,9 @@ func (s *Service) ListIPSetEntries(ctx context.Context, name string) ([]IPSetEnt
 
 // AddIPSetEntry adds a CIDR to an IPSet. The write is synchronous (no task).
 func (s *Service) AddIPSetEntry(ctx context.Context, name string, entry *IPSetEntrySpec) error {
+	if err := s.requireIPSets("AddIPSetEntry"); err != nil {
+		return err
+	}
 	if entry == nil {
 		return fmt.Errorf("firewall.AddIPSetEntry: %w", svcutil.ErrNilSpec)
 	}
@@ -105,6 +140,9 @@ func (s *Service) AddIPSetEntry(ctx context.Context, name string, entry *IPSetEn
 // DeleteIPSetEntry removes a CIDR from an IPSet. The write is synchronous (no
 // task).
 func (s *Service) DeleteIPSetEntry(ctx context.Context, name, cidr string) error {
+	if err := s.requireIPSets("DeleteIPSetEntry"); err != nil {
+		return err
+	}
 	switch {
 	case name == "":
 		return fmt.Errorf("firewall.DeleteIPSetEntry: name: %w", svcutil.ErrMissingField)

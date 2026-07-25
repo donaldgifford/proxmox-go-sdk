@@ -8,9 +8,10 @@ import (
 )
 
 // Service wraps the PVE firewall at one scope — the datacenter (cluster), a
-// node, or a single guest. The three scopes share an identical rule / IPSet /
-// options surface, so there is ONE Service type carrying a scope; the scope only
-// changes which path prefix requests hit (see scope.path). Construct it with
+// node, or a single guest. The three scopes share the same rule and options
+// surface (IPSets exist at cluster and guest scope only), so there is ONE
+// Service type carrying a scope; the scope changes which path prefix requests
+// hit (see scope.path). Construct it with
 // NewClusterScope, NewNodeScope, or NewGuestScope, or via the root client's
 // Firewall / NodeFirewall / GuestFirewall accessors.
 //
@@ -29,7 +30,8 @@ func NewClusterScope(c api.Client, caps version.Capabilities) *Service {
 }
 
 // NewNodeScope returns a Service for a node's firewall
-// (/nodes/{node}/firewall).
+// (/nodes/{node}/firewall). PVE serves no IPSet API at this scope, so the IPSet
+// methods return pverr.ErrUnsupported on the returned Service.
 func NewNodeScope(c api.Client, caps version.Capabilities, node string) *Service {
 	return &Service{c: c, caps: caps, scope: scope{kind: ScopeNode, node: node}}
 }
@@ -53,8 +55,10 @@ type API interface {
 	UpdateRule(ctx context.Context, pos int, update *RuleUpdate) error
 	DeleteRule(ctx context.Context, pos int) error
 
-	// IPSets and their entries. RenameIPSet is gated on PVE 9.1
-	// (OverlappingIPSets).
+	// IPSets and their entries, at cluster and guest scope only: PVE serves no
+	// IPSet API on a node's firewall, so a node-scoped Service returns
+	// pverr.ErrUnsupported from all seven without issuing a request. RenameIPSet
+	// is additionally gated on PVE 9.1 (OverlappingIPSets).
 	ListIPSets(ctx context.Context) ([]IPSet, error)
 	CreateIPSet(ctx context.Context, spec *IPSetSpec) error
 	RenameIPSet(ctx context.Context, name, newName string) error

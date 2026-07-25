@@ -97,31 +97,54 @@ func (s *Server) fwScopeLocked(key string) *fwScope {
 	return sc
 }
 
+// fwGuestKinds are the guest path segments PVE serves a firewall under. They are
+// LITERAL segments, not a wildcard: /nodes/{node}/{kind}/{vmid}/firewall would
+// answer /nodes/pve/anything/100/firewall, which real PVE 404s, and the coverage
+// fabrication guard rejects the collapsed shape for exactly that reason
+// (IMPL-0006).
+var fwGuestKinds = []string{"qemu", "lxc"}
+
 func (s *Server) registerFirewallRoutes() {
-	s.registerFirewallScope("/api2/json/cluster/firewall",
-		func(_ *http.Request) string { return "cluster" })
+	clusterKey := func(*http.Request) string { return "cluster" }
+	s.registerFirewallScope("/api2/json/cluster/firewall", clusterKey)
+	s.registerFirewallIPSetScope("/api2/json/cluster/firewall", clusterKey)
+
+	// Node scope deliberately gets NO IPSet routes: PVE's node firewall is only
+	// /firewall, /log, /options and /rules — IPSets live at cluster and guest
+	// scope. Registering them here made firewall.NewNodeScope(...).ListIPSets
+	// pass against the mock while 404ing live (found by the IMPL-0006 guard).
 	s.registerFirewallScope("/api2/json/nodes/{node}/firewall",
 		func(r *http.Request) string { return "node:" + r.PathValue("node") })
-	s.registerFirewallScope("/api2/json/nodes/{node}/{kind}/{vmid}/firewall",
-		func(r *http.Request) string { return "guest:" + r.PathValue("kind") + ":" + r.PathValue("vmid") })
+
+	for _, kind := range fwGuestKinds {
+		prefix := "/api2/json/nodes/{node}/" + kind + "/{vmid}/firewall"
+		key := func(r *http.Request) string { return "guest:" + kind + ":" + r.PathValue("vmid") }
+		s.registerFirewallScope(prefix, key)
+		s.registerFirewallIPSetScope(prefix, key)
+	}
 }
 
-// registerFirewallScope wires the identical rule/IPSet/options routes for one
-// scope prefix; key turns a matched request into its scope string.
+// registerFirewallScope wires the rule and options routes every firewall scope
+// has; key turns a matched request into its scope string.
 func (s *Server) registerFirewallScope(prefix string, key fwScopeKeyFunc) {
 	s.handle("GET "+prefix+"/rules", s.fwRuleList(key))
 	s.handle("POST "+prefix+"/rules", s.fwRuleCreate(key))
 	s.handle("GET "+prefix+"/rules/{pos}", s.fwRuleGet(key))
 	s.handle("PUT "+prefix+"/rules/{pos}", s.fwRuleUpdate(key))
 	s.handle("DELETE "+prefix+"/rules/{pos}", s.fwRuleDelete(key))
+	s.handle("GET "+prefix+"/options", s.fwOptionsGet(key))
+	s.handle("PUT "+prefix+"/options", s.fwOptionsSet(key))
+}
+
+// registerFirewallIPSetScope wires the IPSet routes, which only the cluster and
+// guest scopes have.
+func (s *Server) registerFirewallIPSetScope(prefix string, key fwScopeKeyFunc) {
 	s.handle("GET "+prefix+"/ipset", s.fwIPSetList(key))
 	s.handle("POST "+prefix+"/ipset", s.fwIPSetCreate(key))
 	s.handle("GET "+prefix+"/ipset/{name}", s.fwIPSetEntryList(key))
 	s.handle("POST "+prefix+"/ipset/{name}", s.fwIPSetEntryAdd(key))
 	s.handle("DELETE "+prefix+"/ipset/{name}", s.fwIPSetDelete(key))
 	s.handle("DELETE "+prefix+"/ipset/{name}/{cidr}", s.fwIPSetEntryDelete(key))
-	s.handle("GET "+prefix+"/options", s.fwOptionsGet(key))
-	s.handle("PUT "+prefix+"/options", s.fwOptionsSet(key))
 }
 
 func (s *Server) fwRuleList(key fwScopeKeyFunc) http.HandlerFunc {
