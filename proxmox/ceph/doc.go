@@ -13,10 +13,13 @@
 //   - Cluster: GetStatus (health + maps, lossless) and GetClusterConfig (the
 //     ceph.conf, returned verbatim as text).
 //
-// The Ceph features are baseline 9.0, so nothing is version-gated. The exact
-// REST path segments are provisional (paths.go): the operations are real but
-// unconfirmed against a live cluster in this environment, and reads preserve any
-// unmodelled keys in an Extra map so nothing is lost.
+// The Ceph features are baseline 9.0, so nothing is version-gated. The REST
+// paths are confirmed against the real 9.2 apidoc and pinned by
+// TestCephPathsReal (two of them were wrong until the IMPL-0006 coverage guard
+// caught it: the pool collection is singular, and the cluster config is
+// /ceph/cfg/raw). Response SHAPES are still provisional — unverified against a
+// live cluster in this environment — so reads preserve any unmodelled keys in an
+// Extra map and nothing is lost.
 //
 // RBD mirroring is a Ceph-side (`rbd mirror` CLI) feature with no confirmed PVE
 // REST endpoint, so GetMirrorStatus / EnableMirroring / DisableMirroring return
