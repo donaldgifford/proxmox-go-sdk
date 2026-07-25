@@ -185,8 +185,11 @@ func TestBuildFindings(t *testing.T) {
 	if got, want := len(f.UnmatchedRoutes), 1; got != want {
 		t.Fatalf("len(UnmatchedRoutes) = %d, want %d: %v", got, want, f.UnmatchedRoutes)
 	}
-	if got, want := f.UnmatchedRoutes[0].String(), "GET /nodes/{}/bogus"; got != want {
+	if got, want := f.UnmatchedRoutes[0].Key.String(), "GET /nodes/{}/bogus"; got != want {
 		t.Errorf("UnmatchedRoutes[0] = %q, want %q", got, want)
+	}
+	if got := f.UnmatchedRoutes[0].RealMethods; len(got) != 0 {
+		t.Errorf("RealMethods = %v, want empty — PVE serves nothing at that path", got)
 	}
 	if got, want := len(f.AllowedRoutes), 1; got != want {
 		t.Fatalf("len(AllowedRoutes) = %d, want %d", got, want)

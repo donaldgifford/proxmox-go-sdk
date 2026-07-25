@@ -261,14 +261,32 @@ package (the `schema`-package precedent).
      Sanity-checked at real scale: 835 lines / 36 KB from the committed
      baseline + live mock routes, and `Findings.UnmatchedRoutes` came back as
      exactly the 26 pre-triaged routes below.)_
-- [ ] 5. The two checks as tool behavior: `-coverage -out docs/COVERAGE.md`
+- [x] 5. The two checks as tool behavior: `-coverage -out docs/COVERAGE.md`
      writes the report; `-coverage -check` regenerates in memory, diffs against
      the committed file, and exits non-zero on drift ("regenerate and commit") —
      and in **both** modes any normalized mockpve route absent from the baseline
      and not allowlisted fails the run, naming the route. Unit test: a fixture
      route set containing a fabricated route (the old flat
      `/cluster/sdn/fabrics` shape) must be named in the error — the guard
-     validated against the exact drift it exists to prevent.
+     validated against the exact drift it exists to prevent. _(Done 2026-07-25:
+     `coverage/checks.go` — `Report.Check()` returns the fatal findings and
+     `CheckDrift(path, committed, regenerated)` returns a `*DriftError`; both
+     are pure, so the flag plumbing in task 6 just maps them to exit codes. The
+     guard's error **separates two failure modes**, which the ledger's own
+     pre-triage shows are different bugs with different fixes: a path PVE does
+     not serve at all (`no such path on PVE (fabricated path)` — ceph `/pools`,
+     the flat fabrics shape) versus a path it serves under other verbs
+     (`PVE serves only GET, POST at this path (wrong verb)` — the collapsed
+     `status/{action}` wildcard). That needed a richer
+     `Unmatched{Key, RealMethods}` finding and a path→verbs index of the
+     baseline. **Stale annotations are fatal too** (`StaleAnnotationsError`) —
+     not in the ledger's wording, but an exceptions file that silently
+     accumulates dead entries is the hand-maintained API knowledge this tracker
+     replaces, and the file is small enough that keeping it exact is free. Drift
+     comparison is byte-exact and points at the first differing line. 6 tests,
+     including the required one: the flat `/cluster/sdn/fabrics` **and**
+     `/cluster/ha/lbalancer` — the two paths INV-0004 actually caught live — are
+     both named by the error.)_
 - [ ] 6. Wire `-coverage` into `main.go` (flags: `-coverage`, `-annotations`,
      `-out`, `-check`; the existing `-apidoc`/`-baseline` flags are reused); the
      tool imports `proxmox/mockpve`, constructs a `Server`, and calls `Routes()`

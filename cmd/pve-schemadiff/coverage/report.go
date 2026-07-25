@@ -66,7 +66,7 @@ type Findings struct {
 	// entry — the fabrication guard's offenders. A route here means the SDK is
 	// tested against an API that does not exist, which is how the SDN-fabrics and
 	// HA DLB paths shipped wrong (INV-0004).
-	UnmatchedRoutes []Key
+	UnmatchedRoutes []Unmatched
 
 	// AllowedRoutes are unmatched routes an annotation permits, with reasons.
 	// They are rendered, so the exemptions stay visible as debt.
@@ -78,6 +78,16 @@ type Findings struct {
 	StaleStubs      []string // Stub paths absent from the baseline.
 	StaleAllowlist  []string // Allowlisted routes the mock no longer registers unmatched.
 	StaleOutOfScope []string // out_of_scope prefixes matching no baseline endpoint.
+}
+
+// Unmatched is one mock route the baseline does not hold, with the verbs PVE
+// does serve at that path. The distinction is what makes the guard's message
+// actionable: an empty RealMethods means the path itself does not exist
+// (fabricated), while a populated one means the path is real and only the verb
+// is wrong — two different fixes.
+type Unmatched struct {
+	Key         Key
+	RealMethods []string // Sorted; empty when PVE serves nothing at this path.
 }
 
 // Empty reports whether there is nothing to complain about.
@@ -117,6 +127,7 @@ func Build(baseline []schema.Endpoint, routes []string, ann *Annotations) (*Repo
 	if err != nil {
 		return nil, err
 	}
+	byPath := indexByPath(known)
 
 	rep := &Report{
 		Baseline:    ann.Baseline,
@@ -124,7 +135,7 @@ func Build(baseline []schema.Endpoint, routes []string, ann *Annotations) (*Repo
 		RouteCount:  len(covered),
 	}
 	rep.Services = buildServices(known, covered, ann, &rep.Totals)
-	rep.Findings = findings(known, covered, ann)
+	rep.Findings = findings(known, byPath, covered, ann)
 	return rep, nil
 }
 
@@ -143,6 +154,19 @@ func indexBaseline(baseline []schema.Endpoint) (map[Key]bool, error) {
 		known[k] = true
 	}
 	return known, nil
+}
+
+// indexByPath groups the baseline's verbs by path, so the fabrication guard can
+// tell a wrong verb from a wrong path.
+func indexByPath(known map[Key]bool) map[string][]string {
+	byPath := make(map[string][]string, len(known))
+	for k := range known {
+		byPath[k.Path] = append(byPath[k.Path], k.Method)
+	}
+	for _, methods := range byPath {
+		slices.Sort(methods)
+	}
+	return byPath
 }
 
 // buildServices groups the classified endpoints into report sections and
@@ -212,7 +236,7 @@ func (c *Counts) add(st State) {
 }
 
 // findings collects the fabrication-guard offenders and the stale annotations.
-func findings(known, covered map[Key]bool, ann *Annotations) Findings {
+func findings(known map[Key]bool, byPath map[string][]string, covered map[Key]bool, ann *Annotations) Findings {
 	var f Findings
 	allowedHit := make(map[string]bool, len(ann.AllowUnmatchedRoutes))
 	for k := range covered {
@@ -224,9 +248,11 @@ func findings(known, covered map[Key]bool, ann *Annotations) Findings {
 			f.AllowedRoutes = append(f.AllowedRoutes, AllowedRoute{Route: k.String(), Reason: reason})
 			continue
 		}
-		f.UnmatchedRoutes = append(f.UnmatchedRoutes, k)
+		f.UnmatchedRoutes = append(f.UnmatchedRoutes, Unmatched{Key: k, RealMethods: byPath[k.Path]})
 	}
-	slices.SortFunc(f.UnmatchedRoutes, func(a, b Key) int { return strings.Compare(a.String(), b.String()) })
+	slices.SortFunc(f.UnmatchedRoutes, func(a, b Unmatched) int {
+		return strings.Compare(a.Key.String(), b.Key.String())
+	})
 	slices.SortFunc(f.AllowedRoutes, func(a, b AllowedRoute) int { return strings.Compare(a.Route, b.Route) })
 
 	for _, s := range ann.Stubs {
