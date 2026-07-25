@@ -352,7 +352,7 @@ checks.
      deliberate. `out_of_scope` is **empty per OQ-4a** (the untriaged families
      are gaps; the comment says why parking them there would hide the debt) and
      `allow_unmatched_routes` is empty, which is the goal.)_
-- [ ] 2. Run the fabrication guard against the real mock; triage every hit by
+- [x] 2. Run the fabrication guard against the real mock; triage every hit by
      **fixing the mock path** (the mock mirrors real PVE) rather than
      allowlisting — any surviving allowlist entry needs a written reason in the
      annotations file and a matching note in the PR.
@@ -383,6 +383,44 @@ checks.
 
      Groups 2 and 3 change SDK behavior, so this task is not mock-only — scope
      note goes in the PR.
+
+     **Triaged 2026-07-25 — all 26 fixed, none allowlisted; the guard now passes
+     and `allow_unmatched_routes` stays empty.** Three commits, one per coherent
+     change; the pre-triage group counts were slightly off (13/6/5/2, not
+     14/7/5/2 — the mock registers 13 routes per firewall scope, of which 6 are
+     IPSet).
+     1. **Guest-firewall wildcard (13 routes)** — the mock now registers one
+        firewall scope per LITERAL guest kind (`fwGuestKinds`), so 13 wildcard
+        routes become 26 real ones. Mock-only.
+     2. **Node-scope IPSet (6 routes)** — confirmed against the baseline: a
+        node's firewall is `/firewall`, `/log`, `/options`, `/rules`,
+        `/rules/{pos}` only. Mock routes removed **and** the SDK's seven
+        node-scope IPSet ops now return a `pverr.ErrUnsupported`-wrapped error
+        naming the scope, before any request (a bare 404 reads like a broken
+        node, not an operation that cannot exist). The one-`Service`-plus-scope
+        model is untouched; `TestIPSetCRUDPerScope` now iterates the two scopes
+        that have IPSets and `TestIPSetsUnsupportedAtNodeScope` pins the
+        refusal. **SDK behavior change.**
+     3. **Ceph paths (5 routes)** — `/ceph/pools` → `/ceph/pool` (PVE spells the
+        collection singular) and `/ceph/config` → `/ceph/cfg/raw` (the config is
+        served three ways under `/cfg`; raw is the verbatim text
+        `GetClusterConfig` returns). Every `ceph` pool op and `GetClusterConfig`
+        would have 404'd live while passing against the mock. Now pinned by
+        `TestCephPathsReal` (the `TestHAStatusPathsReal` pattern) and
+        `ceph/doc.go` no longer calls the paths provisional — only the response
+        shapes are. **SDK behavior change.**
+     4. **`status/{action}` wildcard (2 routes)** — the verb is now bound at
+        registration and the handler is a closure, so an unknown verb is a mux
+        404 exactly as on PVE. Only the **6** verbs the SDK drives are
+        registered: qemu's `/status/reset` is deliberately left out, since the
+        SDK has no `Reset` op and a route for it would count an unreachable
+        endpoint as covered. It shows in the report as a gap, which is what it
+        is. Mock-only.
+
+     Arithmetic after the fixes: 231 mock routes → **248**, all matching, so
+     **248 of 675 endpoints (36.7%)** covered, up from the 205 (30.4%) measured
+     before the triage — the 43 gained are endpoints the SDK always implemented
+     but was testing against wrong paths.
 
 - [ ] 3. Generate and commit the first `docs/COVERAGE.md`; sanity-review the
      totals (the ~196 covered routes against 675 endpoints — the number is the
