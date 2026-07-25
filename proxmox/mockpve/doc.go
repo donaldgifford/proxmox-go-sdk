@@ -30,6 +30,17 @@
 // patterns); [WithCache] is the seam through which a recorded 9.x response
 // corpus will later seed the mock (OQ-10) without redesign.
 //
-// Phase 1 serves /version, /access/ticket, and the task status/log endpoints;
-// later phases register the per-service routes as those services land.
+// # Route surface
+//
+// A Server serves the foundation endpoints (/version, /access/ticket, and the
+// task status/log reads) plus the per-service routes of every SDK service —
+// compute, storage, HA, node networking and administration, SDN, firewall,
+// cluster, access, metrics, Ceph, PBS, and console.
+//
+// [Server.Routes] enumerates them: the raw registered ServeMux patterns, method
+// and /api2/json prefix included. That list is the numerator of the SDK's
+// API-coverage report (docs/COVERAGE.md), which measures it against the real
+// PVE endpoint baseline and fails CI on any mock route that PVE does not
+// actually serve — the mock mirrors real PVE, and the report is what keeps that
+// claim honest.
 package mockpve
