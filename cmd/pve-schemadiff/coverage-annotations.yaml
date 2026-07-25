@@ -1,0 +1,60 @@
+---
+# Hand-curated input for the API coverage tracker (DESIGN-0005 / IMPL-0006).
+#
+# This file holds ONLY the exceptions. Everything else in docs/COVERAGE.md is
+# derived from the committed baseline and mockpve's route table, because a
+# hand-maintained map of the PVE API is exactly what drifted in the first place
+# (INV-0004). Keep it small.
+#
+# Regenerate the report after editing: `just coverage`.
+# Unknown keys are an error, and every entry must still match something —
+# `just coverage-check` fails on a stale entry.
+
+# Provenance of cmd/pve-schemadiff/testdata/baseline.json, for the report header.
+# "30% of the API" means nothing without saying which API was measured, and the
+# baseline is a bare endpoint array with nowhere to record it.
+baseline:
+  pve_version: "9.2"
+  source: "apidoc.js from r740a, 675 endpoints (INV-0004, IMPL-0003)"
+  captured: "2026-07-19"
+
+# Real endpoints the SDK deliberately ships as documented pverr.ErrUnsupported.
+#
+# Empty, and correctly so: audited 2026-07-25 across every ErrUnsupported op in
+# the SDK — HA DLB, storage volume-chain snapshots, ZFS RAIDZ expansion, Ceph RBD
+# mirroring, metrics OTel config, PBS VerifyBackup, console VerifyVNCTicket. Each
+# refuses a path real PVE does NOT serve, so none of them is in the baseline and
+# none is in the mock; they drop out of the arithmetic entirely rather than
+# needing an annotation. An entry belongs here only when PVE serves the endpoint
+# and the SDK still declines to drive it.
+stubs: []
+
+# Capabilities the SDK covers over the proxmox/ssh side channel. PVE serves no
+# endpoint for these, so they appear in no table and would otherwise read as
+# absent rather than deliberate.
+side_channel:
+  - >-
+    snippet and backup upload into /var/lib/vz (ssh.UploadSnippet / UploadBackup — PVE's upload API covers ISO and disk images
+    only)
+  - "arbitrary node commands, including custom scripts (ssh.Exec — no REST equivalent by design)"
+  - "ZFS RAIDZ expansion (a `zpool attach`; storage.ExpandRAIDZ documents the ssh path)"
+  - "Ceph RBD mirroring (an `rbd mirror` CLI feature; ceph.GetMirrorStatus and friends document the ssh path)"
+  - >-
+    raw storage-plugin operations with no REST surface, e.g. volume-level snapshots (storage.VolumeSnapshots documents the
+    ssh path) #magic___^_^___line
+# Path families the SDK has decided not to implement, each with the document that
+# decided it.
+#
+# Empty on purpose (IMPL-0006 OQ-4a): the untriaged families — notifications,
+# hardware mapping, jobs, bulk-action, pools — are GAPS, not decisions. Parking
+# them here would tidy the headline percentage by hiding exactly the debt the
+# tracker was built to expose, behind a label claiming a decision nobody made.
+# They show up in the report's "unassigned" section until someone triages them.
+out_of_scope: []
+
+# The fabrication guard's escape hatch: mockpve routes permitted to reference an
+# endpoint the baseline does not hold. Empty is the goal and the current state —
+# every entry is a claim that the baseline is wrong, so each needs a reason, and
+# each should be read as debt. The 26 routes this guard caught on first run were
+# fixed in the mock and the SDK (IMPL-0006 Phase 3 task 2), not allowlisted.
+allow_unmatched_routes: []

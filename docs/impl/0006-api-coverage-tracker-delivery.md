@@ -332,11 +332,26 @@ checks.
 
 #### Tasks
 
-- [ ] 1. Seed the annotations file (location per OQ-2) with today's true
+- [x] 1. Seed the annotations file (location per OQ-2) with today's true
      exceptions only: `side_channel` (snippet/backup upload via `proxmox/ssh`,
      custom node scripts via `Exec`), the untriaged gap families per the OQ-4
      decision, and a `stubs` audit (expected empty or near-empty — see Ground
-     facts). `allow_unmatched_routes` starts empty.
+     facts). `allow_unmatched_routes` starts empty. _(Done 2026-07-25:
+     `cmd/pve-schemadiff/coverage-annotations.yaml` per OQ-2a. The **stubs audit
+     came back empty, and correctly so**: every `ErrUnsupported` op in the SDK —
+     HA DLB, storage volume-chain snapshots, ZFS RAIDZ expansion, Ceph RBD
+     mirroring, metrics OTel config, PBS `VerifyBackup`, console
+     `VerifyVNCTicket` — refuses a path real PVE does not serve, so it is in
+     neither the baseline nor the mock and drops out of the arithmetic entirely.
+     The section's comment records that, so a future reader does not mistake
+     "empty" for "unaudited"; an entry belongs there only when PVE serves the
+     endpoint and the SDK still declines to drive it. `side_channel` has 5
+     entries — the two the ledger names plus the three ssh-only capabilities
+     those `ErrUnsupported` ops redirect to (RAIDZ expansion, RBD mirroring, raw
+     storage-plugin snapshots), which would otherwise read as absent rather than
+     deliberate. `out_of_scope` is **empty per OQ-4a** (the untriaged families
+     are gaps; the comment says why parking them there would hide the debt) and
+     `allow_unmatched_routes` is empty, which is the goal.)_
 - [ ] 2. Run the fabrication guard against the real mock; triage every hit by
      **fixing the mock path** (the mock mirrors real PVE) rather than
      allowlisting — any surviving allowlist entry needs a written reason in the
