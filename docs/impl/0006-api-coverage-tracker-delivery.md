@@ -422,13 +422,41 @@ checks.
      before the triage — the 43 gained are endpoints the SDK always implemented
      but was testing against wrong paths.
 
-- [ ] 3. Generate and commit the first `docs/COVERAGE.md`; sanity-review the
+- [x] 3. Generate and commit the first `docs/COVERAGE.md`; sanity-review the
      totals (the ~196 covered routes against 675 endpoints — the number is the
-     baseline for the group-5 triage conversation, not a target).
-- [ ] 4. `just coverage` recipe (regenerate) + `just coverage-check` (or
+     baseline for the group-5 triage conversation, not a target). \_(Done
+     2026-07-25: 845 lines, **248 of 675 (36.7%)**. Reviewed per service and
+     against the ledger's estimate — the "~196" is superseded twice over: 231
+     mock routes existed before the triage and 248 after it, and the covered
+     count is per-endpoint, not per-route. Spot-checks look right (`version`
+     1/1, `qemu` 42/104 with the unimplemented `/cluster/qemu` CPU-model family
+     and the agent file/fsfreeze ops as gaps, `unassigned` 0/67). Two traps hit
+     on the way in, both fixed: **`.gitignore`'s `coverage.*` matches
+     `docs/COVERAGE.md`** on a case-insensitive filesystem (macOS) but not on
+     CI's, so the report was committable on one machine and invisible on the
+     other — un-ignored explicitly with a comment; and **`yamlfmt` refolds YAML
+     block scalars and injects a `#magic___^_^___line` sentinel**, which then
+     rendered into the report's side-channel list, so the annotations file uses
+     single-line entries only. Also found `.yamlfmt` had been renamed to
+     `.yamlfmt.yml` in the working tree, which silently disabled the whole
+     yamlfmt config (its own comment says the name must be `.yamlfmt`);
+     restored.)\_
+- [x] 4. `just coverage` recipe (regenerate) + `just coverage-check` (or
      `-check` flag invocation) wired into the CI test-go job next to
      `just schemadiff`; confirm a deliberate local tamper (edit one line of
      `COVERAGE.md`; add one fake mock route) fails each check respectively.
+     _(Done 2026-07-25: both recipes + the `Check API coverage report` step
+     immediately after `Check API schema drift` in `.github/workflows/ci.yml`.
+     `docs/COVERAGE.md` added to `.prettierignore` and the markdownlint ignores
+     alongside `CHANGELOG.md` — the drift check compares bytes, so a formatter
+     rewriting the report would fail CI on a clean tree. **Three deliberate
+     tampers, each exit 1**: (1) editing one summary row → `is stale at line 43`
+     with the committed and expected lines shown; (2) registering
+     `GET /api2/json/cluster/ha/lbalancer` in the mock →
+     `no such path on PVE (fabricated path)`, i.e. the guard catching the exact
+     route INV-0004 F4 found live; (3) annotating that same path as a stub →
+     `stale annotations (they match nothing; delete them)`. Clean tree exits
+     0.)_
 - [ ] 5. Docs: DEVELOPMENT.md gains the regenerate-and-commit workflow (next to
      the schema-drift section it extends); CLAUDE.md's CI matrix mentions the
      coverage step; `mockpve` doc.go notes `Routes()`.
