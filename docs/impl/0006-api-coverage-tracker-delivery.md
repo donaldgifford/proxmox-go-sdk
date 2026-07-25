@@ -102,11 +102,14 @@ The numerator, as an additive public API.
 
 #### Tasks
 
-- [ ] 1. Add the `handle(pattern string, h http.HandlerFunc)` helper on
+- [x] 1. Add the `handle(pattern string, h http.HandlerFunc)` helper on
      `*Server` (records the pattern, then `s.mux.HandleFunc`) and the exported
      `Routes() []string` returning the recorded patterns per the OQ-1 decision,
      with a doc comment stating the format contract (Go 1.22 ServeMux patterns,
-     exactly as registered).
+     exactly as registered). _(Done 2026-07-24: `routes []string` field +
+     `handle` + `Routes()` (returns a copy). `RegisterHandler` records its
+     pattern too, so `Routes()` is an honest enumeration of everything
+     registered, not just the built-ins — documented on both methods.)_
 - [ ] 2. Mechanically switch every `s.mux.HandleFunc` call site in
      `proxmox/mockpve` (~185 across the per-service files) to `s.handle`; a grep
      guard in the tests asserts no direct `mux.HandleFunc` registrations remain

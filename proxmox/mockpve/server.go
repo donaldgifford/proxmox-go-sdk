@@ -17,6 +17,7 @@ import (
 // methods before serving requests.
 type Server struct {
 	mux        *http.ServeMux
+	routes     []string // every pattern registered, in registration order.
 	st         state
 	logger     *slog.Logger
 	cache      ResponseCache
@@ -101,11 +102,36 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
 }
 
+// handle registers h at pattern and records the pattern for [Server.Routes].
+// Every built-in route goes through this helper rather than s.mux.HandleFunc
+// directly, so the recorded list can never drift from what the mock serves
+// (TestNoDirectMuxRegistrations guards that).
+func (s *Server) handle(pattern string, h http.HandlerFunc) {
+	s.routes = append(s.routes, pattern)
+	s.mux.HandleFunc(pattern, h)
+}
+
+// Routes returns every pattern registered on this Server — the built-in routes
+// from [New] plus anything added via [Server.RegisterHandler] — in registration
+// order. Patterns are the raw Go 1.22 ServeMux strings exactly as registered,
+// e.g. "GET /api2/json/nodes/{node}/qemu": the method, the full /api2/json
+// prefix, and the original wildcard names. Callers that compare against another
+// surface normalize both sides themselves (the API-coverage tracker strips the
+// prefix and rewrites wildcards, since PVE's own placeholder names differ).
+//
+// The returned slice is a copy, so callers may retain or sort it. Call it after
+// registration is complete (RegisterHandler is documented as pre-serve).
+func (s *Server) Routes() []string {
+	out := make([]string, len(s.routes))
+	copy(out, s.routes)
+	return out
+}
+
 func (s *Server) registerRoutes() {
-	s.mux.HandleFunc("GET /api2/json/version", s.handleVersion)
-	s.mux.HandleFunc("POST /api2/json/access/ticket", s.handleTicket)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/tasks/{upid}/status", s.handleTaskStatus)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/tasks/{upid}/log", s.handleTaskLog)
+	s.handle("GET /api2/json/version", s.handleVersion)
+	s.handle("POST /api2/json/access/ticket", s.handleTicket)
+	s.handle("GET /api2/json/nodes/{node}/tasks/{upid}/status", s.handleTaskStatus)
+	s.handle("GET /api2/json/nodes/{node}/tasks/{upid}/log", s.handleTaskLog)
 	s.registerQEMURoutes()
 	s.registerLXCRoutes()
 	s.registerStorageRoutes()
@@ -220,8 +246,10 @@ func (s *Server) AddUser(username, password string) {
 // RegisterHandler mounts an extra handler at pattern (Go 1.22 ServeMux syntax,
 // e.g. "GET /api2/json/cluster/nextid"). This is the extension seam for routes
 // the mock does not build in; call it before serving requests. The pattern must
-// not collide with a built-in route.
+// not collide with a built-in route. The pattern is recorded, so it appears in
+// [Server.Routes].
 func (s *Server) RegisterHandler(pattern string, h http.Handler) {
+	s.routes = append(s.routes, pattern)
 	s.mux.Handle(pattern, h)
 }
 
