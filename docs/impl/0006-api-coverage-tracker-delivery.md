@@ -287,17 +287,41 @@ package (the `schema`-package precedent).
      including the required one: the flat `/cluster/sdn/fabrics` **and**
      `/cluster/ha/lbalancer` — the two paths INV-0004 actually caught live — are
      both named by the error.)_
-- [ ] 6. Wire `-coverage` into `main.go` (flags: `-coverage`, `-annotations`,
+- [x] 6. Wire `-coverage` into `main.go` (flags: `-coverage`, `-annotations`,
      `-out`, `-check`; the existing `-apidoc`/`-baseline` flags are reused); the
      tool imports `proxmox/mockpve`, constructs a `Server`, and calls `Routes()`
-     — no codegen, no source parsing.
+     — no codegen, no source parsing. _(Done 2026-07-25:
+     `run(apidoc, baseline, update)` became `run(opts *options)` dispatching to
+     `runCoverage`/`runSchemaDiff`; `-apidoc` is no longer required in coverage
+     mode, and `readBaseline` is now shared by both. Three decisions worth
+     recording. (1) **`options.validate()` rejects nonsense combinations**
+     rather than ignoring them — `-out` in schema-diff mode, `-update` in
+     coverage mode, `-check` without `-out` — because a typo in a CI invocation
+     that silently checks nothing is worse than one that fails. (2) **Exit codes
+     are split**: exit 1 means a check said no (fabrication, stale annotations,
+     drift), exit 2 means the tool could not run (unreadable file, malformed
+     input); the `checkFailed` helper keeps that mapping in one place. (3)
+     `options.routes` is the numerator and a **test seam** — `main` fills it
+     from `mockpve.New().Routes()`, while the command tests supply fixture
+     routes, since measuring the real mock's 231 routes against a 3-endpoint
+     fixture baseline would report every one of them as fabricated. 6 new
+     command tests (write → verify round-trip, drift detection on a hand-edited
+     file, guard-blocks-the-write incl. asserting the file was never created,
+     stdout mode, file errors, and the flag-combination table). Verified from
+     the CLI against the real baseline + real mock: exit 1, all 26 offending
+     routes named, and no file written.)_
 
 #### Success Criteria
 
 - Golden-file test green; the fabrication-guard test names the fabricated
-  fixture route; `just lint` + `just test` green.
+  fixture route; `just lint` + `just test` green. **Met 2026-07-25** (coverage
+  package at 97.6% statements).
 - `go run ./cmd/pve-schemadiff -coverage …` produces a complete report from the
-  real baseline + real mock routes locally.
+  real baseline + real mock routes locally. **Blocked on Phase 3 task 2, by
+  design**: the run currently exits 1 with the 26 fabricated-route findings and
+  writes nothing, which is the guard working. The render itself is verified at
+  real scale (835 lines from the real baseline + real mock routes); it reaches
+  disk once the mock is fixed.
 
 ---
 
