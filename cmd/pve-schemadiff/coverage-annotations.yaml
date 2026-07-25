@@ -15,7 +15,7 @@
 # baseline is a bare endpoint array with nowhere to record it.
 baseline:
   pve_version: "9.2"
-  source: "apidoc.js from r740a, 675 endpoints (INV-0004, IMPL-0003)"
+  source: "apidoc.js from r740a (INV-0004)"
   captured: "2026-07-19"
 
 # Real endpoints the SDK deliberately ships as documented pverr.ErrUnsupported.
@@ -33,15 +33,12 @@ stubs: []
 # endpoint for these, so they appear in no table and would otherwise read as
 # absent rather than deliberate.
 side_channel:
-  - >-
-    snippet and backup upload into /var/lib/vz (ssh.UploadSnippet / UploadBackup — PVE's upload API covers ISO and disk images
-    only)
-  - "arbitrary node commands, including custom scripts (ssh.Exec — no REST equivalent by design)"
-  - "ZFS RAIDZ expansion (a `zpool attach`; storage.ExpandRAIDZ documents the ssh path)"
-  - "Ceph RBD mirroring (an `rbd mirror` CLI feature; ceph.GetMirrorStatus and friends document the ssh path)"
-  - >-
-    raw storage-plugin operations with no REST surface, e.g. volume-level snapshots (storage.VolumeSnapshots documents the
-    ssh path) #magic___^_^___line
+  - "snippet and backup upload into /var/lib/vz (ssh.UploadSnippet, ssh.UploadBackup)"
+  - "arbitrary node commands, including custom scripts (ssh.Exec)"
+  - "ZFS RAIDZ expansion, a `zpool attach` (see storage.ExpandRAIDZ)"
+  - "Ceph RBD mirroring, an `rbd mirror` CLI feature (see ceph.GetMirrorStatus)"
+  - "raw storage-plugin ops, e.g. volume snapshots (see storage.VolumeSnapshots)"
+
 # Path families the SDK has decided not to implement, each with the document that
 # decided it.
 #

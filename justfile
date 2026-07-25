@@ -96,6 +96,22 @@ schemadiff *args:
         -apidoc cmd/pve-schemadiff/testdata/apidoc-9.2.js.gz \
         -baseline cmd/pve-schemadiff/testdata/baseline.json {{args}}
 
+# The report is generated-only (DESIGN-0005): never hand-edit it — run this and
+# commit the result. Also runs the fabrication guard, which fails when mockpve
+# serves a route real PVE does not.
+# Regenerate docs/COVERAGE.md: the SDK's coverage of the 9.2 REST API
+coverage *args:
+    go run ./cmd/pve-schemadiff -coverage \
+        -baseline cmd/pve-schemadiff/testdata/baseline.json \
+        -annotations cmd/pve-schemadiff/coverage-annotations.yaml \
+        -out docs/COVERAGE.md {{args}}
+
+# Fails on a stale report, on a mockpve route with no real endpoint behind it,
+# and on a stale annotation.
+# Verify docs/COVERAGE.md matches a fresh render (CI)
+coverage-check:
+    just coverage -check
+
 # Lint Go + yaml + Actions workflows + markdown + format
 lint:
     golangci-lint run

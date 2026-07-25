@@ -34,6 +34,13 @@ coverage.*
 *.coverprofile
 profile.cov
 
+# ...but docs/COVERAGE.md is the committed API coverage report (DESIGN-0005), not
+# a test artifact. It is un-ignored explicitly because `coverage.*` above matches
+# it on a case-insensitive filesystem (macOS) and not on a case-sensitive one
+# (CI), which would mean the report is committable on one and invisible on the
+# other.
+!docs/COVERAGE.md
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
