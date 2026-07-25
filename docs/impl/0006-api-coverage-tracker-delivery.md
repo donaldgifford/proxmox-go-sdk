@@ -192,11 +192,38 @@ package (the `schema`-package precedent).
      guard); `Services()` must cover every rule. Verified by tampering —
      catch-all, dropped rule, and typo'd prefix each fail with the offending
      path named.)_
-- [ ] 3. Annotations loader (`go.yaml.in/yaml/v4`) for the four sections —
+- [x] 3. Annotations loader (`go.yaml.in/yaml/v4`) for the four sections —
      `stubs` (real endpoints deliberately stubbed, with reason), `side_channel`,
      `out_of_scope` (prefix + deciding doc), and `allow_unmatched_routes` (the
      fabrication-guard escape hatch; empty is the goal). Unknown YAML keys are
-     an error (a typoed section must not silently annotate nothing).
+     an error (a typoed section must not silently annotate nothing). _(Done
+     2026-07-25: `coverage/annotations.go` — `Annotations` + `LoadAnnotations`/
+     `ParseAnnotations` (strict `KnownFields(true)`), `Validate`, and the three
+     lookups `StubReason`/`AllowsRoute`/`OutOfScopeFor` (segment-aware prefix
+     match, reusing `serviceRule.matches`). **Two amendments to the design's
+     illustrative YAML**, both recorded here: (1) a fifth **`baseline:`
+     section** (`pve_version`/`source`/`captured`, all required) — the report
+     header must state which PVE version was measured and `baseline.json` is a
+     bare endpoint array carrying no metadata, so the provenance has nowhere
+     else to live; (2) `allow_unmatched_routes` entries are **typed
+     `{route, reason}`**, not the design example's bare strings, because this
+     ledger's task 5 requires a written reason for any surviving allowlist entry
+     — the schema now enforces what the process demands. `out_of_scope` likewise
+     requires `doc:`, so an untriaged family cannot be relabelled a decided
+     non-goal (OQ-4a) without naming the deciding document. Paths are normalized
+     on load (`/api2/json` stripped, placeholders erased, method upper-cased),
+     so an entry written in PVE's own spelling still matches instead of silently
+     annotating nothing. An empty file is `ErrEmptyAnnotations`, not an empty
+     exception set — a truncated file must not strip the report's provenance and
+     demote every stub to a gap. `Validate` aggregates with `errors.Join` so a
+     hand-edited file reports every problem in one pass. 8 tests: normalization,
+     unknown-key rejection, empty-file, a 10-case validation table (missing
+     fields, unrooted prefix, unparseable path, duplicates in all three keyed
+     sections), multi-error aggregation, the lookups (including
+     method-sensitivity and the `/cluster/notificationsX` non-match), and disk
+     loading. Baseline cross-checks — a stub or allowlist entry naming an
+     endpoint the baseline does not hold — are deliberately NOT here: they need
+     the baseline, so they land with the checks in task 5.)_
 - [ ] 4. Report renderer: per-service tables (method, path, state = covered /
      stub-with-reason / gap), header with totals, per-service percentages, and
      the baseline's PVE version + provenance; golden-file test against a small
