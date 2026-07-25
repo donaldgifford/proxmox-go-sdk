@@ -79,15 +79,15 @@ func (s *Server) AddCephOSD(id int, host string) {
 }
 
 func (s *Server) registerCephRoutes() {
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/ceph/pools", s.handleCephPoolList)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/ceph/pools", s.handleCephPoolCreate)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/ceph/pools/{name}", s.handleCephPoolGet)
-	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/ceph/pools/{name}", s.handleCephPoolDelete)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/ceph/osd", s.handleCephOSDList)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/ceph/osd", s.handleCephOSDCreate)
-	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/ceph/osd/{osdid}", s.handleCephOSDDestroy)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/ceph/status", s.handleCephStatus)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/ceph/config", s.handleCephConfig)
+	s.handle("GET /api2/json/nodes/{node}/ceph/pools", s.handleCephPoolList)
+	s.handle("POST /api2/json/nodes/{node}/ceph/pools", s.handleCephPoolCreate)
+	s.handle("GET /api2/json/nodes/{node}/ceph/pools/{name}", s.handleCephPoolGet)
+	s.handle("DELETE /api2/json/nodes/{node}/ceph/pools/{name}", s.handleCephPoolDelete)
+	s.handle("GET /api2/json/nodes/{node}/ceph/osd", s.handleCephOSDList)
+	s.handle("POST /api2/json/nodes/{node}/ceph/osd", s.handleCephOSDCreate)
+	s.handle("DELETE /api2/json/nodes/{node}/ceph/osd/{osdid}", s.handleCephOSDDestroy)
+	s.handle("GET /api2/json/nodes/{node}/ceph/status", s.handleCephStatus)
+	s.handle("GET /api2/json/nodes/{node}/ceph/config", s.handleCephConfig)
 }
 
 func (s *Server) handleCephPoolList(w http.ResponseWriter, r *http.Request) {

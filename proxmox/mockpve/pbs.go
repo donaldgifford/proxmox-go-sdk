@@ -51,12 +51,12 @@ func (s *Server) AddBackupJob(id, storage, schedule string) {
 }
 
 func (s *Server) registerPBSRoutes() {
-	s.mux.HandleFunc("GET /api2/json/cluster/backup", s.handleBackupJobList)
-	s.mux.HandleFunc("POST /api2/json/cluster/backup", s.handleBackupJobCreate)
-	s.mux.HandleFunc("GET /api2/json/cluster/backup/{id}", s.handleBackupJobGet)
-	s.mux.HandleFunc("PUT /api2/json/cluster/backup/{id}", s.handleBackupJobUpdate)
-	s.mux.HandleFunc("DELETE /api2/json/cluster/backup/{id}", s.handleBackupJobDelete)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/vzdump", s.handleVzdump)
+	s.handle("GET /api2/json/cluster/backup", s.handleBackupJobList)
+	s.handle("POST /api2/json/cluster/backup", s.handleBackupJobCreate)
+	s.handle("GET /api2/json/cluster/backup/{id}", s.handleBackupJobGet)
+	s.handle("PUT /api2/json/cluster/backup/{id}", s.handleBackupJobUpdate)
+	s.handle("DELETE /api2/json/cluster/backup/{id}", s.handleBackupJobDelete)
+	s.handle("POST /api2/json/nodes/{node}/vzdump", s.handleVzdump)
 }
 
 func (s *Server) handleBackupJobList(w http.ResponseWriter, r *http.Request) {

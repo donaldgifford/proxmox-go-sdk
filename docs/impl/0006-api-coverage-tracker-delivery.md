@@ -110,10 +110,15 @@ The numerator, as an additive public API.
      `handle` + `Routes()` (returns a copy). `RegisterHandler` records its
      pattern too, so `Routes()` is an honest enumeration of everything
      registered, not just the built-ins — documented on both methods.)_
-- [ ] 2. Mechanically switch every `s.mux.HandleFunc` call site in
+- [x] 2. Mechanically switch every `s.mux.HandleFunc` call site in
      `proxmox/mockpve` (~185 across the per-service files) to `s.handle`; a grep
      guard in the tests asserts no direct `mux.HandleFunc` registrations remain
-     outside `handle` itself.
+     outside `handle` itself. _(Done 2026-07-24: **201** registrations switched
+     across the 14 per-service files + `registerRoutes` — above the ledger's
+     ~196 estimate. `TestNoDirectMuxRegistrations` reads the package's own
+     non-test sources and permits exactly one direct call, the one inside
+     `handle`; the needle is assembled at runtime so the guard's own source is
+     not a hit.)_
 - [ ] 3. Unit tests: `Routes()` length equals the registration count and
      contains known samples from several services; the route list is stable
      across two `New()` instances.

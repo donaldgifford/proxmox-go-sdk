@@ -138,12 +138,12 @@ func (s *Server) QueueClusterJoin(name string) {
 }
 
 func (s *Server) registerClusterRoutes() {
-	s.mux.HandleFunc("GET /api2/json/cluster/resources", s.handleClusterResources)
-	s.mux.HandleFunc("GET /api2/json/cluster/status", s.handleClusterStatus)
-	s.mux.HandleFunc("POST /api2/json/cluster/config", s.handleClusterCreate)
-	s.mux.HandleFunc("GET /api2/json/cluster/config/join", s.handleClusterJoinInfo)
-	s.mux.HandleFunc("POST /api2/json/cluster/config/join", s.handleClusterJoin)
-	s.mux.HandleFunc("GET /api2/json/cluster/config/nodes", s.handleClusterConfigNodes)
+	s.handle("GET /api2/json/cluster/resources", s.handleClusterResources)
+	s.handle("GET /api2/json/cluster/status", s.handleClusterStatus)
+	s.handle("POST /api2/json/cluster/config", s.handleClusterCreate)
+	s.handle("GET /api2/json/cluster/config/join", s.handleClusterJoinInfo)
+	s.handle("POST /api2/json/cluster/config/join", s.handleClusterJoin)
+	s.handle("GET /api2/json/cluster/config/nodes", s.handleClusterConfigNodes)
 	// /cluster/options GET+PUT are registered by registerHARoutes (shared route).
 }
 

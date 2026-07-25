@@ -31,22 +31,22 @@ func (s *Server) registerConsoleRoutes() {
 	// so register each kind explicitly and close over it.
 	for _, kind := range []string{"qemu", "lxc"} {
 		base := "/api2/json/nodes/{node}/" + kind + "/{vmid}/"
-		s.mux.HandleFunc("POST "+base+"vncproxy", func(w http.ResponseWriter, r *http.Request) {
+		s.handle("POST "+base+"vncproxy", func(w http.ResponseWriter, r *http.Request) {
 			s.handleGuestVNCProxy(w, r, kind)
 		})
-		s.mux.HandleFunc("POST "+base+"spiceproxy", s.handleGuestSpiceProxy)
-		s.mux.HandleFunc("POST "+base+"termproxy", func(w http.ResponseWriter, r *http.Request) {
+		s.handle("POST "+base+"spiceproxy", s.handleGuestSpiceProxy)
+		s.handle("POST "+base+"termproxy", func(w http.ResponseWriter, r *http.Request) {
 			s.handleGuestTermProxy(w, r, kind)
 		})
 		// The guest dial — a guest ticket must be presented HERE, not at the
 		// node-shell path (real PVE binds the ticket to its mint surface).
-		s.mux.HandleFunc("GET "+base+"vncwebsocket", s.handleVNCWebSocket)
+		s.handle("GET "+base+"vncwebsocket", s.handleVNCWebSocket)
 	}
 	// Node shell consoles.
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/vncshell", s.handleNodeVNCShell)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/termproxy", s.handleNodeTermProxy)
+	s.handle("POST /api2/json/nodes/{node}/vncshell", s.handleNodeVNCShell)
+	s.handle("POST /api2/json/nodes/{node}/termproxy", s.handleNodeTermProxy)
 	// The node-shell dial.
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/vncwebsocket", s.handleVNCWebSocket)
+	s.handle("GET /api2/json/nodes/{node}/vncwebsocket", s.handleVNCWebSocket)
 }
 
 // mintVNCTicket records a deterministic VNC ticket for node/id, bound to the

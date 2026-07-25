@@ -109,19 +109,19 @@ func (s *Server) registerFirewallRoutes() {
 // registerFirewallScope wires the identical rule/IPSet/options routes for one
 // scope prefix; key turns a matched request into its scope string.
 func (s *Server) registerFirewallScope(prefix string, key fwScopeKeyFunc) {
-	s.mux.HandleFunc("GET "+prefix+"/rules", s.fwRuleList(key))
-	s.mux.HandleFunc("POST "+prefix+"/rules", s.fwRuleCreate(key))
-	s.mux.HandleFunc("GET "+prefix+"/rules/{pos}", s.fwRuleGet(key))
-	s.mux.HandleFunc("PUT "+prefix+"/rules/{pos}", s.fwRuleUpdate(key))
-	s.mux.HandleFunc("DELETE "+prefix+"/rules/{pos}", s.fwRuleDelete(key))
-	s.mux.HandleFunc("GET "+prefix+"/ipset", s.fwIPSetList(key))
-	s.mux.HandleFunc("POST "+prefix+"/ipset", s.fwIPSetCreate(key))
-	s.mux.HandleFunc("GET "+prefix+"/ipset/{name}", s.fwIPSetEntryList(key))
-	s.mux.HandleFunc("POST "+prefix+"/ipset/{name}", s.fwIPSetEntryAdd(key))
-	s.mux.HandleFunc("DELETE "+prefix+"/ipset/{name}", s.fwIPSetDelete(key))
-	s.mux.HandleFunc("DELETE "+prefix+"/ipset/{name}/{cidr}", s.fwIPSetEntryDelete(key))
-	s.mux.HandleFunc("GET "+prefix+"/options", s.fwOptionsGet(key))
-	s.mux.HandleFunc("PUT "+prefix+"/options", s.fwOptionsSet(key))
+	s.handle("GET "+prefix+"/rules", s.fwRuleList(key))
+	s.handle("POST "+prefix+"/rules", s.fwRuleCreate(key))
+	s.handle("GET "+prefix+"/rules/{pos}", s.fwRuleGet(key))
+	s.handle("PUT "+prefix+"/rules/{pos}", s.fwRuleUpdate(key))
+	s.handle("DELETE "+prefix+"/rules/{pos}", s.fwRuleDelete(key))
+	s.handle("GET "+prefix+"/ipset", s.fwIPSetList(key))
+	s.handle("POST "+prefix+"/ipset", s.fwIPSetCreate(key))
+	s.handle("GET "+prefix+"/ipset/{name}", s.fwIPSetEntryList(key))
+	s.handle("POST "+prefix+"/ipset/{name}", s.fwIPSetEntryAdd(key))
+	s.handle("DELETE "+prefix+"/ipset/{name}", s.fwIPSetDelete(key))
+	s.handle("DELETE "+prefix+"/ipset/{name}/{cidr}", s.fwIPSetEntryDelete(key))
+	s.handle("GET "+prefix+"/options", s.fwOptionsGet(key))
+	s.handle("PUT "+prefix+"/options", s.fwOptionsSet(key))
 }
 
 func (s *Server) fwRuleList(key fwScopeKeyFunc) http.HandlerFunc {

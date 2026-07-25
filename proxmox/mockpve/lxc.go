@@ -68,21 +68,21 @@ func (s *Server) ctExists(node string, vmid int) bool {
 }
 
 func (s *Server) registerLXCRoutes() {
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/lxc", s.handleLXCList)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/lxc", s.handleLXCCreate)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/lxc/{vmid}/status/current", s.handleLXCStatus)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/lxc/{vmid}/config", s.handleLXCConfig)
-	s.mux.HandleFunc("PUT /api2/json/nodes/{node}/lxc/{vmid}/config", s.handleLXCSetConfig)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/lxc/{vmid}/clone", s.handleLXCClone)
-	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/lxc/{vmid}", s.handleLXCDelete)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/lxc/{vmid}/status/{action}", s.handleLXCPower)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/lxc/{vmid}/snapshot", s.handleLXCSnapshotList)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/lxc/{vmid}/snapshot", s.handleLXCSnapshotCreate)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/lxc/{vmid}/snapshot/{snap}/rollback", s.handleLXCSnapshotRollback)
-	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/lxc/{vmid}/snapshot/{snap}", s.handleLXCSnapshotDelete)
+	s.handle("GET /api2/json/nodes/{node}/lxc", s.handleLXCList)
+	s.handle("POST /api2/json/nodes/{node}/lxc", s.handleLXCCreate)
+	s.handle("GET /api2/json/nodes/{node}/lxc/{vmid}/status/current", s.handleLXCStatus)
+	s.handle("GET /api2/json/nodes/{node}/lxc/{vmid}/config", s.handleLXCConfig)
+	s.handle("PUT /api2/json/nodes/{node}/lxc/{vmid}/config", s.handleLXCSetConfig)
+	s.handle("POST /api2/json/nodes/{node}/lxc/{vmid}/clone", s.handleLXCClone)
+	s.handle("DELETE /api2/json/nodes/{node}/lxc/{vmid}", s.handleLXCDelete)
+	s.handle("POST /api2/json/nodes/{node}/lxc/{vmid}/status/{action}", s.handleLXCPower)
+	s.handle("GET /api2/json/nodes/{node}/lxc/{vmid}/snapshot", s.handleLXCSnapshotList)
+	s.handle("POST /api2/json/nodes/{node}/lxc/{vmid}/snapshot", s.handleLXCSnapshotCreate)
+	s.handle("POST /api2/json/nodes/{node}/lxc/{vmid}/snapshot/{snap}/rollback", s.handleLXCSnapshotRollback)
+	s.handle("DELETE /api2/json/nodes/{node}/lxc/{vmid}/snapshot/{snap}", s.handleLXCSnapshotDelete)
 	// Storage download-url backs lxc.PullOCITemplate; it moves to the storage
 	// mock when that service lands (Phase 3).
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/storage/{storage}/download-url", s.handleStorageDownloadURL)
+	s.handle("POST /api2/json/nodes/{node}/storage/{storage}/download-url", s.handleStorageDownloadURL)
 }
 
 // handleStorageDownloadURL models POST /nodes/{node}/storage/{storage}/download-url,

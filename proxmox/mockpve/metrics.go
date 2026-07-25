@@ -67,15 +67,15 @@ func (s *Server) AddMetricServer(id, serverType, host string, port int) {
 }
 
 func (s *Server) registerMetricsRoutes() {
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/rrddata", s.handleNodeRRD)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/status", s.handleNodeStatus)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/qemu/{vmid}/rrddata", s.handleVMRRD)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/lxc/{vmid}/rrddata", s.handleVMRRD)
-	s.mux.HandleFunc("GET /api2/json/cluster/metrics/server", s.handleMetricServerList)
-	s.mux.HandleFunc("GET /api2/json/cluster/metrics/server/{id}", s.handleMetricServerGet)
-	s.mux.HandleFunc("POST /api2/json/cluster/metrics/server/{id}", s.handleMetricServerCreate)
-	s.mux.HandleFunc("PUT /api2/json/cluster/metrics/server/{id}", s.handleMetricServerUpdate)
-	s.mux.HandleFunc("DELETE /api2/json/cluster/metrics/server/{id}", s.handleMetricServerDelete)
+	s.handle("GET /api2/json/nodes/{node}/rrddata", s.handleNodeRRD)
+	s.handle("GET /api2/json/nodes/{node}/status", s.handleNodeStatus)
+	s.handle("GET /api2/json/nodes/{node}/qemu/{vmid}/rrddata", s.handleVMRRD)
+	s.handle("GET /api2/json/nodes/{node}/lxc/{vmid}/rrddata", s.handleVMRRD)
+	s.handle("GET /api2/json/cluster/metrics/server", s.handleMetricServerList)
+	s.handle("GET /api2/json/cluster/metrics/server/{id}", s.handleMetricServerGet)
+	s.handle("POST /api2/json/cluster/metrics/server/{id}", s.handleMetricServerCreate)
+	s.handle("PUT /api2/json/cluster/metrics/server/{id}", s.handleMetricServerUpdate)
+	s.handle("DELETE /api2/json/cluster/metrics/server/{id}", s.handleMetricServerDelete)
 }
 
 // syntheticRRD returns a fixed two-point series so RRD reads are deterministic.
