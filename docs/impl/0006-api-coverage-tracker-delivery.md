@@ -119,9 +119,22 @@ The numerator, as an additive public API.
      non-test sources and permits exactly one direct call, the one inside
      `handle`; the needle is assembled at runtime so the guard's own source is
      not a hit.)_
-- [ ] 3. Unit tests: `Routes()` length equals the registration count and
+- [x] 3. Unit tests: `Routes()` length equals the registration count and
      contains known samples from several services; the route list is stable
-     across two `New()` instances.
+     across two `New()` instances. _(Done 2026-07-24, with one deliberate
+     deviation: "length equals the registration count" is asserted at RUNTIME,
+     not by counting `s.handle` call sites in source. Source-counting is wrong
+     here — `registerFirewallScope` is invoked three times, so 201 call sites
+     produce **231** routes. `TestRoutesAreAllServed` instead dials every
+     recorded pattern credential-free and requires a handler response (401 from
+     checkAuth, or 2xx/4xx from the public ones) rather than the mux's 404,
+     which verifies the stronger property the numerator actually rests on: every
+     reported route is genuinely served. It also pins uniqueness, the documented
+     `"METHOD /api2/json/..."` form, and a ~200 floor. Plus
+     `TestRoutesContainsKnownPatterns` (10 samples spanning foundation, qemu,
+     lxc, storage, ha, sdn, nodes, cluster, access),
+     `TestRoutesStableAcrossInstances` (identical order across two `New()`s +
+     the returned slice is a copy), and `TestRoutesIncludesRegisteredHandler`.)_
 
 #### Success Criteria
 
