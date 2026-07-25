@@ -163,12 +163,35 @@ package (the `schema`-package precedent).
      Verified against the real data: 205 of 231 mock routes match the baseline,
      and the 26 that do not are the pre-triage findings recorded under Phase 3
      task 2 below — i.e. the guard works.)_
-- [ ] 2. Service mapping: the static prefix → service table (`/cluster/ha` →
+- [x] 2. Service mapping: the static prefix → service table (`/cluster/ha` →
      `ha`, `/nodes/{}/qemu` → `qemu`, …); anything unmapped lands in an
      "unassigned" section so new API families surface loudly. A test runs the
      mapper over the real committed baseline and pins the current unassigned set
      (the known gap families), so a future PVE minor adding a family breaks the
-     test loudly instead of silently swelling "unassigned".
+     test loudly instead of silently swelling "unassigned". _(Done 2026-07-25:
+     `coverage/service.go` — 66 rules over 15 services, longest-prefix +
+     whole-segment matching, `Services()` sorted with `unassigned` last. Two
+     decisions worth recording. **No catch-all `/cluster` or `/nodes` rule** —
+     measured both ways, and with catch-alls `unassigned` collapses from 67
+     endpoints to 7 (`/pools*`) and the "new families surface loudly" property
+     dies, since a PVE minor adding a family would silently join an existing
+     service's table. Both bare paths are `exact: true` rules claiming only
+     their own index endpoint, so every family under them is enumerated
+     explicitly (44 `/nodes/{}/…` rules); `TestExactRulesDoNotClaimSubtrees`
+     fails if either is ever widened. **A family is mapped on domain ownership,
+     not on coverage** — `/access/tfa` maps to `access` with zero covered
+     endpoints so it reads as an access gap rather than an orphan, which leaves
+     `unassigned` meaning exactly "no service claims this". Current split:
+     **205/675 (30.4%)** covered, with `unassigned` = 67 endpoints in 5
+     untriaged families — `/cluster/notifications` (31), `/cluster/mapping`
+     (16), `/cluster/jobs` (7), `/pools` (7), `/cluster/bulk-action` (6) — kept
+     visible as gaps per OQ-4a. Four invariants over the real baseline replace a
+     golden file: the unassigned set is pinned per family with counts; no
+     covered endpoint may land in `unassigned` (implementing an unmapped family
+     fails until it is mapped); every rule must match ≥1 baseline endpoint (typo
+     guard); `Services()` must cover every rule. Verified by tampering —
+     catch-all, dropped rule, and typo'd prefix each fail with the offending
+     path named.)_
 - [ ] 3. Annotations loader (`go.yaml.in/yaml/v4`) for the four sections —
      `stubs` (real endpoints deliberately stubbed, with reason), `side_channel`,
      `out_of_scope` (prefix + deciding doc), and `allow_unmatched_routes` (the
