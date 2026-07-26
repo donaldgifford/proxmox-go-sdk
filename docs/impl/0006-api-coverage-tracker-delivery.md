@@ -457,9 +457,17 @@ checks.
      route INV-0004 F4 found live; (3) annotating that same path as a stub →
      `stale annotations (they match nothing; delete them)`. Clean tree exits
      0.)_
-- [ ] 5. Docs: DEVELOPMENT.md gains the regenerate-and-commit workflow (next to
+- [x] 5. Docs: DEVELOPMENT.md gains the regenerate-and-commit workflow (next to
      the schema-drift section it extends); CLAUDE.md's CI matrix mentions the
-     coverage step; `mockpve` doc.go notes `Routes()`.
+     coverage step; `mockpve` doc.go notes `Routes()`. _(Done 2026-07-25:
+     DEVELOPMENT.md gained an "API coverage report" section right after
+     schema-drift plus the two recipes in its task table; it documents the three
+     ways `coverage-check` fails and **what to do about each**, since they have
+     different fixes — regenerate, fix the mock and check the SDK, or delete the
+     dead annotation. CLAUDE.md's CI matrix describes the coverage step in the
+     same detail as the schema-drift one. `mockpve/doc.go` documented `Routes()`
+     as the coverage numerator back in Phase 1 task 1, and `coverage/doc.go` was
+     rewritten at Phase 2 closure.)_
 - [ ] 6. PR: `minor` label (`Routes()` is new public API on an importable
      package, DESIGN-0005 OQ-5a); changelog-final; merge → auto-release;
      DESIGN-0005 status → Implemented.
