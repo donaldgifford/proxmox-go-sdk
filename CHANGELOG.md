@@ -4,6 +4,52 @@ All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [unreleased]
+
+### Features
+
+- *(mockpve)* Add the handle helper and exported Routes()
+- *(coverage)* Add the coverage package with endpoint normalization
+- *(coverage)* Map endpoints to services with no catch-all rules
+- *(coverage)* Load and validate the annotations exceptions file
+- *(coverage)* Compute and render the coverage report
+- *(coverage)* Add the fabrication guard and drift check
+- *(schemadiff)* Add the -coverage mode
+- *(coverage)* Seed the annotations exceptions file
+
+### Bug Fixes
+
+- *(firewall)* Mirror PVE's real per-scope firewall surface
+- *(mockpve)* Register guest power verbs as literal paths
+- *(ceph)* Correct the pool and config paths to what PVE serves
+
+### Refactor
+
+- *(mockpve)* Route every registration through handle
+
+### Documentation
+
+- *(mockpve)* Document the route surface and Routes()
+- *(coverage)* Describe the landed package surface
+- *(impl-0006)* Record the fabrication-guard triage
+- Commit the first generated coverage report
+- Document the coverage report workflow
+- Close out IMPL-0006 and flip DESIGN-0005 to Implemented
+- *(impl-0006)* Close the ledger — every phase criterion met
+
+### Styling
+
+- Apply two Uber-style fixes from the go-style pass
+
+### Testing
+
+- *(mockpve)* Pin Routes() against the served surface
+
+### Miscellaneous Tasks
+
+- Run the coverage checks on every push
+- Ignore transient pvelab run logs
+
 ## [0.9.0] - 2026-07-23
 
 ### Bug Fixes

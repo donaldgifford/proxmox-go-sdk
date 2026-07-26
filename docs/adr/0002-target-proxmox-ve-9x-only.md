@@ -12,17 +12,16 @@ created: 2026-06-22
 
 <!--toc:start-->
 
-- [0002. Target Proxmox VE 9.x only](#0002-target-proxmox-ve-9x-only)
-  - [Status](#status)
-  - [Context](#context)
-  - [Decision](#decision)
-  - [Consequences](#consequences)
-    - [Positive](#positive)
-    - [Negative](#negative)
-    - [Neutral](#neutral)
-  - [Alternatives Considered](#alternatives-considered)
-  - [References](#references)
-  <!--toc:end-->
+- [Status](#status)
+- [Context](#context)
+- [Decision](#decision)
+- [Consequences](#consequences)
+  - [Positive](#positive)
+  - [Negative](#negative)
+  - [Neutral](#neutral)
+- [Alternatives Considered](#alternatives-considered)
+- [References](#references)
+<!--toc:end-->
 
 ## Status
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/firewall"
@@ -37,6 +38,10 @@ func serviceForScope(t *testing.T, mock *mockpve.Server, scope, ver string) *fir
 }
 
 var scopes = []string{"cluster", "node", "guest"}
+
+// ipsetScopes are the scopes PVE serves IPSets at. Node scope is absent on
+// purpose — see TestIPSetsUnsupportedAtNodeScope.
+var ipsetScopes = []string{"cluster", "guest"}
 
 func TestRuleCRUDPerScope(t *testing.T) {
 	t.Parallel()
@@ -126,7 +131,7 @@ func TestCreateRuleValidation(t *testing.T) {
 
 func TestIPSetCRUDPerScope(t *testing.T) {
 	t.Parallel()
-	for _, scope := range scopes {
+	for _, scope := range ipsetScopes {
 		t.Run(scope, func(t *testing.T) {
 			t.Parallel()
 			mock := mockpve.New()
@@ -167,6 +172,40 @@ func TestIPSetCRUDPerScope(t *testing.T) {
 		})
 	}
 }
+
+// PVE serves no IPSet API at node scope — a node's firewall is only /firewall,
+// /log, /options and /rules (confirmed against the real 9.2 apidoc, IMPL-0006).
+// Every IPSet op must therefore refuse BEFORE issuing a request: the alternative
+// is a bare 404 that reads like a broken node rather than an operation that
+// cannot exist. The mock registers no node-scope IPSet routes either, so this
+// can never silently pass again.
+func TestIPSetsUnsupportedAtNodeScope(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := serviceForScope(t, mock, "node", "9.1")
+	ctx := context.Background()
+
+	ops := map[string]error{
+		"ListIPSets":       errFrom(func() error { _, err := svc.ListIPSets(ctx); return err }),
+		"CreateIPSet":      svc.CreateIPSet(ctx, &firewall.IPSetSpec{Name: "trusted"}),
+		"RenameIPSet":      svc.RenameIPSet(ctx, "trusted", "trusted2"),
+		"DeleteIPSet":      svc.DeleteIPSet(ctx, "trusted"),
+		"ListIPSetEntries": errFrom(func() error { _, err := svc.ListIPSetEntries(ctx, "trusted"); return err }),
+		"AddIPSetEntry":    svc.AddIPSetEntry(ctx, "trusted", &firewall.IPSetEntrySpec{CIDR: "10.0.0.0/24"}),
+		"DeleteIPSetEntry": svc.DeleteIPSetEntry(ctx, "trusted", "10.0.0.0/24"),
+	}
+	for op, err := range ops {
+		if !errors.Is(err, pverr.ErrUnsupported) {
+			t.Errorf("%s at node scope = %v, want ErrUnsupported", op, err)
+		}
+		if err != nil && !strings.Contains(err.Error(), "node scope") {
+			t.Errorf("%s error does not explain the scope: %v", op, err)
+		}
+	}
+}
+
+// errFrom runs a read that returns a value plus an error and keeps the error.
+func errFrom(f func() error) error { return f() }
 
 // TestRenameIPSetGate covers the OverlappingIPSets gate: rename requires 9.1.
 func TestRenameIPSetGate(t *testing.T) {

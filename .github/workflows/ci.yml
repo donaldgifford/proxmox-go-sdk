@@ -59,6 +59,11 @@ jobs:
       - name: Check API schema drift
         run: just schemadiff
 
+      # Fails on a stale docs/COVERAGE.md, on a mockpve route referencing an
+      # endpoint real PVE does not serve, and on a stale annotation (DESIGN-0005).
+      - name: Check API coverage report
+        run: just coverage-check
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v6
         with:

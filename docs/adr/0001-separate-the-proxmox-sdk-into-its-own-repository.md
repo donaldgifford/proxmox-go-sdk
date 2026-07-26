@@ -12,20 +12,19 @@ created: 2026-06-22
 
 <!--toc:start-->
 
-- [0001. Separate the Proxmox SDK into its own repository](#0001-separate-the-proxmox-sdk-into-its-own-repository)
-  - [Status](#status)
-  - [Context](#context)
-  - [Decision](#decision)
-    - [SDK shape (modeled on AWS SDK v2 + bpg + pvetui)](#sdk-shape-modeled-on-aws-sdk-v2--bpg--pvetui)
-    - [The SDK / consumer boundary (held deliberately)](#the-sdk--consumer-boundary-held-deliberately)
-    - [naos and any future provider](#naos-and-any-future-provider)
-  - [Consequences](#consequences)
-    - [Positive](#positive)
-    - [Negative](#negative)
-    - [Neutral](#neutral)
-  - [Alternatives Considered](#alternatives-considered)
-  - [References](#references)
-  <!--toc:end-->
+- [Status](#status)
+- [Context](#context)
+- [Decision](#decision)
+  - [SDK shape (modeled on AWS SDK v2 + bpg + pvetui)](#sdk-shape-modeled-on-aws-sdk-v2--bpg--pvetui)
+  - [The SDK / consumer boundary (held deliberately)](#the-sdk--consumer-boundary-held-deliberately)
+  - [naos and any future provider](#naos-and-any-future-provider)
+- [Consequences](#consequences)
+  - [Positive](#positive)
+  - [Negative](#negative)
+  - [Neutral](#neutral)
+- [Alternatives Considered](#alternatives-considered)
+- [References](#references)
+<!--toc:end-->
 
 ## Status
 

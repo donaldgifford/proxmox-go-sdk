@@ -40,6 +40,8 @@ Everything is driven by [`just`](https://github.com/casey/just):
 | `just fmt`            | `go fmt` + yamlfmt + prettier `--write`               |
 | `just run -- <args>`  | run the `mockpve` server via `go run ./cmd/mockpve`   |
 | `just schemadiff`     | guard the API schema against drift (see below)        |
+| `just coverage`       | regenerate `docs/COVERAGE.md` (see below)             |
+| `just coverage-check` | verify the report is current (what CI runs)           |
 | `just release vX.Y.Z` | manual tag (recovery only — releases are automatic)   |
 
 Run `just fmt` and `just lint` before every commit; run `just test` (race)
@@ -108,6 +110,40 @@ just schemadiff -update   # rewrites baseline.json; review the diff in the PR
 
 The endpoint diff in the resulting PR **is** the minor-release API delta —
 review it against the capability gates before merging.
+
+### API coverage report
+
+`docs/COVERAGE.md` measures the SDK against that same baseline — per service,
+every endpoint, covered / stub / out-of-scope / gap (DESIGN-0005). It is
+**generated, never hand-edited**: the numerator is `mockpve.Server.Routes()` (an
+op is covered when a mock route serves it, which this repo's testing discipline
+makes true), and the only hand-written input is
+`cmd/pve-schemadiff/coverage-annotations.yaml`, which holds exceptions only.
+
+If your PR adds, removes, or renames a `mockpve` route, regenerate and commit in
+the same PR:
+
+```bash
+just coverage        # rewrites docs/COVERAGE.md
+just coverage-check  # what CI runs; exits non-zero on any of the three failures
+```
+
+`coverage-check` fails three ways, and each has a different fix:
+
+- **Stale report** — you changed the route surface without regenerating. Run
+  `just coverage` and commit the result.
+- **Fabricated route** — `mockpve` serves a path (or verb) real PVE does not.
+  **Fix the mock, and check the SDK**: the mock exists to mirror PVE, so this
+  usually means an SDK method would 404 live. This is the check that would have
+  caught the SDN-fabrics and HA-DLB paths the day they were written (INV-0004);
+  it caught 26 such routes on its first run. Allowlisting is a last resort and
+  needs a written reason in the annotations file.
+- **Stale annotation** — an exception no longer describes anything. Delete it.
+
+The percentage is deliberately **not a target** (the report's own header says
+so): it is measured against the entire REST API, including surfaces no consumer
+has asked for, so use the per-service tables to answer "is this endpoint
+reachable?" rather than chasing the number.
 
 ## Changelog and releases
 

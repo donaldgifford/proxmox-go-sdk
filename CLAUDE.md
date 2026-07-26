@@ -766,9 +766,9 @@ environment.** This shapes how we test and what "done" means:
 - `.github/workflows/ci.yml` runs on every push/PR — `just test`
   (race+coverage), `just test-replay` (the `Test Replay (cassettes)` job:
   replays the committed go-vcr cassettes through the integration suite with
-  `PVE_REPLAY=1`, no live node), `just lint`, schema-drift, security, and a
-  goreleaser snapshot. (A `.forgejo/workflows/` mirror is planned but not yet in
-  the repo.)
+  `PVE_REPLAY=1`, no live node), `just lint`, schema-drift, **coverage**
+  (`just coverage-check`), security, and a goreleaser snapshot. (A
+  `.forgejo/workflows/` mirror is planned but not yet in the repo.)
 - Release workflows fire only on `v*` tag push; `goreleaser` consumes
   `.goreleaser.yml` and the appropriate token (`GITEA_TOKEN` for Forgejo,
   `GITHUB_TOKEN` for GitHub).
@@ -779,6 +779,22 @@ environment.** This shapes how we test and what "done" means:
   by default; point `-apidoc` at a real 9.x dump (and `-update` to rebaseline)
   to guard the live REST surface. Parse/diff logic lives in the importable
   `cmd/pve-schemadiff/schema` package and is unit-tested against a fixture.
+- A **coverage** step (`just coverage-check`, in the test-go job, right after
+  schema-drift) runs the same tool in `-coverage` mode (IMPL-0006/DESIGN-0005):
+  it measures `mockpve.New().Routes()` (the numerator — an op is covered when a
+  mock route serves it) against the same baseline, renders the committed
+  `docs/COVERAGE.md`, and fails three ways: a **stale report** (regenerate with
+  `just coverage` and commit — the doc is generated-only, and is in the prettier
+  - markdownlint ignore lists so no formatter can rewrite it), a **fabricated
+    route** (mockpve serves a path or verb real PVE does not — fix the mock AND
+    check the SDK, since it usually means an SDK method would 404 live; this is
+    the guard that makes the INV-0004 fabrics/DLB failure mode structurally
+    impossible), or a **stale annotation**. The only hand-written input is
+    `cmd/pve-schemadiff/coverage-annotations.yaml` (exceptions only: stubs,
+    side-channel capabilities, out-of-scope families, the guard's allowlist —
+    currently the allowlist and stubs are empty). Logic lives in the importable
+    `cmd/pve-schemadiff/coverage` package. **The percentage is not a target** —
+    it is measured against the entire REST API.
 
 ## Gotchas
 

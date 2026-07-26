@@ -51,8 +51,15 @@ const (
 	msgBadVNCTicket       = "invalid or expired vnc ticket"
 )
 
-// qemuPowerStatus maps a /status/{action} verb to the run state the mock VM
-// settles into once the synthetic task completes.
+// qemuPowerStatus maps a power verb to the run state the mock guest settles into
+// once the synthetic task completes. The keys are also the routes registered:
+// PVE serves each verb as its own literal path (/status/start, /status/stop, …),
+// never a wildcard, and the coverage fabrication guard rejects the collapsed
+// /status/{action} shape (IMPL-0006).
+//
+// Only the verbs the SDK actually drives are here. PVE's qemu status API also has
+// /status/reset, deliberately left out: the SDK has no Reset op, and registering
+// a route for it would count an unreachable endpoint as covered.
 var qemuPowerStatus = map[string]string{
 	"start":    vmStatusRunning,
 	"stop":     vmStatusStopped,
@@ -61,6 +68,10 @@ var qemuPowerStatus = map[string]string{
 	"suspend":  "suspended",
 	"resume":   vmStatusRunning,
 }
+
+// powerVerbs is qemuPowerStatus's keys in a fixed order, so route registration
+// (and therefore Routes()) is deterministic.
+var powerVerbs = []string{"start", "stop", "shutdown", "reboot", "suspend", "resume"}
 
 // qemuState is the QEMU slice of the mock model, embedded in state and guarded
 // by state.mu.
@@ -217,25 +228,27 @@ func synthUPID(node, taskType, id string) string {
 }
 
 func (s *Server) registerQEMURoutes() {
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/qemu", s.handleQEMUList)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu", s.handleQEMUCreate)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/qemu/{vmid}/status/current", s.handleQEMUStatus)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/qemu/{vmid}/config", s.handleQEMUConfig)
-	s.mux.HandleFunc("PUT /api2/json/nodes/{node}/qemu/{vmid}/config", s.handleQEMUSetConfig)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/clone", s.handleQEMUClone)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/template", s.handleQEMUTemplate)
-	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/qemu/{vmid}", s.handleQEMUDelete)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/status/{action}", s.handleQEMUPower)
-	s.mux.HandleFunc("PUT /api2/json/nodes/{node}/qemu/{vmid}/resize", s.handleQEMUResize)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/move_disk", s.handleQEMUMoveDisk)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/migrate", s.handleQEMUMigrate)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/qemu/{vmid}/snapshot", s.handleQEMUSnapshotList)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/snapshot", s.handleQEMUSnapshotCreate)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/snapshot/{snap}/rollback", s.handleQEMUSnapshotRollback)
-	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/qemu/{vmid}/snapshot/{snap}", s.handleQEMUSnapshotDelete)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/agent/ping", s.handleQEMUAgentPing)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/qemu/{vmid}/agent/exec", s.handleQEMUAgentExec)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/qemu/{vmid}/agent/exec-status", s.handleQEMUAgentExecStatus)
+	s.handle("GET /api2/json/nodes/{node}/qemu", s.handleQEMUList)
+	s.handle("POST /api2/json/nodes/{node}/qemu", s.handleQEMUCreate)
+	s.handle("GET /api2/json/nodes/{node}/qemu/{vmid}/status/current", s.handleQEMUStatus)
+	s.handle("GET /api2/json/nodes/{node}/qemu/{vmid}/config", s.handleQEMUConfig)
+	s.handle("PUT /api2/json/nodes/{node}/qemu/{vmid}/config", s.handleQEMUSetConfig)
+	s.handle("POST /api2/json/nodes/{node}/qemu/{vmid}/clone", s.handleQEMUClone)
+	s.handle("POST /api2/json/nodes/{node}/qemu/{vmid}/template", s.handleQEMUTemplate)
+	s.handle("DELETE /api2/json/nodes/{node}/qemu/{vmid}", s.handleQEMUDelete)
+	for _, verb := range powerVerbs {
+		s.handle("POST /api2/json/nodes/{node}/qemu/{vmid}/status/"+verb, s.handleQEMUPower(verb))
+	}
+	s.handle("PUT /api2/json/nodes/{node}/qemu/{vmid}/resize", s.handleQEMUResize)
+	s.handle("POST /api2/json/nodes/{node}/qemu/{vmid}/move_disk", s.handleQEMUMoveDisk)
+	s.handle("POST /api2/json/nodes/{node}/qemu/{vmid}/migrate", s.handleQEMUMigrate)
+	s.handle("GET /api2/json/nodes/{node}/qemu/{vmid}/snapshot", s.handleQEMUSnapshotList)
+	s.handle("POST /api2/json/nodes/{node}/qemu/{vmid}/snapshot", s.handleQEMUSnapshotCreate)
+	s.handle("POST /api2/json/nodes/{node}/qemu/{vmid}/snapshot/{snap}/rollback", s.handleQEMUSnapshotRollback)
+	s.handle("DELETE /api2/json/nodes/{node}/qemu/{vmid}/snapshot/{snap}", s.handleQEMUSnapshotDelete)
+	s.handle("POST /api2/json/nodes/{node}/qemu/{vmid}/agent/ping", s.handleQEMUAgentPing)
+	s.handle("POST /api2/json/nodes/{node}/qemu/{vmid}/agent/exec", s.handleQEMUAgentExec)
+	s.handle("GET /api2/json/nodes/{node}/qemu/{vmid}/agent/exec-status", s.handleQEMUAgentExecStatus)
 }
 
 func (s *Server) handleQEMUList(w http.ResponseWriter, r *http.Request) {
@@ -450,33 +463,31 @@ func (s *Server) handleQEMUDelete(w http.ResponseWriter, r *http.Request) {
 	s.writeData(w, s.finishedTask(node, "qmdestroy", strconv.Itoa(vmid)))
 }
 
-func (s *Server) handleQEMUPower(w http.ResponseWriter, r *http.Request) {
-	if !s.checkAuth(w, r) {
-		return
+// handleQEMUPower serves one power verb; the verb is bound at registration
+// because the route is a literal path with no wildcard to read it from.
+func (s *Server) handleQEMUPower(action string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !s.checkAuth(w, r) {
+			return
+		}
+		node := r.PathValue("node")
+		vmid, err := strconv.Atoi(r.PathValue("vmid"))
+		if err != nil {
+			s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
+			return
+		}
+		s.st.mu.Lock()
+		rec := s.lookupVM(node, vmid)
+		if rec != nil {
+			rec.Status = qemuPowerStatus[action]
+		}
+		s.st.mu.Unlock()
+		if rec == nil {
+			s.writeError(w, http.StatusNotFound, msgNoSuchVM)
+			return
+		}
+		s.writeData(w, s.finishedTask(node, "qm"+action, strconv.Itoa(vmid)))
 	}
-	node := r.PathValue("node")
-	action := r.PathValue("action")
-	newStatus, ok := qemuPowerStatus[action]
-	if !ok {
-		s.writeError(w, http.StatusBadRequest, "unknown power action")
-		return
-	}
-	vmid, err := strconv.Atoi(r.PathValue("vmid"))
-	if err != nil {
-		s.writeError(w, http.StatusBadRequest, msgInvalidVMID)
-		return
-	}
-	s.st.mu.Lock()
-	rec := s.lookupVM(node, vmid)
-	if rec != nil {
-		rec.Status = newStatus
-	}
-	s.st.mu.Unlock()
-	if rec == nil {
-		s.writeError(w, http.StatusNotFound, msgNoSuchVM)
-		return
-	}
-	s.writeData(w, s.finishedTask(node, "qm"+action, strconv.Itoa(vmid)))
 }
 
 func (s *Server) handleQEMUResize(w http.ResponseWriter, r *http.Request) {

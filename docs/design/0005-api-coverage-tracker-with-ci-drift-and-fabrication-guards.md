@@ -1,7 +1,7 @@
 ---
 id: DESIGN-0005
 title: "API coverage tracker with CI drift and fabrication guards"
-status: Approved
+status: Implemented
 author: Donald Gifford
 created: 2026-07-19
 ---
@@ -10,7 +10,7 @@ created: 2026-07-19
 
 # DESIGN 0005: API coverage tracker with CI drift and fabrication guards
 
-**Status:** Approved **Author:** Donald Gifford **Date:** 2026-07-19 (OQs
+**Status:** Implemented **Author:** Donald Gifford **Date:** 2026-07-19 (OQs
 decided 2026-07-21: all a)
 
 <!--toc:start-->

@@ -52,12 +52,12 @@ func (s *Server) ensureNodeLocked(node string) *nodeState {
 }
 
 func (s *Server) registerNodeNetworkRoutes() {
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/network", s.handleNetworkList)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/network", s.handleNetworkCreate)
-	s.mux.HandleFunc("PUT /api2/json/nodes/{node}/network", s.handleNetworkApply)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/network/{iface}", s.handleNetworkGet)
-	s.mux.HandleFunc("PUT /api2/json/nodes/{node}/network/{iface}", s.handleNetworkUpdate)
-	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/network/{iface}", s.handleNetworkDelete)
+	s.handle("GET /api2/json/nodes/{node}/network", s.handleNetworkList)
+	s.handle("POST /api2/json/nodes/{node}/network", s.handleNetworkCreate)
+	s.handle("PUT /api2/json/nodes/{node}/network", s.handleNetworkApply)
+	s.handle("GET /api2/json/nodes/{node}/network/{iface}", s.handleNetworkGet)
+	s.handle("PUT /api2/json/nodes/{node}/network/{iface}", s.handleNetworkUpdate)
+	s.handle("DELETE /api2/json/nodes/{node}/network/{iface}", s.handleNetworkDelete)
 }
 
 func (s *Server) handleNetworkList(w http.ResponseWriter, r *http.Request) {

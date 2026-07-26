@@ -142,20 +142,20 @@ func (s *Server) AddZFSPool(node, name string, size, free int64) {
 }
 
 func (s *Server) registerStorageRoutes() {
-	s.mux.HandleFunc("GET /api2/json/storage", s.handleDatastoreList)
-	s.mux.HandleFunc("GET /api2/json/storage/{storage}", s.handleDatastoreGet)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/storage", s.handleNodeStorageList)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/storage/{storage}/status", s.handleNodeStorageStatus)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/storage/{storage}/content", s.handleContentList)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/storage/{storage}/content", s.handleVolumeCreate)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/storage/{storage}/content/{volid}", s.handleVolumeGet)
-	s.mux.HandleFunc("DELETE /api2/json/nodes/{node}/storage/{storage}/content/{volid}", s.handleVolumeDelete)
+	s.handle("GET /api2/json/storage", s.handleDatastoreList)
+	s.handle("GET /api2/json/storage/{storage}", s.handleDatastoreGet)
+	s.handle("GET /api2/json/nodes/{node}/storage", s.handleNodeStorageList)
+	s.handle("GET /api2/json/nodes/{node}/storage/{storage}/status", s.handleNodeStorageStatus)
+	s.handle("GET /api2/json/nodes/{node}/storage/{storage}/content", s.handleContentList)
+	s.handle("POST /api2/json/nodes/{node}/storage/{storage}/content", s.handleVolumeCreate)
+	s.handle("GET /api2/json/nodes/{node}/storage/{storage}/content/{volid}", s.handleVolumeGet)
+	s.handle("DELETE /api2/json/nodes/{node}/storage/{storage}/content/{volid}", s.handleVolumeDelete)
 	// No .../content/{volid}/snapshot routes: PVE exposes no storage-level
 	// volume-snapshot endpoint (see storage.VolumeSnapshots).
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/storage/{storage}/upload", s.handleStorageUpload)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/disks/zfs", s.handleZFSList)
-	s.mux.HandleFunc("POST /api2/json/nodes/{node}/disks/zfs", s.handleZFSCreate)
-	s.mux.HandleFunc("GET /api2/json/nodes/{node}/disks/zfs/{name}", s.handleZFSGet)
+	s.handle("POST /api2/json/nodes/{node}/storage/{storage}/upload", s.handleStorageUpload)
+	s.handle("GET /api2/json/nodes/{node}/disks/zfs", s.handleZFSList)
+	s.handle("POST /api2/json/nodes/{node}/disks/zfs", s.handleZFSCreate)
+	s.handle("GET /api2/json/nodes/{node}/disks/zfs/{name}", s.handleZFSGet)
 }
 
 // handleStorageUpload models the streaming multipart upload endpoint. It reads
