@@ -138,9 +138,12 @@ The numerator, as an additive public API.
 
 #### Success Criteria
 
-- `go build ./...`, `just lint`, `just test` (race) green.
+- `go build ./...`, `just lint`, `just test` (race) green. **Met 2026-07-25.**
 - `mockpve.New().Routes()` returns every registered pattern; no registration
-  bypasses the helper.
+  bypasses the helper. **Met 2026-07-25** — `TestNoDirectMuxRegistrations` fails
+  if a registration sidesteps `handle`, and `TestRoutesAreAllServed` dials every
+  reported pattern to prove the enumeration is honest in the other direction
+  too.
 
 ---
 
@@ -317,11 +320,11 @@ package (the `schema`-package precedent).
   fixture route; `just lint` + `just test` green. **Met 2026-07-25** (coverage
   package at 97.6% statements).
 - `go run ./cmd/pve-schemadiff -coverage …` produces a complete report from the
-  real baseline + real mock routes locally. **Blocked on Phase 3 task 2, by
-  design**: the run currently exits 1 with the 26 fabricated-route findings and
-  writes nothing, which is the guard working. The render itself is verified at
-  real scale (835 lines from the real baseline + real mock routes); it reaches
-  disk once the mock is fixed.
+  real baseline + real mock routes locally. **Met 2026-07-25, after Phase 3 task
+  2 unblocked it.** It was blocked by design: the run exited 1 with the 26
+  fabricated-route findings and wrote nothing, which is the guard working. With
+  the mock and the two SDK path bugs fixed it exits 0 and writes the committed
+  845-line `docs/COVERAGE.md` (248/675, 0 unmatched).
 
 ---
 
@@ -468,16 +471,27 @@ checks.
      same detail as the schema-drift one. `mockpve/doc.go` documented `Routes()`
      as the coverage numerator back in Phase 1 task 1, and `coverage/doc.go` was
      rewritten at Phase 2 closure.)_
-- [ ] 6. PR: `minor` label (`Routes()` is new public API on an importable
+- [x] 6. PR: `minor` label (`Routes()` is new public API on an importable
      package, DESIGN-0005 OQ-5a); changelog-final; merge → auto-release;
-     DESIGN-0005 status → Implemented.
+     DESIGN-0005 status → Implemented. _(Done 2026-07-25: PR #25, single semver
+     label `minor`, changelog as the branch's final commit. All checks green,
+     including `Test Go` — so `just coverage-check` passes on CI's Linux too,
+     which is the case-sensitivity trap `.gitignore`'s `!docs/COVERAGE.md`
+     negation exists to avoid. DESIGN-0005 → Implemented in the same branch.
+     Merge + the label-driven tag are Donald's to fire.)_
 
 #### Success Criteria
 
 - CI fails on a stale `COVERAGE.md` and on a fabricated mock route; both checks
-  green on the real tree with an empty (or reasoned) allowlist.
+  green on the real tree with an empty (or reasoned) allowlist. **Met
+  2026-07-25** — each failure mode was exercised with a deliberate tamper (stale
+  report names the differing line; a re-added `/cluster/ha/lbalancer` route is
+  named as fabricated; a dead annotation is named as stale), and the untampered
+  tree is green in CI with `stubs`, `out_of_scope` and `allow_unmatched_routes`
+  all empty.
 - `docs/COVERAGE.md` is committed, generated-only, and current; DESIGN-0005 is
-  Implemented.
+  Implemented. **Met 2026-07-25** — ignored by prettier and markdownlint, and
+  `just coverage-check` passes in the CI `Test Go` job, not just locally.
 
 ## Open Questions
 
