@@ -67,6 +67,9 @@ dist/
 pvelab.yaml
 .pvelab-state.json
 .pvelab.env
+# Transient lab run logs (`just dogfood-up > dogfood-run.log`) — they name lab
+# nodes and are per-run, so they stay local.
+*-run.log
 
 # donald-loop runtime state
 .claude/donald-loop.local.md
