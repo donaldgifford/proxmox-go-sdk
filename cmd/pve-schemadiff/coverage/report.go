@@ -53,9 +53,9 @@ func (c Counts) Percent() string {
 
 // ServiceReport is one section of the report.
 type ServiceReport struct {
+	Counts
 	Name string
 	Rows []Row // Sorted by path, then method.
-	Counts
 }
 
 // Findings are the integrity problems Build detects. They are not report

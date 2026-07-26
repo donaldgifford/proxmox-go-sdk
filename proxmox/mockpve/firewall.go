@@ -408,11 +408,10 @@ func (s *Server) fwIPSetEntryDelete(key fwScopeKeyFunc) http.HandlerFunc {
 		sc := s.fwScopeLocked(key(r))
 		rec, found := sc.ipsets[name]
 		if found {
-			if _, ok := rec.entries[cidr]; ok {
-				delete(rec.entries, cidr)
-			} else {
-				found = false
-			}
+			_, found = rec.entries[cidr]
+		}
+		if found {
+			delete(rec.entries, cidr)
 		}
 		s.st.mu.Unlock()
 		if !found {
