@@ -35,6 +35,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - Commit the first generated coverage report
 - Document the coverage report workflow
 - Close out IMPL-0006 and flip DESIGN-0005 to Implemented
+- *(impl-0006)* Close the ledger — every phase criterion met
 
 ### Styling
 
