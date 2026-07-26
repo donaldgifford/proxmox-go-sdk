@@ -1,7 +1,7 @@
 ---
 id: IMPL-0006
 title: "API coverage tracker delivery"
-status: Draft
+status: Completed
 author: Donald Gifford
 created: 2026-07-21
 ---
@@ -10,8 +10,8 @@ created: 2026-07-21
 
 # IMPL 0006: API coverage tracker delivery
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-07-21 (OQs decided
-2026-07-21: all a)
+**Status:** Completed **Author:** Donald Gifford **Date:** 2026-07-21 (OQs
+decided 2026-07-21: all a; delivered 2026-07-25)
 
 <!--toc:start-->
 
