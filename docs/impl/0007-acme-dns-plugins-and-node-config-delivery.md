@@ -167,11 +167,23 @@ self-service.
      does NOT enforce gofumpt's blank-line rule between a single-line and a
      multi-line func — `golangci-lint fmt <file>` is what fixes a `gofumpt`
      finding.)_
-- [ ] 3. mockpve plugin state in `mockpve/nodesadmin.go`: `acmePlugins` map (id
+- [x] 3. mockpve plugin state in `mockpve/nodesadmin.go`: `acmePlugins` map (id
      → record with digest), routes for the five verbs through `handle`,
      `AddACMEPlugin` seeder, digest-mismatch conflict on update (mirror real
      PVE's refusal), `delete` param honored. The mock stores `data` verbatim and
-     returns it on get/list, same as real PVE.
+     returns it on get/list, same as real PVE. _(Done 2026-08-17, with one
+     placement deviation: the plugin + discovery routes live in a NEW
+     `mockpve/acme.go` rather than growing `nodesadmin.go` — that file is
+     already the apt/disks/certs/accounts grab-bag, and a per-surface file is
+     the mock's own convention. `acmePlugins` keyed by ID; `AddACMEPlugin`
+     seeder; digest guard (a non-matching `digest` is a 400, an absent one is
+     unguarded, as on real PVE); `delete` honored, applied AFTER the sets so a
+     set+unset request is unambiguous. The list handler **sorts** — the rest of
+     mockpve returns raw map order, but a random order makes an `// Output:`
+     Example impossible, and real PVE's order is stable too. Numeric fields are
+     stored as the form's strings (that is what makes partial update trivial)
+     and converted by `atoiOrZero`, since errcheck's check-blank forbids the `v,
+     _ := strconv.Atoi` shorthand.)\_
 - [ ] 4. The five CRUD ops (`ListACMEPlugins`/`GetACMEPlugin`/
      `CreateACMEPlugin`/`UpdateACMEPlugin`/`DeleteACMEPlugin`), all synchronous
      (`error`, never `tasks.Ref`). Unit round-trips against mockpve: create with

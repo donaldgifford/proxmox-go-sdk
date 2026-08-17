@@ -138,6 +138,7 @@ func (s *Server) registerRoutes() {
 	s.registerHARoutes()
 	s.registerNodeNetworkRoutes()
 	s.registerNodeAdminRoutes()
+	s.registerACMERoutes()
 	s.registerSDNRoutes()
 	s.registerFirewallRoutes()
 	s.registerClusterRoutes()

@@ -29,6 +29,8 @@ type state struct {
 	console  consoleState
 	// acmeAccounts is cluster-scoped (/cluster/acme/account), keyed by handle.
 	acmeAccounts map[string]*acmeAccountRecord
+	// acmePlugins is cluster-scoped (/cluster/acme/plugins), keyed by plugin ID.
+	acmePlugins map[string]*acmePluginRecord
 }
 
 // versionData backs GET /version.
