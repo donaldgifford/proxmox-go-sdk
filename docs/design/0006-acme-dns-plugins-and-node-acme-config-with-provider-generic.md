@@ -1,7 +1,7 @@
 ---
 id: DESIGN-0006
 title: "ACME DNS plugins and node ACME config with provider-generic credentials"
-status: Draft
+status: Approved
 author: Donald Gifford
 created: 2026-08-16
 ---
@@ -10,7 +10,9 @@ created: 2026-08-16
 
 # DESIGN 0006: ACME DNS plugins and node ACME config with provider-generic credentials
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-08-16
+**Status:** Approved **Author:** Donald Gifford **Date:** 2026-08-16 (OQs
+decided 2026-08-17: all a; OQ-6 amended — one shared domain for both providers,
+sequential runs)
 
 <!--toc:start-->
 
@@ -23,7 +25,7 @@ created: 2026-08-16
   - [What the SDK covers today](#what-the-sdk-covers-today)
   - [Wire facts (from the committed 9.2 apidoc)](#wire-facts-from-the-committed-92-apidoc)
 - [Detailed Design](#detailed-design)
-  - [Provider-generic credentials: the `ACMEPluginData` interface](#provider-generic-credentials-the-acmeplugindata-interface)
+  - [Provider-generic credentials: the ACMEPluginData interface](#provider-generic-credentials-the-acmeplugindata-interface)
   - [Plugin CRUD](#plugin-crud)
   - [Challenge schema and directories (discovery reads)](#challenge-schema-and-directories-discovery-reads)
   - [Node ACME config](#node-acme-config)
@@ -380,8 +382,9 @@ here is 9.0 baseline).
   the cf plugin, set `acmedomain0` on one node, order, await the task, verify
   the served certificate's SAN, then revoke + clean up. Recorded with the
   extended redaction; the cassette's `data` and certificate-order responses
-  scrubbed before commit. A Namecheap variant only if lab credentials exist
-  (OQ-6).
+  scrubbed before commit. A `TestACMEDNSNamecheap` variant runs against the same
+  domain after its nameservers switch to Namecheap DNS (OQ-6: one shared domain,
+  sequential runs).
 - The order/renew/revoke task-vs-sync REST-with-caveat from Phase 6 gets
   resolved by this live run and the caveat comments updated.
 
@@ -393,12 +396,14 @@ here is 9.0 baseline).
 2. Live verification (Donald-run, needs a real domain in a Cloudflare zone + LE
    staging): the integration test above, cassettes leak-reviewed and committed,
    replay wired into `just test-replay`.
-3. Namecheap live verification when/if credentials exist; until then Namecheap
-   is unit-verified only and its doc comment says so (the honesty rule).
+3. Namecheap live verification on the same domain after its nameservers switch
+   to Namecheap DNS (OQ-6: one shared domain, sequential provider runs); until
+   that run lands, Namecheap is unit-verified only and its doc comment says so
+   (the honesty rule).
 
 ## Open Questions
 
-1. **Where does the ACME surface live?** **Decision: pending.**
+1. **Where does the ACME surface live?** **Decision (2026-08-17): a.**
    - **a (recommended):** `proxmox/nodes`, beside the ACME account ops in
      `certificates.go` (new files `acmeplugins.go`, `nodeconfig.go`). The whole
      ACME story stays in one package — accounts, plugins, node wiring, ordering
@@ -413,7 +418,7 @@ here is 9.0 baseline).
      options/status/resources today, and the node-config half wouldn't belong
      there either.
 
-2. **Shape of the provider-generic mechanism?** **Decision: pending.**
+2. **Shape of the provider-generic mechanism?** **Decision (2026-08-17): a.**
    - **a (recommended):** The two-method `ACMEPluginData` interface + typed
      provider structs + `RawPluginData`. Smallest possible seam; adding a
      provider is one struct with two trivial methods; the raw type keeps all 160
@@ -429,8 +434,8 @@ here is 9.0 baseline).
      unverified providers would look as trustworthy as verified ones — against
      the honesty rule.
 
-3. **Ship Namecheap typed in the first PR, or Cloudflare only?** **Decision:
-   pending.**
+3. **Ship Namecheap typed in the first PR, or Cloudflare only?** **Decision
+   (2026-08-17): a.**
    - **a (recommended):** Both. Two implementations are the minimum proof the
      interface generalizes, Namecheap's all-required/IP-allowlisted shape is
      usefully un-Cloudflare-like, and you named it as the second provider you'd
@@ -440,8 +445,8 @@ here is 9.0 baseline).
      second-provider ergonomics (the thing this design exists for) go
      unexercised.
 
-4. **Client-side validation against the challenge schema?** **Decision:
-   pending.**
+4. **Client-side validation against the challenge schema?** **Decision
+   (2026-08-17): a.**
    - **a (recommended):** None. The SDK validates only its own contract
      (non-empty `ID`, `Data` present when `Type` is dns) and lets PVE validate
      provider fields — PVE owns that schema and the SDK duplicating it would
@@ -452,7 +457,7 @@ here is 9.0 baseline).
      create, a cache-staleness question, and a failure mode where the SDK
      rejects what the server would accept.
 
-5. **How much of node config gets typed?** **Decision: pending.**
+5. **How much of node config gets typed?** **Decision (2026-08-17): a.**
    - **a (recommended):** Generic lossless `GetNodeConfig`/`SetNodeConfig` with
      only the ACME keys typed (plus `Digest`); everything else through `Extra`.
      Covers both endpoints completely (two gap rows close, and
@@ -465,8 +470,14 @@ here is 9.0 baseline).
      convention.
 
 6. **Live verification needs a real domain + Cloudflare zone — what is the
-   plan?** **Decision: pending (this one is genuinely yours — it depends on what
-   you are willing to point at the lab).**
+   plan?** **Decision (2026-08-17): a, amended — Donald provides ONE domain
+   usable for both the Cloudflare and Namecheap live runs.** Operational
+   consequence: a zone resolves through one DNS host at a time, so the two
+   provider verifications are **sequential** — the domain's nameservers point at
+   Cloudflare for the `cf` run, then switch to Namecheap DNS (with propagation
+   wait) for the `namecheap` run. The integration tests already take the domain
+   via `PVE_TEST_ACME_DOMAIN`, so nothing in the harness changes; only the run
+   order does.
    - **a (recommended):** A dedicated subdomain (e.g. `lab.<your-domain>`) in
      your existing Cloudflare account, a scoped API token (Zone.DNS edit on that
      zone only), Let's Encrypt **staging** as the directory, run against r740a
