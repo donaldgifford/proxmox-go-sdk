@@ -17,6 +17,7 @@ nav:
         - 'DESIGN-0003: SDN fabrics real paths, node membership, and live status': design/0003-sdn-fabrics-real-paths-node-membership-and-live-status.md
         - 'DESIGN-0004: HA arm and disarm, status reads, and DLB reclassification': design/0004-ha-arm-and-disarm-status-reads-and-dlb-reclassification.md
         - 'DESIGN-0005: API coverage tracker with CI drift and fabrication guards': design/0005-api-coverage-tracker-with-ci-drift-and-fabrication-guards.md
+        - 'DESIGN-0006: ACME DNS plugins and node ACME config with provider-generic credentials': design/0006-acme-dns-plugins-and-node-acme-config-with-provider-generic.md
     - Implementation Plans:
         - Overview: impl/README.md
         - 'IMPL-0001: Proxmox VE 9.x SDK coverage': impl/0001-proxmox-ve-9x-sdk-coverage.md
@@ -25,6 +26,7 @@ nav:
         - 'IMPL-0004: SDN fabrics remediation delivery': impl/0004-sdn-fabrics-remediation-delivery.md
         - 'IMPL-0005: HA arm disarm status and migrate delivery': impl/0005-ha-arm-disarm-status-and-migrate-delivery.md
         - 'IMPL-0006: API coverage tracker delivery': impl/0006-api-coverage-tracker-delivery.md
+        - 'IMPL-0007: ACME DNS plugins and node config delivery': impl/0007-acme-dns-plugins-and-node-config-delivery.md
     - Investigations:
         - Overview: investigation/README.md
         - 'INV-0001: Nested Proxmox nodes for automated live SDK testing': investigation/0001-nested-proxmox-nodes-for-automated-live-sdk-testing.md
@@ -40,6 +42,7 @@ nav:
     - 'PegaProx-Go: Provider Abstraction & Proxmox API Strategy': PEGAPROX-GO-PROVIDER-AND-API.md
     - 'PegaProx-Go: What a Go Rewrite Actually Improves': PEGAPROX-GO-COMPARISON.md
     - proxmox-go-sdk — Project Review: REVIEW.md
+    - Proxmox VE API coverage: COVERAGE.md
 plugins:
     - techdocs-core
 site_description: An idiomatic golang sdk for Proxmox
