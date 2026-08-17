@@ -126,7 +126,7 @@ self-service.
 
 #### Tasks
 
-- [ ] 1. Provider data model in `proxmox/nodes/acmeproviders.go`: the two-method
+- [x] 1. Provider data model in `proxmox/nodes/acmeproviders.go`: the two-method
      `ACMEPluginData` interface, `Cloudflare` (Token/AccountID/ ZoneID/Key/Email
      → `CF_*`), `Namecheap` (Username/APIKey/SourceIP → `NAMECHEAP_*`),
      `RawPluginData{Provider, Values}`, and the unexported render helper (sorted
@@ -134,7 +134,18 @@ self-service.
      values as credentials (never log), Namecheap as unit-verified-only until
      Phase 4, and the field names as confirmed-live-via-challenge-schema. Unit
      tests: exact base64 output for both typed providers and raw;
-     empty-omission; sort stability.
+     empty-omission; sort stability. _(Done 2026-08-17: `ACMEPluginData` +
+     `Cloudflare`/`Namecheap`/`RawPluginData` + `encodePluginData` (sorted,
+     empty-omitting, base64). All three providers satisfy the interface **by
+     value** — uniform construction, and a typed-nil receiver is impossible;
+     `Cloudflare` sits exactly at gocritic's 80-byte hugeParam threshold so it
+     carries a documented `nolint` rather than becoming the one provider needing
+     `&`. Note for future edits: gofumpt moves a `//nolint` directive to the END
+     of its doc-comment group, so the reason must be self-contained on that one
+     line (the first attempt was silently reordered into nonsense). 8 tests
+     including exact-base64 for each provider, the standalone empty case, a
+     64-iteration determinism loop that fails without the sort, and a
+     no-plaintext-leak guard.)_
 - [ ] 2. Plugin types + paths in `proxmox/nodes/acmeplugins.go`: lossless
      `ACMEPlugin` read (`Plugin`, `Type`, `API`, `Data` verbatim base64,
      `ValidationDelay`, `Nodes` CSV, `Disable`, `Digest`, `Extra` via
