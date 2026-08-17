@@ -10,7 +10,8 @@ created: 2026-08-17
 
 # IMPL 0007: ACME DNS plugins and node config delivery
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-08-17
+**Status:** Draft **Author:** Donald Gifford **Date:** 2026-08-17 (OQs decided
+2026-08-17: all a)
 
 <!--toc:start-->
 
@@ -63,9 +64,9 @@ shared domain for both providers, sequential nameserver switch).
   per OQ-1).
 - `GetNodeConfig`/`SetNodeConfig` over `/nodes/{node}/config`, ACME keys typed,
   digest guard, explicit-delete slot contract.
-- mockpve state/routes/seeders for all of the above; coverage report regen
-  (nine-or-ten gap→covered flips, zero annotation edits — OQ-2 may add one
-  `out_of_scope` entry for the deprecated `tos`).
+- mockpve state/routes/seeders for all of the above; coverage report regen (ten
+  gap→covered flips; the one annotation edit is the `tos` `out_of_scope` entry,
+  OQ-2a).
 - Recorder redaction for the plugin `data` field, landing **before** any live
   capture.
 - Env-gated integration tests for both providers; TESTING.md walkthrough;
@@ -88,7 +89,7 @@ Checked against the tree and the committed 9.2 apidoc, 2026-08-17:
 - The gap rows this closes: 5× `/cluster/acme/plugins` verbs,
   `GET /cluster/acme/challenge-schema`, `GET /cluster/acme/directories`,
   `GET /cluster/acme/meta` (OQ-1), and `GET`/`PUT /nodes/{}/config` — today's
-  coverage is 248/675; this lands at 257 or 258.
+  coverage is 248/675; this lands at 258.
 - Discovery return shapes are confirmed in the apidoc and are simple:
   `directories` → `[{name, url}]`; `meta` → an object with
   `caaIdentities`/`externalAccountRequired`/`termsOfService`/`website` and
@@ -165,8 +166,8 @@ self-service.
 - `go build ./...`, `just lint`, `just test` (race) green.
 - Plugin CRUD round-trips against mockpve, including the digest guard and the
   verbatim-base64 property (what was rendered at create is what get returns).
-- `just coverage-check` green with the seven-or-eight cluster-ACME rows flipped
-  to covered and zero unmatched routes — the fabrication guard is the proof the
+- `just coverage-check` green with the eight cluster-ACME rows flipped to
+  covered and zero unmatched routes — the fabrication guard is the proof the
   paths are real.
 
 ---
@@ -196,8 +197,9 @@ typed both ways.
      acmedomain slots + account → get parses both; delete one slot; digest
      rejection; non-ACME keys survive via `Extra` untouched.
 - [ ] 4. Regenerate `docs/COVERAGE.md` (`just coverage`) — the two node-config
-     rows flip; total lands at 257 or 258 per OQ-1 — and apply the OQ-2 decision
-     on `/cluster/acme/tos` (out_of_scope annotation or left as gap).
+     rows flip; total lands at 258 (OQ-1a) — and add the `/cluster/acme/tos`
+     `out_of_scope` annotation with its deprecation reason (OQ-2a, the section's
+     first non-empty entry).
 
 #### Success Criteria
 
@@ -313,8 +315,8 @@ this phase completes, the ACME surface is mock-verified and says so.
 | `proxmox/mockpve/nodesadmin.go`                | Modify | `acmePlugins` + node-config state, routes, seeders, digest guard |
 | `proxmox/integration/recorder_test.go`         | Modify | `data` redaction both directions + test                          |
 | `proxmox/integration/acme_test.go`             | Create | The two env-gated live tests                                     |
-| `docs/COVERAGE.md`                             | Modify | Regenerated: nine-or-ten flips                                   |
-| `cmd/pve-schemadiff/coverage-annotations.yaml` | Modify | Only if OQ-2 = a (tos out_of_scope entry)                        |
+| `docs/COVERAGE.md`                             | Modify | Regenerated: ten flips                                           |
+| `cmd/pve-schemadiff/coverage-annotations.yaml` | Modify | tos out_of_scope entry (OQ-2a)                                   |
 | `TESTING.md`                                   | Modify | ACME DNS walkthrough                                             |
 | `docs/design/0006-acme-dns-plugins-…md`        | Modify | Status → Implemented (Phase 3 task 5)                            |
 
@@ -338,7 +340,7 @@ this phase completes, the ACME surface is mock-verified and says so.
 
 ## Open Questions
 
-1. **Does `GetACMEMeta` ride along in Phase 1?** **Decision: pending.**
+1. **Does `GetACMEMeta` ride along in Phase 1?** **Decision (2026-08-17): a.**
    - **a (recommended):** Yes. The apidoc confirms a simple lossless object
      (`termsOfService`, `website`, `caaIdentities`, `externalAccountRequired`,
      `additionalProperties:1`) with an optional `directory` query param — one
@@ -351,7 +353,7 @@ this phase completes, the ACME surface is mock-verified and says so.
      honestly) has no SDK path to it.
 
 2. **How does the coverage report treat the deprecated `/cluster/acme/tos`?**
-   **Decision: pending.**
+   **Decision (2026-08-17): a.**
    - **a (recommended):** Add an `out_of_scope` annotation with reason
      "deprecated upstream in favour of /cluster/acme/meta; no SDK surface by
      design (DESIGN-0006)". This is exactly what the annotations file exists for
@@ -362,8 +364,8 @@ this phase completes, the ACME surface is mock-verified and says so.
      undone when it is actually a deliberate exclusion recorded only in a design
      doc.
 
-3. **Integration-test env shape (amends the design's sketch)?** **Decision:
-   pending.**
+3. **Integration-test env shape (amends the design's sketch)?** **Decision
+   (2026-08-17): a.**
    - **a (recommended):** Direct-value envs, matching the suite's existing
      convention (`PVE_TOKEN_SECRET`, `PVE_TEST_STORAGE`, …):
      `PVE_TEST_ACME_DOMAIN`, `PVE_TEST_ACME_CF_TOKEN` (+ optional
@@ -376,7 +378,7 @@ this phase completes, the ACME surface is mock-verified and says so.
      pvelab.yaml's secrets pattern, but the integration suite has no config file
      to hold the names — the indirection adds a hop with nothing to justify it.
 
-4. **Which node hosts the Phase-4 live runs?** **Decision: pending.**
+4. **Which node hosts the Phase-4 live runs?** **Decision (2026-08-17): a.**
    - **a (recommended):** A pvelab nested node. Ordering an ACME cert REPLACES
      the node's pveproxy certificate — on a disposable clone that is free; the
      nested nodes already have outbound gateway+DNS from the install, DNS-01
