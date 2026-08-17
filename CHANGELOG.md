@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [unreleased]
+
+### Documentation
+
+- *(design-0006)* ACME DNS plugins with provider-generic credentials
+- *(design-0006)* Record the OQ decisions — all a, doc Approved
+
 ## [0.10.0] - 2026-07-26
 
 ### Features
