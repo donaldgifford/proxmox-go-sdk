@@ -11,6 +11,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(design-0006)* ACME DNS plugins with provider-generic credentials
 - *(design-0006)* Record the OQ decisions — all a, doc Approved
 - *(impl-0007)* Phase the ACME DNS delivery
+- *(impl-0007)* Record the OQ decisions — all a
 
 ## [0.10.0] - 2026-07-26
 
