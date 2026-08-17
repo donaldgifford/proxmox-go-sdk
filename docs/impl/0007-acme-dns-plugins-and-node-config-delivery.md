@@ -146,14 +146,27 @@ self-service.
      including exact-base64 for each provider, the standalone empty case, a
      64-iteration determinism loop that fails without the sort, and a
      no-plaintext-leak guard.)_
-- [ ] 2. Plugin types + paths in `proxmox/nodes/acmeplugins.go`: lossless
+- [x] 2. Plugin types + paths in `proxmox/nodes/acmeplugins.go`: lossless
      `ACMEPlugin` read (`Plugin`, `Type`, `API`, `Data` verbatim base64,
      `ValidationDelay`, `Nodes` CSV, `Disable`, `Digest`, `Extra` via
      `svcutil.DecodeExtra`), `ACMEPluginSpec` (ID required;
      `Data ACMEPluginData` required when Type is dns; `Nodes []string`
      `json:"-"` CSV-joined post-encode), `ACMEPluginUpdate` (+
      `Delete []string`, `Digest`), path helpers, and `TestACMEPathsReal` pinning
-     the plugin paths (the `TestCephPathsReal` pattern).
+     the plugin paths (the `TestCephPathsReal` pattern). _(Done 2026-08-17:
+     `acmeplugins.go` carries `ACMEPlugin` (lossless), `ACMEPluginSpec`,
+     `ACMEPluginUpdate`, plus the task-5 read types written up front since they
+     share the file: `ChallengeSchemaEntry`, `ACMEDirectory`, and lossless
+     `ACMEMeta`. Two additions beyond the ledger line: exported
+     `ChallengeTypeDNS`/`ChallengeTypeStandalone` constants (the wire enum has
+     exactly two values, and goconst would flag the repeated literal anyway),
+     and `ACMEPluginUpdate.Data` so credentials can be ROTATED — an update that
+     could not replace the payload would force delete-and-recreate for a token
+     rotation. Paths pinned by `TestACMEPathsReal`, including a comment on why
+     there is no `tos` helper. Toolchain note: `just fmt` runs `go fmt`, which
+     does NOT enforce gofumpt's blank-line rule between a single-line and a
+     multi-line func — `golangci-lint fmt <file>` is what fixes a `gofumpt`
+     finding.)_
 - [ ] 3. mockpve plugin state in `mockpve/nodesadmin.go`: `acmePlugins` map (id
      → record with digest), routes for the five verbs through `handle`,
      `AddACMEPlugin` seeder, digest-mismatch conflict on update (mirror real
