@@ -81,6 +81,13 @@ type API interface {
 	CreateACMEPlugin(ctx context.Context, spec *ACMEPluginSpec) error
 	UpdateACMEPlugin(ctx context.Context, id string, update *ACMEPluginUpdate) error
 	DeleteACMEPlugin(ctx context.Context, id string) error
+
+	// ACME discovery (IMPL-0007). GetChallengeSchema publishes each provider's
+	// credential fields — the runtime source of truth behind ACMEPluginData —
+	// and the other two describe the CAs a node can order from.
+	GetChallengeSchema(ctx context.Context) ([]ChallengeSchemaEntry, error)
+	ListACMEDirectories(ctx context.Context) ([]ACMEDirectory, error)
+	GetACMEMeta(ctx context.Context, opts ...ACMEMetaOption) (*ACMEMeta, error)
 }
 
 // Compile-time assertion that *Service implements the published contract.

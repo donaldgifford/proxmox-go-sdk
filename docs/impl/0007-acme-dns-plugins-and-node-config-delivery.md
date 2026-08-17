@@ -200,21 +200,37 @@ self-service.
      `Delete`, stale-digest refusal WITH a fresh-digest control (a refusal test
      alone would pass if the mock refused everything), not-found for all three
      addressed verbs, and the client-side guards.)_
-- [ ] 5. Discovery reads: `GetChallengeSchema` (`ChallengeSchemaEntry`, `Schema`
+- [x] 5. Discovery reads: `GetChallengeSchema` (`ChallengeSchemaEntry`, `Schema`
      as `json.RawMessage`), `ListACMEDirectories` (`ACMEDirectory{Name, URL}`),
      and `GetACMEMeta` per OQ-1 (lossless `ACMEMeta`, optional
      `WithACMEDirectory` query option). mockpve serves static payloads: two
      schema entries (`cf`, `namecheap` with plausible field schemas), the two
      Let's Encrypt directories, a static meta. Unit tests decode all three.
+     _(Done 2026-08-17: all three landed and added to the `API` interface.
+     `GetACMEMeta`'s `directory` rides in the GET path as a query parameter
+     (`WithACMEDirectory`) — the storage `WithContentType` precedent, since GET
+     bodies are not form-encoded. The mock's meta payload carries an unmodelled
+     `externalAccountBinding` key so the lossless path is exercised rather than
+     assumed, and it derives `termsOfService` from the requested directory so
+     `TestGetACMEMetaWithDirectory` proves the option reached the wire instead
+     of merely compiling. `TestGetChallengeSchema` asserts each typed provider's
+     `API()` appears as a schema id and that `cf`'s schema mentions `CF_Token` —
+     the in-repo half of the Phase 4 field-name check, which is the only part
+     verifiable without a node. 4 tests, all green.)_
 
 #### Success Criteria
 
-- `go build ./...`, `just lint`, `just test` (race) green.
+- `go build ./...`, `just lint`, `just test` (race) green. **Met 2026-08-17.**
 - Plugin CRUD round-trips against mockpve, including the digest guard and the
   verbatim-base64 property (what was rendered at create is what get returns).
+  **Met 2026-08-17** — `TestCreateAndGetACMEPluginCloudflare` asserts the get
+  returns byte-for-byte what `encodePluginData` rendered, and the digest guard
+  is covered in both directions (stale refused, fresh accepted).
 - `just coverage-check` green with the eight cluster-ACME rows flipped to
   covered and zero unmatched routes — the fabrication guard is the proof the
-  paths are real.
+  paths are real. **Met 2026-08-17** — 248/675 → **256/675 (37.9%)**, exactly
+  the eight cluster-ACME rows, 0 unmatched. The two node-config rows land in
+  Phase 2 for the planned 258.
 
 ---
 

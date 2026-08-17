@@ -289,3 +289,71 @@ func applyPluginData(body url.Values, d ACMEPluginData) {
 		body.Set("data", encoded)
 	}
 }
+
+// GetChallengeSchema returns the challenge providers this node supports, each
+// with the raw credential-field schema PVE publishes for it. Cluster-scoped.
+//
+// This is the authoritative source for a provider's id and field names: read it
+// to build a [RawPluginData] for a provider the SDK does not type, or to confirm
+// a typed provider's fields against the node itself.
+func (s *Service) GetChallengeSchema(ctx context.Context) ([]ChallengeSchemaEntry, error) {
+	var out []ChallengeSchemaEntry
+	if err := s.c.DoRequest(ctx, http.MethodGet, acmeChallengeSchemaPath(), nil, &out); err != nil {
+		return nil, fmt.Errorf("nodes.GetChallengeSchema: %w", err)
+	}
+	return out, nil
+}
+
+// ListACMEDirectories returns the named ACME directory endpoints PVE ships,
+// including Let's Encrypt production and staging. Cluster-scoped.
+//
+// Pass a staging URL as ACMEAccountSpec.Directory while testing: staging has far
+// looser rate limits, so a failed order costs nothing.
+func (s *Service) ListACMEDirectories(ctx context.Context) ([]ACMEDirectory, error) {
+	var out []ACMEDirectory
+	if err := s.c.DoRequest(ctx, http.MethodGet, acmeDirectoriesPath(), nil, &out); err != nil {
+		return nil, fmt.Errorf("nodes.ListACMEDirectories: %w", err)
+	}
+	return out, nil
+}
+
+// GetACMEMeta returns a CA's directory metadata — its terms-of-service URL,
+// website, CAA identities, and whether external account binding is required.
+// Cluster-scoped.
+//
+// With no options it queries PVE's default CA (Let's Encrypt production); pass
+// WithACMEDirectory to ask a different one, e.g. the staging URL from
+// ListACMEDirectories. Read TermsOfService here rather than hardcoding a URL
+// when registering an account with RegisterACMEAccount.
+//
+// It supersedes PVE's deprecated /cluster/acme/tos, which the SDK does not
+// implement.
+func (s *Service) GetACMEMeta(ctx context.Context, opts ...ACMEMetaOption) (*ACMEMeta, error) {
+	var cfg acmeMetaConfig
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	path := acmeMetaPath()
+	if cfg.directory != "" {
+		path += "?directory=" + url.QueryEscape(cfg.directory)
+	}
+	var meta ACMEMeta
+	if err := s.c.DoRequest(ctx, http.MethodGet, path, nil, &meta); err != nil {
+		return nil, fmt.Errorf("nodes.GetACMEMeta: %w", err)
+	}
+	return &meta, nil
+}
+
+// acmeMetaConfig collects the optional query parameters for GetACMEMeta.
+type acmeMetaConfig struct {
+	directory string
+}
+
+// ACMEMetaOption configures GetACMEMeta.
+type ACMEMetaOption func(*acmeMetaConfig)
+
+// WithACMEDirectory queries the CA at the given ACME directory URL instead of
+// PVE's default. Use a URL from ListACMEDirectories.
+func WithACMEDirectory(directoryURL string) ACMEMetaOption {
+	return func(c *acmeMetaConfig) { c.directory = directoryURL }
+}

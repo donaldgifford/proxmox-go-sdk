@@ -307,13 +307,18 @@ func (s *Server) handleACMEDirectories(w http.ResponseWriter, r *http.Request) {
 
 // handleACMEMeta serves the CA directory metadata. The response carries a key
 // the SDK does not model (externalAccountBinding) so the lossless-read path is
-// exercised by the unit tests rather than assumed.
+// exercised by the unit tests rather than assumed, and it echoes the optional
+// directory query parameter so a test can prove the option reached the wire.
 func (s *Server) handleACMEMeta(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
 	}
+	terms := "https://acme.example/terms/v1"
+	if dir := r.URL.Query().Get("directory"); dir != "" {
+		terms = dir + "/terms"
+	}
 	s.writeData(w, map[string]any{
-		"termsOfService":          "https://acme.example/terms/v1",
+		"termsOfService":          terms,
 		"website":                 "https://acme.example",
 		"caaIdentities":           []string{"acme.example"},
 		"externalAccountRequired": false,
