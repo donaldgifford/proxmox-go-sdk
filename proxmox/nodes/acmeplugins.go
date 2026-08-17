@@ -1,8 +1,12 @@
 package nodes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/internal/svcutil"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/types"
@@ -169,4 +173,119 @@ func (m *ACMEMeta) UnmarshalJSON(data []byte) error {
 	}
 	m.Extra = extra
 	return nil
+}
+
+// ListACMEPlugins returns every configured ACME challenge plugin. ACME is
+// cluster-scoped: this and the other plugin methods take no node.
+func (s *Service) ListACMEPlugins(ctx context.Context) ([]ACMEPlugin, error) {
+	var out []ACMEPlugin
+	if err := s.c.DoRequest(ctx, http.MethodGet, acmePluginsPath(), nil, &out); err != nil {
+		return nil, fmt.Errorf("nodes.ListACMEPlugins: %w", err)
+	}
+	return out, nil
+}
+
+// GetACMEPlugin returns one challenge plugin by ID. The returned Digest can be
+// passed to ACMEPluginUpdate to guard against a concurrent change.
+func (s *Service) GetACMEPlugin(ctx context.Context, id string) (*ACMEPlugin, error) {
+	if id == "" {
+		return nil, fmt.Errorf("nodes.GetACMEPlugin: id: %w", svcutil.ErrMissingField)
+	}
+	var plugin ACMEPlugin
+	if err := s.c.DoRequest(ctx, http.MethodGet, acmePluginPath(id), nil, &plugin); err != nil {
+		return nil, fmt.Errorf("nodes.GetACMEPlugin: %w", err)
+	}
+	return &plugin, nil
+}
+
+// CreateACMEPlugin registers a challenge plugin. The write is synchronous (no
+// task): PVE stores it in the cluster config and answers with null data.
+//
+// For a DNS-01 plugin, spec.Data supplies the provider and its credentials; the
+// SDK renders them to PVE's api and base64 data parameters. A standalone plugin
+// needs no Data.
+func (s *Service) CreateACMEPlugin(ctx context.Context, spec *ACMEPluginSpec) error {
+	if spec == nil {
+		return fmt.Errorf("nodes.CreateACMEPlugin: %w", svcutil.ErrNilSpec)
+	}
+	if spec.ID == "" {
+		return fmt.Errorf("nodes.CreateACMEPlugin: id: %w", svcutil.ErrMissingField)
+	}
+	challenge := spec.Type
+	if challenge == "" {
+		challenge = ChallengeTypeDNS
+	}
+	if challenge == ChallengeTypeDNS && spec.Data == nil {
+		return fmt.Errorf("nodes.CreateACMEPlugin: data is required for a %s plugin: %w",
+			ChallengeTypeDNS, svcutil.ErrMissingField)
+	}
+	body, err := svcutil.EncodeWithExtra(spec, spec.Extra)
+	if err != nil {
+		return fmt.Errorf("nodes.CreateACMEPlugin: %w", err)
+	}
+	body.Set("type", challenge)
+	applyPluginData(body, spec.Data)
+	if len(spec.Nodes) > 0 {
+		body.Set("nodes", strings.Join(spec.Nodes, ","))
+	}
+	if err := s.c.DoRequest(ctx, http.MethodPost, acmePluginsPath(), body, nil); err != nil {
+		return fmt.Errorf("nodes.CreateACMEPlugin: %w", err)
+	}
+	return nil
+}
+
+// UpdateACMEPlugin changes a challenge plugin. The write is synchronous.
+//
+// Set update.Data to rotate the provider credentials; leave it nil to keep the
+// stored payload. Set update.Digest to the digest from the read that informed
+// the update and PVE refuses the write if the config changed meanwhile.
+func (s *Service) UpdateACMEPlugin(ctx context.Context, id string, update *ACMEPluginUpdate) error {
+	if update == nil {
+		return fmt.Errorf("nodes.UpdateACMEPlugin: %w", svcutil.ErrNilSpec)
+	}
+	if id == "" {
+		return fmt.Errorf("nodes.UpdateACMEPlugin: id: %w", svcutil.ErrMissingField)
+	}
+	body, err := svcutil.EncodeWithExtra(update, update.Extra)
+	if err != nil {
+		return fmt.Errorf("nodes.UpdateACMEPlugin: %w", err)
+	}
+	applyPluginData(body, update.Data)
+	if len(update.Nodes) > 0 {
+		body.Set("nodes", strings.Join(update.Nodes, ","))
+	}
+	if len(update.Delete) > 0 {
+		body.Set("delete", strings.Join(update.Delete, ","))
+	}
+	if err := s.c.DoRequest(ctx, http.MethodPut, acmePluginPath(id), body, nil); err != nil {
+		return fmt.Errorf("nodes.UpdateACMEPlugin: %w", err)
+	}
+	return nil
+}
+
+// DeleteACMEPlugin removes a challenge plugin. The write is synchronous.
+//
+// A node config still referencing the plugin is not rewritten: clear the
+// reference with SetNodeConfig first, or its next certificate order fails.
+func (s *Service) DeleteACMEPlugin(ctx context.Context, id string) error {
+	if id == "" {
+		return fmt.Errorf("nodes.DeleteACMEPlugin: id: %w", svcutil.ErrMissingField)
+	}
+	if err := s.c.DoRequest(ctx, http.MethodDelete, acmePluginPath(id), nil, nil); err != nil {
+		return fmt.Errorf("nodes.DeleteACMEPlugin: %w", err)
+	}
+	return nil
+}
+
+// applyPluginData writes the api and data parameters for d, or leaves the form
+// untouched when d is nil (a standalone plugin, or an update that keeps the
+// stored credentials).
+func applyPluginData(body url.Values, d ACMEPluginData) {
+	if d == nil {
+		return
+	}
+	body.Set("api", d.API())
+	if encoded := encodePluginData(d); encoded != "" {
+		body.Set("data", encoded)
+	}
 }

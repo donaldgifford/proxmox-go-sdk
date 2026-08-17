@@ -184,12 +184,22 @@ self-service.
      stored as the form's strings (that is what makes partial update trivial)
      and converted by `atoiOrZero`, since errcheck's check-blank forbids the `v,
      _ := strconv.Atoi` shorthand.)\_
-- [ ] 4. The five CRUD ops (`ListACMEPlugins`/`GetACMEPlugin`/
+- [x] 4. The five CRUD ops (`ListACMEPlugins`/`GetACMEPlugin`/
      `CreateACMEPlugin`/`UpdateACMEPlugin`/`DeleteACMEPlugin`), all synchronous
      (`error`, never `tasks.Ref`). Unit round-trips against mockpve: create with
      typed `Cloudflare` data → get returns the exact base64; create with
      `RawPluginData`; update with `Delete` + digest-mismatch rejection;
-     standalone type with no data; nil-spec and missing-ID guards.
+     standalone type with no data; nil-spec and missing-ID guards. _(Done
+     2026-08-17: all five synchronous, added to the `API` interface (the
+     mockability seam). Two contract decisions worth recording: (a) a `dns`
+     plugin with no `Data` is refused **client-side** — PVE would accept the
+     config and then fail every order, which is far harder to diagnose than an
+     error at the call; (b) `Type` defaults to `dns` so the common case needs no
+     enum. 12 tests: the flagship verbatim-base64 round-trip, the raw-provider
+     path, standalone, sorted list, rotate-vs-keep credentials on update,
+     `Delete`, stale-digest refusal WITH a fresh-digest control (a refusal test
+     alone would pass if the mock refused everything), not-found for all three
+     addressed verbs, and the client-side guards.)_
 - [ ] 5. Discovery reads: `GetChallengeSchema` (`ChallengeSchemaEntry`, `Schema`
      as `json.RawMessage`), `ListACMEDirectories` (`ACMEDirectory{Name, URL}`),
      and `GetACMEMeta` per OQ-1 (lossless `ACMEMeta`, optional

@@ -71,6 +71,16 @@ type API interface {
 	OrderNodeCertificate(ctx context.Context, node string) (tasks.Ref, error)
 	RenewNodeCertificate(ctx context.Context, node string) (tasks.Ref, error)
 	RevokeNodeCertificate(ctx context.Context, node string) (tasks.Ref, error)
+
+	// ACME challenge plugins (IMPL-0007). Cluster-scoped like the accounts, and
+	// every write is synchronous — a plugin is cluster config, not a worker.
+	// CreateACMEPlugin and UpdateACMEPlugin carry provider credentials; see
+	// ACMEPluginData.
+	ListACMEPlugins(ctx context.Context) ([]ACMEPlugin, error)
+	GetACMEPlugin(ctx context.Context, id string) (*ACMEPlugin, error)
+	CreateACMEPlugin(ctx context.Context, spec *ACMEPluginSpec) error
+	UpdateACMEPlugin(ctx context.Context, id string, update *ACMEPluginUpdate) error
+	DeleteACMEPlugin(ctx context.Context, id string) error
 }
 
 // Compile-time assertion that *Service implements the published contract.
