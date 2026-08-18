@@ -250,7 +250,10 @@ func cassetteName(t *testing.T) string {
 // self-signed node (PVE_INSECURE_TLS=1); it mirrors the SDK's own opt-in.
 func insecureTransport() http.RoundTripper {
 	return &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12}, //nolint:gosec // opt-in for self-signed PVE, matches the SDK
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			MinVersion:         tls.VersionTLS12,
+		}, //nolint:gosec // opt-in for self-signed PVE, matches the SDK
 	}
 }
 

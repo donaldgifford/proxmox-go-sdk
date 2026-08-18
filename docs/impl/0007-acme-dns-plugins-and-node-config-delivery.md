@@ -386,12 +386,25 @@ will execute, and the release PR.
 
 #### Tasks
 
-- [ ] 1. Recorder redaction FIRST: the integration harness's `BeforeSaveHook`
+- [x] 1. Recorder redaction FIRST: the integration harness's `BeforeSaveHook`
      scrubs the `data` form field (request side) and the base64 `data` values in
      plugin response bodies to `REDACTED`, plus the go-vcr parsed-`Form` map
      (the 2026-07-23 leak-review precedent). Extend `TestRedactInteraction` with
      a plugin-create interaction so the scrub is pinned before any live capture
-     exists.
+     exists. _(Done 2026-08-18, and the phase-1 review pass independently
+     confirmed the gap by running the two existing regexes against real ACME
+     payloads: **none** of the three places `data` appears was scrubbed. The new
+     `redactACMEPluginData` covers all three — request body, go-vcr's separately
+     stored parsed `Form` map (the 2026-07-23 node-name precedent), and the
+     response body of a plugin read, since PVE does not treat `data` as
+     write-only. **The scrub is URL-scoped to `/cluster/acme/plugins` and must
+     stay that way:** `data` is also the name of PVE's response envelope, so a
+     blanket rule rewrites `{"data":"UPID:…"}` and breaks `tasks.Wait` on replay
+     for every existing task-returning cassette. `TestRedactACMEDataSpareUPID`
+     pins exactly that, beside `TestRedactACMEPluginData` (request body, Form
+     map, and both the single and list read shapes, while asserting the
+     non-secret `id`/`type`/`api` parameters survive so the cassette still
+     documents the request shape).)_
 - [ ] 2. Env-gated integration tests in `proxmox/integration/`
      (`//go:build integration`): `TestACMEDNSCloudflare` and
      `TestACMEDNSNamecheap`, gated per OQ-3's env set, both skipping cleanly

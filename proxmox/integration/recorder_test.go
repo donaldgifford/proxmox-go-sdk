@@ -40,6 +40,21 @@ var (
 	jsonSecretRe = regexp.MustCompile(`(?i)"(ticket|csrfpreventiontoken|value|password)"\s*:\s*"[^"]*"`)
 )
 
+// The ACME plugin's data field carries live DNS-provider credentials (a
+// Cloudflare API token) as base64 of KEY=value lines. It rides the request form
+// on create/update AND comes back in every plugin read, so both directions need
+// scrubbing — and base64 is exactly the shape a human skimming a cassette will
+// not recognise as a secret, so this cannot be left to the manual leak review.
+//
+// The scrub is scoped by URL rather than applied globally: "data" is also the
+// name of PVE's response envelope, so a blanket rule would rewrite
+// {"data":"UPID:…"} and destroy the task id in every task-returning cassette.
+var (
+	acmePluginURLPart = "/cluster/acme/plugins"
+	acmeDataFormRe    = regexp.MustCompile(`(^|&)data=[^&]*`)
+	acmeDataJSONRe    = regexp.MustCompile(`"data"\s*:\s*"[^"]*"`)
+)
+
 // uploadBodyTruncatedMarker labels a multipart upload body that was dropped
 // before the cassette hit disk (see truncateUploadBody).
 const uploadBodyTruncatedMarker = "multipart upload body truncated"
@@ -73,7 +88,32 @@ func redactInteraction(i *cassette.Interaction) error {
 	if i.Response.Body != "" {
 		i.Response.Body = jsonSecretRe.ReplaceAllString(i.Response.Body, `"${1}":"`+redacted+`"`)
 	}
+
+	redactACMEPluginData(i)
 	return nil
+}
+
+// redactACMEPluginData scrubs the ACME plugin credential blob in all three
+// places it appears: the request form body, go-vcr's separately-stored parsed
+// Form map (the gap the 2026-07-23 leak review found for node names), and the
+// response body of a plugin read.
+//
+// Under the URL guard the JSON pattern is safe for both read shapes — the
+// envelope is {"data":[ for a list and {"data":{ for a single plugin, and
+// requiring :" means only the inner string field matches.
+func redactACMEPluginData(i *cassette.Interaction) {
+	if !strings.Contains(i.Request.URL, acmePluginURLPart) {
+		return
+	}
+	if i.Request.Body != "" {
+		i.Request.Body = acmeDataFormRe.ReplaceAllString(i.Request.Body, "${1}data="+redacted)
+	}
+	if v, ok := i.Request.Form["data"]; ok && len(v) > 0 {
+		i.Request.Form["data"] = []string{redacted}
+	}
+	if i.Response.Body != "" {
+		i.Response.Body = acmeDataJSONRe.ReplaceAllString(i.Response.Body, `"data":"`+redacted+`"`)
+	}
 }
 
 func redactHeaders(h http.Header, keys ...string) {
@@ -617,5 +657,87 @@ func TestRecorderPasswordAuthRedaction(t *testing.T) {
 	}
 	if !bytes.Contains(data, []byte(redacted)) {
 		t.Error("expected the REDACTED marker in the cassette")
+	}
+}
+
+// TestRedactACMEPluginData is the guard that must exist BEFORE the first live
+// ACME recording, not after: a plugin's data field is a live Cloudflare API
+// token, cassettes are committed to git, and base64 is exactly what a human
+// leak review fails to recognise. It pins all three places the blob appears —
+// the request body, go-vcr's parsed Form map, and the plugin read's response.
+func TestRedactACMEPluginData(t *testing.T) {
+	// base64("CF_Token=live-cloudflare-token"), as the SDK renders it.
+	const blob = "Q0ZfVG9rZW49bGl2ZS1jbG91ZGZsYXJlLXRva2Vu"
+	create := &cassette.Interaction{
+		Request: cassette.Request{
+			URL:    "https://pve:8006/api2/json/cluster/acme/plugins",
+			Method: http.MethodPost,
+			Body:   "id=cf-lab&type=dns&api=cf&data=" + blob,
+			Form:   map[string][]string{"data": {blob}, "api": {"cf"}},
+		},
+		Response: cassette.Response{Body: `{"data":null}`},
+	}
+	if err := redactInteraction(create); err != nil {
+		t.Fatalf("redactInteraction: %v", err)
+	}
+	if strings.Contains(create.Request.Body, blob) {
+		t.Errorf("credential blob survived in the request body: %q", create.Request.Body)
+	}
+	if strings.Contains(strings.Join(create.Request.Form["data"], ""), blob) {
+		t.Errorf("credential blob survived in the parsed Form map: %v", create.Request.Form)
+	}
+	// Non-secret parameters must survive so the cassette still documents the
+	// request shape.
+	for _, keep := range []string{"id=cf-lab", "type=dns", "api=cf"} {
+		if !strings.Contains(create.Request.Body, keep) {
+			t.Errorf("%q was clobbered: %q", keep, create.Request.Body)
+		}
+	}
+
+	// A read returns the stored credential — PVE does not treat data as
+	// write-only — in both the single and list shapes.
+	for _, tc := range []struct{ name, body string }{
+		{"single", `{"data":{"plugin":"cf-lab","api":"cf","data":"` + blob + `"}}`},
+		{"list", `{"data":[{"plugin":"cf-lab","api":"cf","data":"` + blob + `"}]}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			read := &cassette.Interaction{
+				Request: cassette.Request{
+					URL:    "https://pve:8006/api2/json/cluster/acme/plugins/cf-lab",
+					Method: http.MethodGet,
+				},
+				Response: cassette.Response{Body: tc.body},
+			}
+			if err := redactInteraction(read); err != nil {
+				t.Fatalf("redactInteraction: %v", err)
+			}
+			if strings.Contains(read.Response.Body, blob) {
+				t.Errorf("credential blob survived in a read: %q", read.Response.Body)
+			}
+			if !strings.Contains(read.Response.Body, "cf-lab") {
+				t.Errorf("the plugin id was clobbered: %q", read.Response.Body)
+			}
+		})
+	}
+}
+
+// TestRedactACMEDataSpareUPID is the other half of the ACME scrub: it must be
+// URL-scoped. "data" is also the name of PVE's response envelope, so a blanket
+// rule would rewrite {"data":"UPID:…"} and break tasks.Wait on replay for every
+// existing task-returning cassette.
+func TestRedactACMEDataSpareUPID(t *testing.T) {
+	const upid = "UPID:pve:0005:qmstart:100:root@pam!sdk:"
+	i := &cassette.Interaction{
+		Request: cassette.Request{
+			URL:    "https://pve:8006/api2/json/nodes/pve/qemu/100/status/start",
+			Method: http.MethodPost,
+		},
+		Response: cassette.Response{Body: `{"data":"` + upid + `"}`},
+	}
+	if err := redactInteraction(i); err != nil {
+		t.Fatalf("redactInteraction: %v", err)
+	}
+	if !strings.Contains(i.Response.Body, upid) {
+		t.Errorf("the UPID envelope was clobbered by the ACME scrub: %q", i.Response.Body)
 	}
 }
