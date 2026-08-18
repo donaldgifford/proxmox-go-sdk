@@ -467,19 +467,32 @@ will execute, and the release PR.
      render verified per-package across `go list ./...` — note `go doc ./...` is
      not a valid invocation ("too many periods in symbol specification"), so the
      phrase in this ledger line means the per-package loop.)_
-- [ ] 5. PR: exactly one `minor` label (new public API on `proxmox/nodes`);
+- [x] 5. PR: exactly one `minor` label (new public API on `proxmox/nodes`);
      changelog as the branch's final commit; DESIGN-0006 status → Implemented in
-     the same PR; merge → auto-release.
+     the same PR; merge → auto-release. _(Done 2026-08-18: **PR #27**, all 12
+     checks green — test, Test Go, Test Replay (cassettes), Lint, check
+     (schema-drift + coverage), Security Scan, CodeQL, Analyze Go, license
+     check, both required-label checks, goreleaser snapshot. Labels `minor` +
+     `documentation` (the labeler's own, not a semver label — the required-label
+     check passes). DESIGN-0006 → Implemented; this ledger → In Progress, NOT
+     Completed, because Phase 4 is real work that has not happened. **Awaiting
+     Donald's merge**, which mints the tag.)_
 
 #### Success Criteria
 
 - All CI jobs green on the PR: `just test` (race), `just test-replay`,
-  `just lint`, schema-drift, `just coverage-check`, goreleaser snapshot.
+  `just lint`, schema-drift, `just coverage-check`, goreleaser snapshot. **Met
+  2026-08-18** on PR #27.
 - `TestRedactInteraction` proves a plugin-create interaction is scrubbed before
-  any cassette exists.
+  any cassette exists. **Met 2026-08-18** — landed as its own
+  `TestRedactACMEPluginData` (request body, parsed `Form` map, and both read
+  shapes) rather than growing the existing test, plus
+  `TestRedactACMEDataSpareUPID` proving the scrub does not clobber the task
+  envelope. No ACME cassette exists yet, which is the point: the guard precedes
+  the capture.
 - The integration tests compile under the tag and skip without env; the Example
-  runs deterministically under `go test`.
-- PR merged and the tag minted (Donald fires the merge).
+  runs deterministically under `go test`. **Met 2026-08-18.**
+- PR merged and the tag minted (Donald fires the merge). **Pending Donald.**
 
 ---
 
