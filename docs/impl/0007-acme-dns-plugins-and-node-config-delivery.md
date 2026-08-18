@@ -405,7 +405,7 @@ will execute, and the release PR.
      map, and both the single and list read shapes, while asserting the
      non-secret `id`/`type`/`api` parameters survive so the cassette still
      documents the request shape).)_
-- [ ] 2. Env-gated integration tests in `proxmox/integration/`
+- [x] 2. Env-gated integration tests in `proxmox/integration/`
      (`//go:build integration`): `TestACMEDNSCloudflare` and
      `TestACMEDNSNamecheap`, gated per OQ-3's env set, both skipping cleanly
      without a node/domain. Flow per the design: staging directory via
@@ -448,11 +448,25 @@ will execute, and the release PR.
      line — that is the exact failure mode the redaction exists to prevent, and
      a reviewer who does not know `data:` is a credential will nod straight past
      it.)_
-- [ ] 4. Docs promotion: `nodes/doc.go` gains the ACME story (accounts → plugins
+- [x] 4. Docs promotion: `nodes/doc.go` gains the ACME story (accounts → plugins
      → node config → order, with the provider-generic model); a runnable
      `Example` (named, e.g. `Example_acmeDNS`) wiring plugin-create → node
      config → order against mockpve with an `// Output:` block; `go doc ./...`
-     renders cleanly.
+     renders cleanly. _(Done 2026-08-18. The old `doc.go` was stale in a way
+     worth noting: it still described networking as "the first surface (Phase
+     5)" and promised node status/packages/disks/certificates in "later phases"
+     — all of which landed in Phase 6. The rewrite covers the whole surface
+     under headings, and states the ACME flow as the four ordered pieces it
+     actually is (account → plugin → node wiring → order), since the ordering is
+     the part a consumer gets wrong. It also records two things the API cannot
+     express: that some surfaces here are cluster-scoped despite the package
+     being node-scoped, and that credentials are credentials — the shipped
+     provider types redact under `fmt`, an implementation of your own does not
+     inherit that. `Example_acmeDNS` runs plugin-create → node config →
+     read-back → order against mockpve with a deterministic `// Output:`. Doc
+     render verified per-package across `go list ./...` — note `go doc ./...` is
+     not a valid invocation ("too many periods in symbol specification"), so the
+     phrase in this ledger line means the per-package loop.)_
 - [ ] 5. PR: exactly one `minor` label (new public API on `proxmox/nodes`);
      changelog as the branch's final commit; DESIGN-0006 status → Implemented in
      the same PR; merge → auto-release.
