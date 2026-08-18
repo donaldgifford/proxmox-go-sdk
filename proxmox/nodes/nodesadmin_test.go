@@ -3,6 +3,7 @@ package nodes_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/mockpve"
@@ -305,10 +306,25 @@ func TestACMEAccounts(t *testing.T) {
 		t.Fatalf("Wait(register acme): %v", err)
 	}
 
-	if err := svc.UpdateACMEAccount(ctx, "staging", &nodes.ACMEAccountUpdate{
+	// The update runs as a worker: applying it means talking to the CA, and the
+	// 9.2 schema declares a UPID return for this verb.
+	ref, err = svc.UpdateACMEAccount(ctx, "staging", &nodes.ACMEAccountUpdate{
 		Contact: []string{"ops@example.com"},
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("UpdateACMEAccount: %v", err)
+	}
+	if _, err := ts.Wait(ctx, ref); err != nil {
+		t.Fatalf("Wait(update acme): %v", err)
+	}
+	// The contact lives inside the CA's own account object, which the SDK keeps
+	// verbatim rather than modelling — so the round-trip is asserted there.
+	acct, err := svc.GetACMEAccount(ctx, "staging")
+	if err != nil {
+		t.Fatalf("GetACMEAccount: %v", err)
+	}
+	if !strings.Contains(string(acct.Account), "ops@example.com") {
+		t.Errorf("account object = %s, want the updated contact", acct.Account)
 	}
 
 	ref, err = svc.DeactivateACMEAccount(ctx, "staging")

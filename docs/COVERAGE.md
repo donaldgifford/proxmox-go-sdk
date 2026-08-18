@@ -394,7 +394,7 @@ side channel, so they appear in no table below.
 | DELETE | `/cluster/acme/plugins/{}` | covered |  |
 | GET | `/cluster/acme/plugins/{}` | covered |  |
 | PUT | `/cluster/acme/plugins/{}` | covered |  |
-| GET | `/cluster/acme/tos` | out of scope | Deprecated upstream in favour of /cluster/acme/meta, which returns the same terms-of-service URL alongside the rest of the CA's directory metadata. The SDK offers GetACMEMeta and no tos surface, so a caller accepting the CA's terms reads them from one place. (DESIGN-0006) |
+| GET | `/cluster/acme/tos` | out of scope | Deprecated upstream in favour of /cluster/acme/meta, which the SDK wraps as GetACMEMeta. (DESIGN-0006) |
 | GET | `/nodes` | gap |  |
 | GET | `/nodes/{}` | gap |  |
 | GET | `/nodes/{}/apt` | gap |  |

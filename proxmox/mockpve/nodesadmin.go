@@ -1,6 +1,7 @@
 package mockpve
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -133,6 +134,34 @@ type acmeAccountPayload struct {
 	Location  string `json:"location,omitempty"`
 	Directory string `json:"directory,omitempty"`
 	TOS       string `json:"tos,omitempty"`
+	// Account is the CA's own account object. Real PVE passes it through
+	// verbatim, and the contact addresses live inside it rather than in a
+	// top-level field — so a caller reading back a contact change has to look
+	// here, and the mock has to carry it for that to be testable.
+	Account json.RawMessage `json:"account,omitempty"`
+}
+
+// acmeAccountObject renders the CA-side account object for a record: the shape
+// an ACME server returns, with each contact as an RFC 8555 mailto URI.
+func acmeAccountObject(rec *acmeAccountRecord) json.RawMessage {
+	contacts := make([]string, 0, len(rec.Contact))
+	for _, c := range rec.Contact {
+		if c == "" {
+			continue
+		}
+		if !strings.HasPrefix(c, "mailto:") {
+			c = "mailto:" + c
+		}
+		contacts = append(contacts, c)
+	}
+	obj, err := json.Marshal(map[string]any{
+		"status":  "valid",
+		"contact": contacts,
+	})
+	if err != nil {
+		return nil // unreachable: the map holds only strings and slices.
+	}
+	return obj
 }
 
 // --- seeders ---
@@ -476,7 +505,10 @@ func (s *Server) handleACMEAccountGet(w http.ResponseWriter, r *http.Request) {
 	rec := s.st.acmeAccounts[name]
 	var payload acmeAccountPayload
 	if rec != nil {
-		payload = acmeAccountPayload{Location: rec.Location, Directory: rec.Directory, TOS: rec.TOS}
+		payload = acmeAccountPayload{
+			Location: rec.Location, Directory: rec.Directory, TOS: rec.TOS,
+			Account: acmeAccountObject(rec),
+		}
 	}
 	s.st.mu.Unlock()
 	if rec == nil {
@@ -486,7 +518,10 @@ func (s *Server) handleACMEAccountGet(w http.ResponseWriter, r *http.Request) {
 	s.writeData(w, payload)
 }
 
-// handleACMEAccountUpdate changes an account's contact. Synchronous.
+// handleACMEAccountUpdate changes an account's contact and returns a worker
+// task. PVE talks to the CA to apply the change (its own description notes that
+// sending no new information triggers a refresh), and the 9.2 schema declares a
+// bare string return — its house style for a UPID.
 func (s *Server) handleACMEAccountUpdate(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
@@ -507,7 +542,7 @@ func (s *Server) handleACMEAccountUpdate(w http.ResponseWriter, r *http.Request)
 		s.writeError(w, http.StatusNotFound, msgNoSuchACMEAccount)
 		return
 	}
-	s.writeData(w, nil)
+	s.writeData(w, s.finishedTask("pve", "acmeupdate", name))
 }
 
 // handleACMEAccountDelete deactivates an account and returns a worker task.

@@ -597,6 +597,22 @@ the Phase-3 PR:
   to exactly this hazard: the operator asserting "this node is disposable",
   which no environment can imply on its own. The preflight is NOT gated on it —
   it writes nothing.
+- **The task-vs-sync half of task 5 is closed from the schema, and it found a
+  bug.** Auditing every ACME endpoint's declared `returns` against the committed
+  9.2 apidoc settled order/renew/revoke as tasks (all three declare
+  `{"type": "string"}` with no format, which is PVE's house style for a UPID —
+  cross-checked against `POST /nodes/{node}/qemu/{vmid}/status/start`, a known
+  task) and turned up a fourth: **`PUT /cluster/acme/account/{name}` is also a
+  task**, and `nodes.UpdateACMEAccount` was returning only `error`, throwing the
+  UPID away. A caller could not wait for the contact change to land. The mock
+  returned null too, so mock and SDK agreed with each other and both disagreed
+  with real PVE — the exact failure mode mockpve exists to prevent, and one the
+  coverage guard cannot see, since the path and verb are right and only the
+  return shape is wrong. Fixed on the branch in all three layers
+  (`UpdateACMEAccount` → `(tasks.Ref, error)`; the mock emits a real UPID; the
+  `API` interface follows). **Pre-v1 signature break**, and the reason this
+  bullet is a phase note rather than a tick: what remains for task 5 is the
+  observed behaviour on a node, which is still Donald's.
 
 #### Tasks
 
@@ -628,7 +644,11 @@ the Phase-3 PR:
 - [ ] 5. Caveat closure: update the Phase-6 order/renew/revoke REST-with-caveat
      comments with the observed task-vs-sync behaviour; record the run in
      `certification.yaml`; tick this ledger; flip IMPL-0007 status → Completed
-     (docs ride a `dont-release` PR or the next release PR).
+     (docs ride a `dont-release` PR or the next release PR). _(The schema half
+     is done — see the third phase note above: all three cert ops are tasks, the
+     caveat comments now say so from the schema, and the audit found
+     `UpdateACMEAccount` discarding a UPID. The tick still waits on the observed
+     behaviour from a live run.)_
 
 #### Success Criteria
 
@@ -650,6 +670,8 @@ the Phase-3 PR:
 | `proxmox/nodes/nodeconfig.go`                  | Create | `NodeConfig` + property-string codecs + get/set                  |
 | `proxmox/nodes/paths.go`                       | Modify | Plugin/schema/directories/meta/node-config path helpers          |
 | `proxmox/nodes/doc.go`                         | Modify | ACME story promotion                                             |
+| `proxmox/nodes/certificates.go`                | Modify | `UpdateACMEAccount` → `tasks.Ref`; cert-op caveats from schema   |
+| `proxmox/nodes/service.go`                     | Modify | `API` follows that signature                                     |
 | `proxmox/nodes/example_test.go`                | Modify | `Example_acmeDNS`                                                |
 | `proxmox/mockpve/nodesadmin.go`                | Modify | `acmePlugins` + node-config state, routes, seeders, digest guard |
 | `proxmox/integration/recorder_test.go`         | Modify | `data` redaction both directions + test                          |

@@ -50,11 +50,13 @@ side_channel:
 # someone triages them. An entry earns its place only when a document decided
 # against the family, which is what the doc field records.
 out_of_scope:
+  # /cluster/acme/meta returns the same terms-of-service URL alongside the rest
+  # of the CA's directory metadata, so a caller accepting the CA's terms reads
+  # them from one place. The reason field stays short because it renders into a
+  # COVERAGE.md table cell; DESIGN-0006 carries the argument.
   - prefix: "/cluster/acme/tos"
     reason: >-
-      Deprecated upstream in favour of /cluster/acme/meta, which returns the same terms-of-service URL alongside the rest
-      of the CA's directory metadata. The SDK offers GetACMEMeta and no tos surface, so a caller accepting the CA's terms
-      reads them from one place.
+      Deprecated upstream in favour of /cluster/acme/meta, which the SDK wraps as GetACMEMeta.
     doc: "DESIGN-0006"
 
 # The fabrication guard's escape hatch: mockpve routes permitted to reference an

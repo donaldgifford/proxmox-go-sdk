@@ -208,26 +208,31 @@ func (s *Service) RegisterACMEAccount(ctx context.Context, spec *ACMEAccountSpec
 	return svcutil.TaskRef("nodes.RegisterACMEAccount", upid)
 }
 
-// UpdateACMEAccount changes an account's contact addresses. The write is
-// synchronous (no task).
-func (s *Service) UpdateACMEAccount(ctx context.Context, name string, update *ACMEAccountUpdate) error {
+// UpdateACMEAccount changes an account's contact addresses. It runs as a worker;
+// the returned tasks.Ref is awaited.
+//
+// Applying the change means talking to the CA, which is why this is a task and
+// not a config write — and why an update with no new information is PVE's way of
+// refreshing the account from the CA.
+func (s *Service) UpdateACMEAccount(ctx context.Context, name string, update *ACMEAccountUpdate) (tasks.Ref, error) {
 	if update == nil {
-		return fmt.Errorf("nodes.UpdateACMEAccount: %w", svcutil.ErrNilSpec)
+		return tasks.Ref{}, fmt.Errorf("nodes.UpdateACMEAccount: %w", svcutil.ErrNilSpec)
 	}
 	if name == "" {
-		return fmt.Errorf("nodes.UpdateACMEAccount: name: %w", svcutil.ErrMissingField)
+		return tasks.Ref{}, fmt.Errorf("nodes.UpdateACMEAccount: name: %w", svcutil.ErrMissingField)
 	}
 	body, err := svcutil.EncodeWithExtra(update, update.Extra)
 	if err != nil {
-		return fmt.Errorf("nodes.UpdateACMEAccount: %w", err)
+		return tasks.Ref{}, fmt.Errorf("nodes.UpdateACMEAccount: %w", err)
 	}
 	if len(update.Contact) > 0 {
 		body.Set("contact", strings.Join(update.Contact, ","))
 	}
-	if err := s.c.DoRequest(ctx, http.MethodPut, acmeAccountPath(name), body, nil); err != nil {
-		return fmt.Errorf("nodes.UpdateACMEAccount: %w", err)
+	var upid string
+	if err := s.c.DoRequest(ctx, http.MethodPut, acmeAccountPath(name), body, &upid); err != nil {
+		return tasks.Ref{}, fmt.Errorf("nodes.UpdateACMEAccount: %w", err)
 	}
-	return nil
+	return svcutil.TaskRef("nodes.UpdateACMEAccount", upid)
 }
 
 // DeactivateACMEAccount deactivates an account with the CA and removes it
@@ -247,8 +252,11 @@ func (s *Service) DeactivateACMEAccount(ctx context.Context, name string) (tasks
 // via POST /nodes/{node}/certificates/acme/certificate. It runs as a worker; the
 // returned tasks.Ref is awaited.
 //
-// This is REST-with-caveat: the endpoint is real, but whether order vs renew is
-// task-vs-sync was not confirmed against a live node.
+// Task-vs-sync is settled from the schema rather than guessed: the committed 9.2
+// apidoc declares a bare string return for order, renew AND revoke, which is
+// PVE's house style for a UPID (a known worker like qemu status/start declares
+// exactly the same). What remains unobserved is the task's live behaviour — how
+// long it runs and what its log carries on failure.
 func (s *Service) OrderNodeCertificate(ctx context.Context, node string) (tasks.Ref, error) {
 	var upid string
 	if err := s.c.DoRequest(ctx, http.MethodPost, nodeCertACMEPath(node), nil, &upid); err != nil {
@@ -259,8 +267,8 @@ func (s *Service) OrderNodeCertificate(ctx context.Context, node string) (tasks.
 
 // RenewNodeCertificate renews node's existing ACME certificate
 // (PUT /nodes/{node}/certificates/acme/certificate). It runs as a worker; the
-// returned tasks.Ref is awaited. Same REST-with-caveat status as
-// OrderNodeCertificate.
+// returned tasks.Ref is awaited; see OrderNodeCertificate on how that was
+// established.
 func (s *Service) RenewNodeCertificate(ctx context.Context, node string) (tasks.Ref, error) {
 	var upid string
 	if err := s.c.DoRequest(ctx, http.MethodPut, nodeCertACMEPath(node), nil, &upid); err != nil {
@@ -271,8 +279,8 @@ func (s *Service) RenewNodeCertificate(ctx context.Context, node string) (tasks.
 
 // RevokeNodeCertificate revokes node's ACME certificate with the CA
 // (DELETE /nodes/{node}/certificates/acme/certificate). It runs as a worker; the
-// returned tasks.Ref is awaited. Same REST-with-caveat status as
-// OrderNodeCertificate.
+// returned tasks.Ref is awaited; see OrderNodeCertificate on how that was
+// established.
 func (s *Service) RevokeNodeCertificate(ctx context.Context, node string) (tasks.Ref, error) {
 	var upid string
 	if err := s.c.DoRequest(ctx, http.MethodDelete, nodeCertACMEPath(node), nil, &upid); err != nil {

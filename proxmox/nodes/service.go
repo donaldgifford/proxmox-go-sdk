@@ -66,7 +66,7 @@ type API interface {
 	ListACMEAccounts(ctx context.Context) ([]string, error)
 	GetACMEAccount(ctx context.Context, name string) (*ACMEAccount, error)
 	RegisterACMEAccount(ctx context.Context, spec *ACMEAccountSpec) (tasks.Ref, error)
-	UpdateACMEAccount(ctx context.Context, name string, update *ACMEAccountUpdate) error
+	UpdateACMEAccount(ctx context.Context, name string, update *ACMEAccountUpdate) (tasks.Ref, error)
 	DeactivateACMEAccount(ctx context.Context, name string) (tasks.Ref, error)
 	OrderNodeCertificate(ctx context.Context, node string) (tasks.Ref, error)
 	RenewNodeCertificate(ctx context.Context, node string) (tasks.Ref, error)
