@@ -35,6 +35,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 ### Testing
 
 - *(integration)* Add the ACME DNS-01 lifecycle tests
+- *(integration)* Add an ACME preflight and gate ordering on an opt-in
 
 ## [0.10.0] - 2026-07-26
 
