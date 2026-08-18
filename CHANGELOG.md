@@ -6,12 +6,33 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [unreleased]
 
+### Features
+
+- *(nodes)* Add the provider-generic ACME plugin data model
+- *(nodes)* Add the ACME plugin and discovery read types
+- *(mockpve)* Serve the ACME plugin and discovery endpoints
+- *(nodes)* Add ACME plugin CRUD
+- *(nodes)* Add ACME discovery reads
+- *(nodes)* Type the node ACME config both ways
+
+### Bug Fixes
+
+- *(nodes)* Refuse an ACME plugin whose credentials render empty
+- *(integration)* Scrub the ACME plugin credential blob from cassettes
+
 ### Documentation
 
 - *(design-0006)* ACME DNS plugins with provider-generic credentials
 - *(design-0006)* Record the OQ decisions — all a, doc Approved
 - *(impl-0007)* Phase the ACME DNS delivery
 - *(impl-0007)* Record the OQ decisions — all a
+- *(testing)* Add the ACME DNS-01 walkthrough
+- *(nodes)* Promote the package doc and add an ACME example
+- Mark DESIGN-0006 implemented and IMPL-0007 in progress
+
+### Testing
+
+- *(integration)* Add the ACME DNS-01 lifecycle tests
 
 ## [0.10.0] - 2026-07-26
 
