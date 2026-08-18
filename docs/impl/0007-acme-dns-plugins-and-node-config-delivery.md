@@ -614,6 +614,18 @@ the Phase-3 PR:
   bullet is a phase note rather than a tick: what remains for task 5 is the
   observed behaviour on a node, which is still Donald's.
 
+  The audit covered the surface, not just the ops under suspicion — all 20
+  ACME-adjacent (method, path) pairs plus `/nodes/{node}/config`. Everything
+  else agrees with what shipped: plugin `POST`/`PUT`/`DELETE` and
+  `PUT /nodes/{node}/config` all declare `{"type": "null"}`, so their `error`
+  returns are right; `POST`/`DELETE /cluster/acme/account` declare strings, and
+  those two were already tasks. Two shape details also re-checked against the
+  schema rather than trusted: the account GET returns `account` as an **object**
+  (hence `json.RawMessage`, and the contact addresses live inside it — nothing
+  to model), and the `acme` property string's `domains` sub-key is
+  **semicolon**-separated (`domain[;domain;...]`), which is what the codec
+  emits.
+
 #### Tasks
 
 - [ ] 1. Environment prep: the shared domain's zone on Cloudflare DNS with a
