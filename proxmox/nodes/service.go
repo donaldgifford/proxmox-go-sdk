@@ -82,6 +82,12 @@ type API interface {
 	UpdateACMEPlugin(ctx context.Context, id string, update *ACMEPluginUpdate) error
 	DeleteACMEPlugin(ctx context.Context, id string) error
 
+	// Node configuration (IMPL-0007). The ACME property strings are typed both
+	// ways; SetNodeConfig is synchronous and clears nothing implicitly — name a
+	// key in NodeConfigUpdate.Delete to unset it.
+	GetNodeConfig(ctx context.Context, node string) (*NodeConfig, error)
+	SetNodeConfig(ctx context.Context, node string, update *NodeConfigUpdate) error
+
 	// ACME discovery (IMPL-0007). GetACMEChallengeSchema publishes each
 	// provider's credential fields — the runtime source of truth behind
 	// ACMEPluginData — and the other two describe the CAs a node can order from.

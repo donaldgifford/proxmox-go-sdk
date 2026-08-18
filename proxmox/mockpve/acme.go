@@ -326,3 +326,97 @@ func (s *Server) handleACMEMeta(w http.ResponseWriter, r *http.Request) {
 		"externalAccountBinding":  "unmodelled",
 	})
 }
+
+// --- node config ---
+
+// mockNodeConfigDigest is the digest every node-config read reports; see
+// mockACMEPluginDigest for why a single fixed value is enough.
+const mockNodeConfigDigest = "mockpve-node-config-digest"
+
+// SetNodeConfigKey seeds one raw node-config key ("acme", "acmedomain0",
+// "description"). The mock stores config keys as the property strings the wire
+// carries, so a seed reads back byte-identical. Call before serving.
+func (s *Server) SetNodeConfigKey(node, key, value string) {
+	s.st.mu.Lock()
+	defer s.st.mu.Unlock()
+	n := s.ensureNodeLocked(node)
+	if n.config == nil {
+		n.config = make(map[string]string)
+	}
+	n.config[key] = value
+}
+
+func (s *Server) registerNodeConfigRoutes() {
+	s.handle("GET /api2/json/nodes/{node}/config", s.handleNodeConfigGet)
+	s.handle("PUT /api2/json/nodes/{node}/config", s.handleNodeConfigSet)
+}
+
+// handleNodeConfigGet returns the node config plus its digest. The optional
+// property filter narrows the response to a single key, as on real PVE.
+func (s *Server) handleNodeConfigGet(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	s.st.mu.Lock()
+	out := map[string]string{}
+	// An unknown node reads as an empty config, matching how the other
+	// node-scoped handlers here tolerate one (see handleNetworkList).
+	if n := s.st.nodes[node]; n != nil {
+		for k, v := range n.config {
+			out[k] = v
+		}
+	}
+	s.st.mu.Unlock()
+	out["digest"] = mockNodeConfigDigest
+
+	if property := r.URL.Query().Get("property"); property != "" {
+		filtered := map[string]string{}
+		if v, ok := out[property]; ok {
+			filtered[property] = v
+		}
+		out = filtered
+	}
+	s.writeData(w, out)
+}
+
+// handleNodeConfigSet applies a partial config change: every submitted key is
+// stored verbatim, then the delete list is applied. Like the plugin update it
+// honours PVE's digest guard, and it never touches a key the request did not
+// name — the mock has to be as explicit as the real thing for the SDK's
+// "clears nothing implicitly" contract to mean anything.
+func (s *Server) handleNodeConfigSet(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	node := r.PathValue("node")
+	if !s.parseForm(w, r) {
+		return
+	}
+	if digest := r.PostForm.Get("digest"); digest != "" && digest != mockNodeConfigDigest {
+		s.writeError(w, http.StatusBadRequest, msgDigestMismatch)
+		return
+	}
+
+	s.st.mu.Lock()
+	n := s.ensureNodeLocked(node)
+	if n.config == nil {
+		n.config = make(map[string]string)
+	}
+	for key, values := range r.PostForm {
+		switch key {
+		case "digest", "delete":
+			continue
+		}
+		if len(values) > 0 && values[0] != "" {
+			n.config[key] = values[0]
+		}
+	}
+	if del := r.PostForm.Get("delete"); del != "" {
+		for _, key := range strings.Split(del, ",") {
+			delete(n.config, strings.TrimSpace(key))
+		}
+	}
+	s.st.mu.Unlock()
+	s.writeData(w, nil)
+}

@@ -300,35 +300,82 @@ typed both ways.
 
 #### Tasks
 
-- [ ] 1. Property-string parse/render in `proxmox/nodes/nodeconfig.go`:
+- [x] 1. Property-string parse/render in `proxmox/nodes/nodeconfig.go`:
      `NodeACME` ↔ `acme` (`account=…[,domains=…;…]`) and `ACMEDomain` ↔
      `acmedomain[n]` (`[domain=]<domain>[,plugin=…][,alias=…]`), following the
      CRS-settings precedent (typed both ways, no Extra inside a compound
      property). Table-driven tests: default-key domain form, all-options form,
-     round-trip stability, malformed-string rejection.
-- [ ] 2. `NodeConfig` lossless read (`ACME`, `ACMEDomains` index-ordered,
+     round-trip stability, malformed-string rejection. _(Done 2026-08-18:
+     `parseNodeACME`/ `encodeNodeACME` and `parseACMEDomain`/`encodeACMEDomain`,
+     plus `acmeDomainSlot`/`acmeDomainKey` for the indexed config key. Two facts
+     re-confirmed against the committed 9.2 apidoc before writing: `acme` has NO
+     default key (both `account` and `domains` are keyed) while `acmedomain[n]`
+     makes `domain` its default key, so the bare form PVE's own UI writes must
+     parse. One asymmetry is deliberate — `parseNodeACME` ignores what it cannot
+     understand (the CRS precedent), but `parseACMEDomain` returns an ERROR when
+     no domain is present, because `domain` is required and a domain-less slot
+     is not something the SDK can write back. The bare default key is honoured
+     only in FIRST position, so `plugin=cf,host.example` is an error rather than
+     silently adopting the trailing token. 5 table-driven tests, 33 cases,
+     including a round-trip that asserts re-encoding is a fixed point.)_
+- [x] 2. `NodeConfig` lossless read (`ACME`, `ACMEDomains` index-ordered,
      `Digest`, `Extra`) + `GetNodeConfig`; `NodeConfigUpdate` + `SetNodeConfig`
      with the explicit-delete contract (writes only the slots given; clearing is
      `Delete: ["acmedomain1"]`, never implicit diffing) and the `Digest`
      concurrent-write guard. Extend `TestACMEPathsReal` with the node-config
-     path.
-- [ ] 3. mockpve node-config state: per-node config map + digest,
+     path. _(Done 2026-08-18. **Deviation from DESIGN-0006, worth recording:**
+     `ACMEDomain` gained an `Index` field the design did not have. The design's
+     contract was positional — `ACMEDomains[i]` ↔ `acmedomain<i>` — which is
+     wrong for a SPARSE config: a node with slots 0 and 3 would read back as a
+     two-element slice and write back as slots 0 and 1, silently moving a
+     domain. Carrying the true slot makes the round-trip honest, and
+     `SetNodeConfig` refuses a duplicate index rather than dropping one of two
+     writes to the same slot. A malformed slot does not fail the read — the raw
+     string stays in `Extra` under its own key, since one hand-edited line
+     should not render a node unreadable. `SetNodeConfig` encodes through
+     `EncodeWithExtra` with an empty struct: every typed field here is a
+     property string or a control parameter, so there is nothing for the flat
+     JSON encoder to render.)_
+- [x] 3. mockpve node-config state: per-node config map + digest,
      `GET`/`PUT /nodes/{node}/config` routes through `handle`, digest-mismatch
      conflict, `delete` param honored, seeder. Unit round-trips: set two
      acmedomain slots + account → get parses both; delete one slot; digest
-     rejection; non-ACME keys survive via `Extra` untouched.
-- [ ] 4. Regenerate `docs/COVERAGE.md` (`just coverage`) — the two node-config
+     rejection; non-ACME keys survive via `Extra` untouched. _(Done 2026-08-18:
+     `nodeState.config` (raw key → property string, exactly as the wire carries
+     it), `SetNodeConfigKey` seeder, and the two routes in `mockpve/acme.go`
+     beside the plugin routes. The GET honours PVE's optional `property` filter.
+     An unknown node reads as an empty config rather than a 404, matching how
+     the neighbouring node-scoped handlers tolerate one (`handleNetworkList`);
+     the PUT uses `ensureNodeLocked`. The mock stores only what the request
+     names and applies `delete` afterwards — it has to be as literal as real PVE
+     for the SDK's "clears nothing implicitly" contract to be worth testing. 7
+     service-level tests: the two-domain round-trip, sparse slots, the
+     explicit-delete contract in both halves (a write naming slot 0 leaves slot
+     1 alone), losslessness of description/wakeonlan/startall-onboot-delay, the
+     malformed slot, the digest guard in both directions, and the client-side
+     guards.)_
+- [x] 4. Regenerate `docs/COVERAGE.md` (`just coverage`) — the two node-config
      rows flip; total lands at 258 (OQ-1a) — and add the `/cluster/acme/tos`
      `out_of_scope` annotation with its deprecation reason (OQ-2a, the section's
-     first non-empty entry).
+     first non-empty entry). _(Done 2026-08-18: **258/675 (38.2%)**, the figure
+     the ground-facts section predicted. `/cluster/acme/tos` is the
+     `out_of_scope` section's first entry, reason citing DESIGN-0006 and
+     pointing at `GetACMEMeta`; its row now reads "out of scope" with the reason
+     inline instead of an unexplained gap. The section's header comment was
+     rewritten so "empty on purpose" did not survive as a lie next to a
+     non-empty list — the untriaged families are still deliberately absent, and
+     the comment now says why an entry earns its place.)_
 
 #### Success Criteria
 
 - Property-string round-trips pass, including multi-slot `acmedomain[n]` and the
-  explicit-delete contract.
+  explicit-delete contract. **Met 2026-08-18** — and the sparse-slot case that
+  the positional design would have got wrong is covered too
+  (`TestNodeConfigSparseSlots`).
 - `just coverage-check` green; the committed report is current with all intended
-  flips and no annotation drift.
-- `just lint` + `just test` (race) green.
+  flips and no annotation drift. **Met 2026-08-18** — 256 → **258/675 (38.2%)**,
+  0 unmatched routes, one new annotation.
+- `just lint` + `just test` (race) green. **Met 2026-08-18.**
 
 ---
 

@@ -17,6 +17,7 @@ func TestACMEPathsReal(t *testing.T) {
 		{acmeDirectoriesPath(), "/cluster/acme/directories"},
 		{acmeMetaPath(), "/cluster/acme/meta"},
 		{nodeCertACMEPath("pve"), "/nodes/pve/certificates/acme/certificate"},
+		{nodeConfigPath("pve"), "/nodes/pve/config"},
 	}
 	for _, tt := range tests {
 		if tt.got != tt.want {

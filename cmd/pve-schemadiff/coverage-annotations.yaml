@@ -42,12 +42,20 @@ side_channel:
 # Path families the SDK has decided not to implement, each with the document that
 # decided it.
 #
-# Empty on purpose (IMPL-0006 OQ-4a): the untriaged families — notifications,
-# hardware mapping, jobs, bulk-action, pools — are GAPS, not decisions. Parking
-# them here would tidy the headline percentage by hiding exactly the debt the
-# tracker was built to expose, behind a label claiming a decision nobody made.
-# They show up in the report's "unassigned" section until someone triages them.
-out_of_scope: []
+# The untriaged families — notifications, hardware mapping, jobs, bulk-action,
+# pools — are deliberately NOT here (IMPL-0006 OQ-4a): they are GAPS, not
+# decisions. Parking them here would tidy the headline percentage by hiding
+# exactly the debt the tracker was built to expose, behind a label claiming a
+# decision nobody made. They show up in the report's "unassigned" section until
+# someone triages them. An entry earns its place only when a document decided
+# against the family, which is what the doc field records.
+out_of_scope:
+  - prefix: "/cluster/acme/tos"
+    reason: >-
+      Deprecated upstream in favour of /cluster/acme/meta, which returns the same terms-of-service URL alongside the rest
+      of the CA's directory metadata. The SDK offers GetACMEMeta and no tos surface, so a caller accepting the CA's terms
+      reads them from one place.
+    doc: "DESIGN-0006"
 
 # The fabrication guard's escape hatch: mockpve routes permitted to reference an
 # endpoint the baseline does not hold. Empty is the goal and the current state —

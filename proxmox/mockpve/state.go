@@ -51,6 +51,9 @@ type ticketRecord struct {
 type nodeState struct {
 	tasks     map[string]*taskRecord     // keyed by UPID
 	netIfaces map[string]*netIfaceRecord // keyed by interface name
+	// config is the node config file (/nodes/{node}/config): raw PVE keys to
+	// their property-string values, exactly as the wire carries them.
+	config map[string]string
 	// Node administration (task 4).
 	aptUpdates []aptUpdateRecord
 	repos      []nodeRepoFileRecord
