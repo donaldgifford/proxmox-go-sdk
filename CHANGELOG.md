@@ -34,6 +34,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - Mark DESIGN-0006 implemented and IMPL-0007 in progress
 - *(impl-0007)* Close phase 3 — CI green on PR #27
 - *(impl-0007)* Record the surface-wide return-shape audit
+- *(claude)* ACME is mock-verified, and the YAML formatter/linter gotcha
 
 ### Testing
 
