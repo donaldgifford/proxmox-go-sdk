@@ -132,35 +132,47 @@ export PVE_TEST_PLACEMENT_VMID_2=9302   # multi-node cluster, e.g. the pvelab la
 export PVE_TEST_FABRIC_NODES="pvelab-1,pvelab-2,pvelab-3"  # SDN fabric lifecycle (>= 2 pvelab nodes)
 export PVE_TEST_FABRIC_IFACE="ens19"    # fabric-facing interface on every fabric node
 export PVE_TEST_HA_ARM=1                # HA arm/disarm cycle — DISPOSABLE clusters only (pvelab)
+export PVE_TEST_ACME_DOMAIN="pve1.lab.example.com"   # ACME DNS-01 — an FQDN in YOUR zone
+export PVE_TEST_ACME_CF_TOKEN="…"       # Cloudflare scoped token (Zone.DNS edit on that zone)
+export PVE_TEST_ACME_NC_USERNAME="…"    # Namecheap run (second provider)
+export PVE_TEST_ACME_NC_API_KEY="…"
+export PVE_TEST_ACME_NC_SOURCE_IP="…"   # the address PVE calls out from, allowlisted at Namecheap
 ```
 
 Every variable:
 
-| Variable                    | Required | Purpose                                                    |
-| --------------------------- | -------- | ---------------------------------------------------------- |
-| `PVE_ENDPOINT`              | yes      | base URL, e.g. `https://pve.example:8006`                  |
-| `PVE_TOKEN_ID`              | yes\*    | e.g. `root@pam!sdk`                                        |
-| `PVE_TOKEN_SECRET`          | yes\*    | the token's secret                                         |
-| `PVE_USERNAME`              | yes\*    | password auth, e.g. `root@pam` (when token vars absent)    |
-| `PVE_PASSWORD`              | yes\*    | password auth; pairs with `PVE_USERNAME`                   |
-| `PVE_NODE`                  | no       | node under test (default `pve`)                            |
-| `PVE_INSECURE_TLS`          | no       | `1` to skip TLS verify (self-signed)                       |
-| `PVE_RECORD`                | no       | `1` to record cassettes while running                      |
-| `PVE_REPLAY`                | no       | `1` to replay committed cassettes (no node; see below)     |
-| `PVE_DEBUG`                 | no       | `1` to stream a line per SDK request                       |
-| `PVE_TEST_STORAGE`          | gate     | storage for scratch disks / uploads                        |
-| `PVE_TEST_ISO_STORAGE`      | gate     | ISO-upload storage (allows `iso`); else `PVE_TEST_STORAGE` |
-| `PVE_TEST_VMID`             | gate     | scratch QEMU VMID (created + destroyed)                    |
-| `PVE_TEST_CONSOLE_VMID`     | gate     | scratch QEMU VMID for the console-mint test (own VMID)     |
-| `PVE_TEST_LXC_VMID`         | gate     | scratch LXC VMID (created + destroyed)                     |
-| `PVE_TEST_LXC_TEMPLATE`     | gate     | OS template volid for the LXC lifecycle                    |
-| `PVE_TEST_ISO_PATH`         | gate     | local path to a small ISO to upload                        |
-| `PVE_TEST_PLACEMENT_VMID_1` | gate     | scratch VMID for the HA placement pair (multi-node)        |
-| `PVE_TEST_PLACEMENT_VMID_2` | gate     | the pair's second scratch VMID                             |
-| `PVE_TEST_FABRIC_NODES`     | gate     | CSV of >= 2 node names for the SDN fabric lifecycle        |
-| `PVE_TEST_FABRIC_IFACE`     | gate     | fabric-facing interface name on every fabric node          |
-| `PVE_TEST_HA_ARM`           | gate     | `1` to run the cluster-wide HA arm/disarm cycle (pvelab!)  |
-| `PVE_SCRUB_EXTRA`           | no       | extra `live=placeholder` recording-scrub pairs (CSV)       |
+| Variable                      | Required | Purpose                                                                      |
+| ----------------------------- | -------- | ---------------------------------------------------------------------------- |
+| `PVE_ENDPOINT`                | yes      | base URL, e.g. `https://pve.example:8006`                                    |
+| `PVE_TOKEN_ID`                | yes\*    | e.g. `root@pam!sdk`                                                          |
+| `PVE_TOKEN_SECRET`            | yes\*    | the token's secret                                                           |
+| `PVE_USERNAME`                | yes\*    | password auth, e.g. `root@pam` (when token vars absent)                      |
+| `PVE_PASSWORD`                | yes\*    | password auth; pairs with `PVE_USERNAME`                                     |
+| `PVE_NODE`                    | no       | node under test (default `pve`)                                              |
+| `PVE_INSECURE_TLS`            | no       | `1` to skip TLS verify (self-signed)                                         |
+| `PVE_RECORD`                  | no       | `1` to record cassettes while running                                        |
+| `PVE_REPLAY`                  | no       | `1` to replay committed cassettes (no node; see below)                       |
+| `PVE_DEBUG`                   | no       | `1` to stream a line per SDK request                                         |
+| `PVE_TEST_STORAGE`            | gate     | storage for scratch disks / uploads                                          |
+| `PVE_TEST_ISO_STORAGE`        | gate     | ISO-upload storage (allows `iso`); else `PVE_TEST_STORAGE`                   |
+| `PVE_TEST_VMID`               | gate     | scratch QEMU VMID (created + destroyed)                                      |
+| `PVE_TEST_CONSOLE_VMID`       | gate     | scratch QEMU VMID for the console-mint test (own VMID)                       |
+| `PVE_TEST_LXC_VMID`           | gate     | scratch LXC VMID (created + destroyed)                                       |
+| `PVE_TEST_LXC_TEMPLATE`       | gate     | OS template volid for the LXC lifecycle                                      |
+| `PVE_TEST_ISO_PATH`           | gate     | local path to a small ISO to upload                                          |
+| `PVE_TEST_PLACEMENT_VMID_1`   | gate     | scratch VMID for the HA placement pair (multi-node)                          |
+| `PVE_TEST_PLACEMENT_VMID_2`   | gate     | the pair's second scratch VMID                                               |
+| `PVE_TEST_FABRIC_NODES`       | gate     | CSV of >= 2 node names for the SDN fabric lifecycle                          |
+| `PVE_TEST_FABRIC_IFACE`       | gate     | fabric-facing interface name on every fabric node                            |
+| `PVE_TEST_HA_ARM`             | gate     | `1` to run the cluster-wide HA arm/disarm cycle (pvelab!)                    |
+| `PVE_TEST_ACME_DOMAIN`        | gate     | FQDN to certify, in the DNS provider's zone (pvelab!)                        |
+| `PVE_TEST_ACME_CF_TOKEN`      | gate     | Cloudflare scoped API token — gates the Cloudflare run                       |
+| `PVE_TEST_ACME_CF_ACCOUNT_ID` | no       | Cloudflare account id, when the token needs it                               |
+| `PVE_TEST_ACME_NC_USERNAME`   | gate     | Namecheap API username — with the key, gates that run                        |
+| `PVE_TEST_ACME_NC_API_KEY`    | gate     | Namecheap API key                                                            |
+| `PVE_TEST_ACME_NC_SOURCE_IP`  | gate     | caller address allowlisted in the Namecheap account                          |
+| `PVE_TEST_ACME_ACCOUNT_EMAIL` | no       | contact for the staging account (default: `sdk-tests@$PVE_TEST_ACME_DOMAIN`) |
+| `PVE_SCRUB_EXTRA`             | no       | extra `live=placeholder` recording-scrub pairs (CSV)                         |
 
 \* one credential pair is required: `PVE_TOKEN_ID`+`PVE_TOKEN_SECRET` (wins when
 both pairs are set) or `PVE_USERNAME`+`PVE_PASSWORD`.
@@ -299,6 +311,62 @@ is live-only and skips under `PVE_REPLAY=1`.
 go test -tags=integration ./proxmox/integration/... -run 'TestConsoleMint|TestConsoleRFB' -v
 ```
 
+### ACME DNS-01 (IMPL-0007)
+
+**Run this on a pvelab node, never r740a.** An ACME order REPLACES the node's
+pveproxy certificate. On a disposable clone that is free; on the real node a
+failed cleanup leaves the homelab web UI serving a certificate your browser
+refuses. The test always uses Let's Encrypt **staging** (resolved from the
+node's own `ListACMEDirectories`, and it fails outright rather than falling
+through to production), so the certificate it installs is untrusted by design —
+which is exactly why it must not land on a node you actually use.
+
+What you need before the first run:
+
+1. **A domain you control**, with an FQDN pointing at nothing in particular —
+   DNS-01 proves control of the _zone_, so the name need not resolve to the node
+   and nothing needs to be reachable from the internet.
+2. **A scoped Cloudflare token**, not the global key: Zone → DNS → Edit, limited
+   to that one zone. The SDK also accepts the legacy global key + email
+   (`ACMECloudflare.Key`/`Email`), but a scoped token is the whole reason
+   Cloudflare offers them.
+3. **For the Namecheap run**: API access enabled on the account, plus the
+   caller's public address allowlisted — Namecheap authenticates by API key AND
+   source IP, so `PVE_TEST_ACME_NC_SOURCE_IP` is the address _PVE_ calls out
+   from, not your workstation's.
+
+```sh
+# Cloudflare — needs: PVE_TEST_ACME_DOMAIN, PVE_TEST_ACME_CF_TOKEN
+go test -tags=integration ./proxmox/integration/... -run TestACMEDNSCloudflare -v
+```
+
+The two provider runs are **sequential, not parallel**, because they share one
+domain: a zone has exactly one set of authoritative nameservers, so proving
+DNS-01 through Namecheap means pointing the domain's nameservers at Namecheap
+first and waiting for that delegation to propagate (registrar NS changes are
+slow — allow hours, and confirm with `dig +trace NS your.domain` before
+starting). Then:
+
+```sh
+# Namecheap — after the nameserver switch has propagated
+go test -tags=integration ./proxmox/integration/... -run TestACMEDNSNamecheap -v
+```
+
+Each run takes minutes, most of it waiting: the plugin sets a 60-second
+validation delay so the TXT record lands on the authoritative servers before the
+CA looks, and the order task itself does the DNS-01 exchange. The test then
+dials the node's `:8006` and inspects the certificate actually being served — a
+finished PVE task only proves PVE stored something.
+
+The ACME **account is reused** across runs rather than recreated (it holds the
+CA registration key, and re-registering every run is what burns rate limits).
+The plugin and the node's ACME config _are_ restored on cleanup.
+
+If an order fails, `PVE_DEBUG=1` plus the task log on the node
+(`pvenode acme cert order` writes to the task log) is the fastest path: the
+usual causes are a token missing Zone.DNS edit, a source IP not allowlisted, or
+the nameservers still pointing at the other provider.
+
 ### Everything at once
 
 Once you trust the individual runs:
@@ -434,7 +502,13 @@ so a live secret never lands in a file:
 - `Cookie` / `Set-Cookie` (auth tickets) and `CSRFPreventionToken`,
 - `password` / `secret` / `otp` in request forms,
 - `ticket` / `CSRFPreventionToken` / token `value` in credential-endpoint
-  responses.
+  responses,
+- the ACME plugin `data` field — a live DNS-provider credential — in the request
+  form, in go-vcr's separately stored parsed form map, and in the response body
+  of a plugin read (PVE returns the stored value; it is not write-only). This
+  one is scoped to `/cluster/acme/plugins` by URL, because `data` is also the
+  name of PVE's response envelope and a blanket rule would rewrite
+  `{"data":"UPID:…"}` in every task-returning cassette.
 
 Each is replaced with `REDACTED`. This redaction is itself guarded by a unit
 test that runs in normal CI:
@@ -454,6 +528,10 @@ record run cannot accidentally commit un-reviewed data. Before committing any
 cassette, open the `.yaml` and confirm:
 
 - no `PVE_TOKEN_SECRET`, ticket, or password appears (search for your secret),
+- every ACME plugin `data` value reads `REDACTED`. Do not skim past a base64
+  blob: `data: Q0ZfVG9rZW49…` is a live provider credential, and base64 is
+  precisely the shape that survives a human leak review. Decode anything that
+  looks like one (`base64 -d`) if you are unsure,
 - you are comfortable committing the infrastructure details that _are_ captured:
   node names, IP addresses, MAC addresses, storage names, VM configs.
 

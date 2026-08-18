@@ -432,10 +432,22 @@ will execute, and the release PR.
      from the pre-run read. Both skip with an actionable message when their env
      is absent, and under `PVE_REPLAY` too, since no cassette can stand in for a
      TLS dial. `go vet -tags=integration` clean.)_
-- [ ] 3. TESTING.md: an ACME DNS section — domain + scoped-token prep, the env
+- [x] 3. TESTING.md: an ACME DNS section — domain + scoped-token prep, the env
      set, Let's Encrypt staging, the sequential provider dance (Cloudflare run →
      nameserver switch + propagation wait → Namecheap run), and the cassette
-     leak-review checklist addition (`data` must read REDACTED).
+     leak-review checklist addition (`data` must read REDACTED). _(Done
+     2026-08-18: a "ACME DNS-01" section under the lifecycle tests, plus six new
+     env rows and two edits to the recording chapter. The section leads with the
+     constraint that actually matters — **run it on pvelab, never r740a**,
+     because an order replaces the node's pveproxy certificate and the staging
+     cert it installs is untrusted by design — and explains WHY the two provider
+     runs are sequential rather than just asserting it: a zone has one set of
+     authoritative nameservers, so the Namecheap run needs a registrar NS switch
+     and its propagation wait first (`dig +trace NS` to confirm). The
+     leak-review checklist gained an explicit "do not skim past a base64 blob"
+     line — that is the exact failure mode the redaction exists to prevent, and
+     a reviewer who does not know `data:` is a credential will nod straight past
+     it.)_
 - [ ] 4. Docs promotion: `nodes/doc.go` gains the ACME story (accounts → plugins
      → node config → order, with the provider-generic model); a runnable
      `Example` (named, e.g. `Example_acmeDNS`) wiring plugin-create → node
