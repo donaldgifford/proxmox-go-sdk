@@ -23,6 +23,10 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(integration)* Restore the TestVersionRoundTrip cassette
 - *(nodes)* UpdateACMEAccount returns the task it was discarding
 
+### Refactor
+
+- *(mockpve)* Type the CA account object; cover the refresh path
+
 ### Documentation
 
 - *(design-0006)* ACME DNS plugins with provider-generic credentials
