@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -35,7 +36,7 @@ func TestCreateACMEPluginCloudflare(t *testing.T) {
 	delay := 30
 	if err := svc.CreateACMEPlugin(ctx, &nodes.ACMEPluginSpec{
 		ID:              "cf-lab",
-		Data:            nodes.Cloudflare{Token: "cf-token", AccountID: "acct-1"},
+		Data:            nodes.ACMECloudflare{Token: "cf-token", AccountID: "acct-1"},
 		ValidationDelay: &delay,
 		Nodes:           []string{"pve1", "pve2"},
 	}); err != nil {
@@ -50,8 +51,8 @@ func TestCreateACMEPluginCloudflare(t *testing.T) {
 		t.Errorf("Plugin = %q, want %q", got.Plugin, "cf-lab")
 	}
 	// Type defaults to dns without the caller saying so.
-	if got.Type != nodes.ChallengeTypeDNS {
-		t.Errorf("Type = %q, want %q", got.Type, nodes.ChallengeTypeDNS)
+	if got.Type != nodes.ACMEChallengeTypeDNS {
+		t.Errorf("Type = %q, want %q", got.Type, nodes.ACMEChallengeTypeDNS)
 	}
 	// The api parameter comes from the provider, never from the caller.
 	if got.API != "cf" {
@@ -81,7 +82,7 @@ func TestCreateACMEPluginRaw(t *testing.T) {
 
 	if err := svc.CreateACMEPlugin(ctx, &nodes.ACMEPluginSpec{
 		ID: "desec-lab",
-		Data: nodes.RawPluginData{
+		Data: nodes.ACMERawPluginData{
 			Provider: "desec",
 			Values:   map[string]string{"DEDYN_TOKEN": "tok", "DEDYN_NAME": "h.dedyn.io"},
 		},
@@ -110,7 +111,7 @@ func TestCreateACMEPluginStandalone(t *testing.T) {
 
 	if err := svc.CreateACMEPlugin(ctx, &nodes.ACMEPluginSpec{
 		ID:   "http-only",
-		Type: nodes.ChallengeTypeStandalone,
+		Type: nodes.ACMEChallengeTypeStandalone,
 	}); err != nil {
 		t.Fatalf("CreateACMEPlugin: %v", err)
 	}
@@ -118,8 +119,8 @@ func TestCreateACMEPluginStandalone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetACMEPlugin: %v", err)
 	}
-	if got.Type != nodes.ChallengeTypeStandalone {
-		t.Errorf("Type = %q, want %q", got.Type, nodes.ChallengeTypeStandalone)
+	if got.Type != nodes.ACMEChallengeTypeStandalone {
+		t.Errorf("Type = %q, want %q", got.Type, nodes.ACMEChallengeTypeStandalone)
 	}
 	if got.API != "" || got.Data != "" {
 		t.Errorf("API/Data = %q/%q, want both empty for a standalone plugin", got.API, got.Data)
@@ -157,7 +158,7 @@ func TestUpdateACMEPluginRotatesData(t *testing.T) {
 	ctx := context.Background()
 
 	if err := svc.UpdateACMEPlugin(ctx, "cf-lab", &nodes.ACMEPluginUpdate{
-		Data: nodes.Cloudflare{Token: "rotated-token"},
+		Data: nodes.ACMECloudflare{Token: "rotated-token"},
 	}); err != nil {
 		t.Fatalf("UpdateACMEPlugin: %v", err)
 	}
@@ -312,7 +313,7 @@ func TestACMEPluginGuards(t *testing.T) {
 		t.Error("CreateACMEPlugin(nil) error = nil, want non-nil")
 	}
 	if err := svc.CreateACMEPlugin(ctx, &nodes.ACMEPluginSpec{
-		Data: nodes.Cloudflare{Token: "t"},
+		Data: nodes.ACMECloudflare{Token: "t"},
 	}); err == nil {
 		t.Error("CreateACMEPlugin with no ID succeeded, want a missing-field error")
 	}
@@ -332,5 +333,108 @@ func TestACMEPluginGuards(t *testing.T) {
 	}
 	if err := svc.DeleteACMEPlugin(ctx, ""); err == nil {
 		t.Error("DeleteACMEPlugin with no id succeeded, want a missing-field error")
+	}
+}
+
+// TestACMEPluginRejectsEmptyCredentials covers the trap a non-nil-but-empty
+// provider sets: a struct built from an unset environment variable satisfies the
+// interface, so the nil guard above does not catch it. PVE would store the
+// credential-less plugin and report success, and the failure would only surface
+// later as a certificate order that cannot answer its challenge.
+func TestACMEPluginRejectsEmptyCredentials(t *testing.T) {
+	t.Parallel()
+	svc := newService(t, mockpve.New())
+	ctx := context.Background()
+
+	// Create: the whole provider is empty (imagine os.Getenv returning "").
+	err := svc.CreateACMEPlugin(ctx, &nodes.ACMEPluginSpec{
+		ID:   "cf-empty",
+		Data: nodes.ACMECloudflare{},
+	})
+	if err == nil {
+		t.Fatal("CreateACMEPlugin with empty credentials succeeded, want a missing-field error")
+	}
+	if _, getErr := svc.GetACMEPlugin(ctx, "cf-empty"); getErr == nil {
+		t.Error("the refused plugin was created anyway — the guard must fire before the request")
+	}
+
+	// Update is the worse case: without the guard this returns nil having
+	// changed nothing, so the caller believes a rotation happened while the old
+	// credentials stay live.
+	if err := svc.CreateACMEPlugin(ctx, &nodes.ACMEPluginSpec{
+		ID:   "cf-live",
+		Data: nodes.ACMECloudflare{Token: "original-token"},
+	}); err != nil {
+		t.Fatalf("CreateACMEPlugin: %v", err)
+	}
+	if err := svc.UpdateACMEPlugin(ctx, "cf-live", &nodes.ACMEPluginUpdate{
+		Data: nodes.ACMECloudflare{},
+	}); err == nil {
+		t.Error("UpdateACMEPlugin with empty credentials succeeded, want a missing-field error")
+	}
+	got, err := svc.GetACMEPlugin(ctx, "cf-live")
+	if err != nil {
+		t.Fatalf("GetACMEPlugin: %v", err)
+	}
+	if want := "CF_Token=original-token"; decodeData(t, got.Data) != want {
+		t.Errorf("stored data = %q, want the untouched %q", decodeData(t, got.Data), want)
+	}
+
+	// A raw provider with no name would send api= and is refused the same way.
+	if err := svc.CreateACMEPlugin(ctx, &nodes.ACMEPluginSpec{
+		ID:   "unnamed",
+		Data: nodes.ACMERawPluginData{Values: map[string]string{"K": "v"}},
+	}); err == nil {
+		t.Error("CreateACMEPlugin with an unnamed provider succeeded, want a missing-field error")
+	}
+}
+
+// TestCreateACMEPluginRejectsUnknownType pins the closed enum. Before the type
+// was defined, a capital-D typo slipped past the "dns needs data" guard and was
+// POSTed to the cluster config.
+func TestCreateACMEPluginRejectsUnknownType(t *testing.T) {
+	t.Parallel()
+	svc := newService(t, mockpve.New())
+
+	err := svc.CreateACMEPlugin(context.Background(), &nodes.ACMEPluginSpec{
+		ID:   "typo",
+		Type: "DNS",
+		Data: nodes.ACMECloudflare{Token: "t"},
+	})
+	if err == nil {
+		t.Fatal(`CreateACMEPlugin with Type "DNS" succeeded, want an invalid-value error`)
+	}
+	if !strings.Contains(err.Error(), "invalid value") {
+		t.Errorf("error = %v, want it to name the invalid value", err)
+	}
+}
+
+// TestACMEPluginStringRedacts guards the read type against a consumer logging a
+// plugin: base64 is an encoding, not protection, so String must elide it.
+func TestACMEPluginStringRedacts(t *testing.T) {
+	t.Parallel()
+	svc := newService(t, mockpve.New())
+	ctx := context.Background()
+
+	const token = "live-cloudflare-token"
+	if err := svc.CreateACMEPlugin(ctx, &nodes.ACMEPluginSpec{
+		ID:   "cf",
+		Data: nodes.ACMECloudflare{Token: token},
+	}); err != nil {
+		t.Fatalf("CreateACMEPlugin: %v", err)
+	}
+	got, err := svc.GetACMEPlugin(ctx, "cf")
+	if err != nil {
+		t.Fatalf("GetACMEPlugin: %v", err)
+	}
+	// Through an any, which is how a value reaches slog — and the only form
+	// that exercises fmt's dispatch to String rather than calling it directly.
+	var logged any = *got
+	rendered := fmt.Sprintf("%v", logged)
+	if strings.Contains(rendered, got.Data) {
+		t.Errorf("%%v rendered the credential blob: %s", rendered)
+	}
+	if !strings.Contains(rendered, "<redacted>") || !strings.Contains(rendered, "cf") {
+		t.Errorf("%%v = %q, want it redacted but still identifying the plugin", rendered)
 	}
 }

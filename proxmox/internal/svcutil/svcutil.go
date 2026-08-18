@@ -19,6 +19,10 @@ var (
 	ErrNilSpec = errors.New("nil spec")
 	// ErrMissingField is wrapped when a required spec field is empty.
 	ErrMissingField = errors.New("missing required field")
+	// ErrInvalidValue is wrapped when a spec field holds a value the wire
+	// protocol does not admit — a typo in a closed enum, say. Refusing it here
+	// beats letting the server store something it cannot act on.
+	ErrInvalidValue = errors.New("invalid value")
 )
 
 // TaskRef parses the UPID PVE returns for a task-starting operation into a

@@ -12,15 +12,18 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/types"
 )
 
-// ACME challenge types. PVE admits exactly these two: a DNS-01 challenge driven
-// by an acme.sh provider plugin, or the built-in standalone HTTP-01 challenge.
+// ACMEChallengeType is a plugin's challenge mechanism. PVE admits exactly the
+// two values below; the SDK refuses any other on a write rather than letting a
+// typo (say "DNS") reach the cluster config.
+type ACMEChallengeType string
+
 const (
-	// ChallengeTypeDNS is the DNS-01 challenge. A plugin of this type carries
-	// provider credentials (see ACMEPluginData).
-	ChallengeTypeDNS = "dns"
-	// ChallengeTypeStandalone is PVE's built-in HTTP-01 challenge. It needs no
-	// credentials, so a standalone plugin has no data.
-	ChallengeTypeStandalone = "standalone"
+	// ACMEChallengeTypeDNS is the DNS-01 challenge. A plugin of this type
+	// carries provider credentials (see [ACMEPluginData]).
+	ACMEChallengeTypeDNS ACMEChallengeType = "dns"
+	// ACMEChallengeTypeStandalone is PVE's built-in HTTP-01 challenge. It needs
+	// no credentials, so a standalone plugin has no data.
+	ACMEChallengeTypeStandalone ACMEChallengeType = "standalone"
 )
 
 // ACMEPlugin is one ACME challenge plugin from GET /cluster/acme/plugins or
@@ -28,17 +31,18 @@ const (
 // are preserved in Extra.
 //
 // Data is the stored credential payload exactly as PVE returns it — base64 of
-// newline-separated KEY=value lines. The SDK deliberately offers no decode
-// helper, so printing an ACMEPlugin cannot spill plaintext credentials.
+// newline-separated KEY=value lines. The SDK offers no decode helper, but
+// base64 is an encoding and not protection: redact Data before logging it. The
+// String method does that for you.
 type ACMEPlugin struct {
-	Plugin          string        `json:"plugin,omitempty"` // the plugin ID.
-	Type            string        `json:"type,omitempty"`   // ChallengeTypeDNS or ChallengeTypeStandalone.
-	API             string        `json:"api,omitempty"`    // acme.sh plugin name, e.g. "cf".
-	Data            string        `json:"data,omitempty"`   // base64 credential payload, verbatim.
-	ValidationDelay int           `json:"validation-delay,omitempty"`
-	Nodes           string        `json:"nodes,omitempty"` // comma-separated node names; empty means all.
-	Disable         types.PVEBool `json:"disable,omitempty"`
-	Digest          string        `json:"digest,omitempty"` // config digest; pass to an update to guard it.
+	Plugin          string            `json:"plugin,omitempty"` // the plugin ID.
+	Type            ACMEChallengeType `json:"type,omitempty"`
+	API             string            `json:"api,omitempty"`  // acme.sh plugin name, e.g. "cf".
+	Data            string            `json:"data,omitempty"` // base64 credential payload, verbatim.
+	ValidationDelay int               `json:"validation-delay,omitempty"`
+	Nodes           string            `json:"nodes,omitempty"` // comma-separated node names; empty means all.
+	Disable         types.PVEBool     `json:"disable,omitempty"`
+	Digest          string            `json:"digest,omitempty"` // config digest; pass to an update to guard it.
 	// Extra holds plugin keys the SDK does not model, as their raw PVE string
 	// values. It is populated on reads and ignored on writes.
 	Extra map[string]string `json:"-"`
@@ -68,6 +72,18 @@ func (p *ACMEPlugin) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// String renders the plugin with its credential payload elided, so logging a
+// read is safe. Reach for [ACMEPlugin.Data] explicitly when you genuinely need
+// the stored blob.
+func (p ACMEPlugin) String() string {
+	data := "<empty>"
+	if p.Data != "" {
+		data = "<redacted>"
+	}
+	return fmt.Sprintf("nodes.ACMEPlugin{Plugin:%s Type:%s API:%s Data:%s Nodes:%s Disable:%v}",
+		p.Plugin, p.Type, p.API, data, p.Nodes, bool(p.Disable))
+}
+
 // ACMEPluginSpec is the body of POST /cluster/acme/plugins, registering a
 // challenge plugin. ID is required. Data is required for ChallengeTypeDNS and
 // supplies both the api and data parameters; leave it nil for
@@ -77,8 +93,10 @@ func (p *ACMEPlugin) UnmarshalJSON(data []byte) error {
 //
 // Pass it to Service.CreateACMEPlugin by pointer.
 type ACMEPluginSpec struct {
-	ID   string `json:"id"`             // required; a PVE config ID.
-	Type string `json:"type,omitempty"` // defaults to ChallengeTypeDNS.
+	ID string `json:"id"` // required; a PVE config ID.
+	// Type defaults to ACMEChallengeTypeDNS when empty. Any value other than
+	// the two defined constants is refused before the request is sent.
+	Type ACMEChallengeType `json:"type,omitempty"`
 	// Data supplies the provider credentials. The SDK derives the api and
 	// (base64) data parameters from it.
 	Data ACMEPluginData `json:"-"`
@@ -87,7 +105,9 @@ type ACMEPluginSpec struct {
 	ValidationDelay *int `json:"validation-delay,omitempty"`
 	// Nodes restricts the plugin to these cluster nodes; empty means all. It is
 	// CSV-joined into PVE's nodes parameter.
-	Nodes   []string       `json:"-"`
+	Nodes []string `json:"-"`
+	// Disable registers the plugin without putting it in service; nil leaves it
+	// enabled.
 	Disable *types.PVEBool `json:"disable,omitempty"`
 	// Extra carries PVE parameters the SDK does not model.
 	Extra map[string]string `json:"-"`
@@ -103,8 +123,14 @@ type ACMEPluginUpdate struct {
 	// Leave nil to keep what is stored.
 	Data            ACMEPluginData `json:"-"`
 	ValidationDelay *int           `json:"validation-delay,omitempty"`
-	Nodes           []string       `json:"-"`
-	Disable         *types.PVEBool `json:"disable,omitempty"`
+	// Nodes REPLACES the node restriction. Empty leaves the stored restriction
+	// unchanged — note this differs from [ACMEPluginSpec.Nodes], where empty
+	// means every node. To widen a restricted plugin back to the whole cluster,
+	// name "nodes" in Delete.
+	Nodes []string `json:"-"`
+	// Disable takes the plugin out of (or back into) service; nil leaves the
+	// stored setting unchanged.
+	Disable *types.PVEBool `json:"disable,omitempty"`
 	// Delete names plugin keys to unset. It is CSV-joined into PVE's delete
 	// parameter.
 	Delete []string `json:"-"`
@@ -115,18 +141,18 @@ type ACMEPluginUpdate struct {
 	Extra map[string]string `json:"-"`
 }
 
-// ChallengeSchemaEntry is one provider from GET /cluster/acme/challenge-schema:
+// ACMEChallengeSchemaEntry is one provider from GET /cluster/acme/challenge-schema:
 // the id PVE expects in a plugin's api field, a human-readable name, the
 // challenge type it serves, and the provider's own credential-field schema.
 //
 // Schema is kept as raw JSON: its shape is provider-defined, so the SDK
 // preserves it verbatim rather than modelling 160 variations. Read it to
-// discover the field names a [RawPluginData] needs.
-type ChallengeSchemaEntry struct {
-	ID     string          `json:"id"`
-	Name   string          `json:"name,omitempty"`
-	Type   string          `json:"type,omitempty"`
-	Schema json.RawMessage `json:"schema,omitempty"`
+// discover the field names an [ACMERawPluginData] needs.
+type ACMEChallengeSchemaEntry struct {
+	ID     string            `json:"id"`
+	Name   string            `json:"name,omitempty"`
+	Type   ACMEChallengeType `json:"type,omitempty"`
+	Schema json.RawMessage   `json:"schema,omitempty"`
 }
 
 // ACMEDirectory is one named CA endpoint from GET /cluster/acme/directories —
@@ -213,18 +239,26 @@ func (s *Service) CreateACMEPlugin(ctx context.Context, spec *ACMEPluginSpec) er
 	}
 	challenge := spec.Type
 	if challenge == "" {
-		challenge = ChallengeTypeDNS
+		challenge = ACMEChallengeTypeDNS
 	}
-	if challenge == ChallengeTypeDNS && spec.Data == nil {
-		return fmt.Errorf("nodes.CreateACMEPlugin: data is required for a %s plugin: %w",
-			ChallengeTypeDNS, svcutil.ErrMissingField)
+	switch challenge {
+	case ACMEChallengeTypeDNS, ACMEChallengeTypeStandalone:
+	default:
+		return fmt.Errorf("nodes.CreateACMEPlugin: type %q: %w",
+			challenge, svcutil.ErrInvalidValue)
+	}
+	if challenge == ACMEChallengeTypeDNS && spec.Data == nil {
+		return fmt.Errorf("nodes.CreateACMEPlugin: data (required for a %s plugin): %w",
+			ACMEChallengeTypeDNS, svcutil.ErrMissingField)
 	}
 	body, err := svcutil.EncodeWithExtra(spec, spec.Extra)
 	if err != nil {
 		return fmt.Errorf("nodes.CreateACMEPlugin: %w", err)
 	}
-	body.Set("type", challenge)
-	applyPluginData(body, spec.Data)
+	body.Set("type", string(challenge))
+	if err := applyPluginData(body, spec.Data); err != nil {
+		return fmt.Errorf("nodes.CreateACMEPlugin: %w", err)
+	}
 	if len(spec.Nodes) > 0 {
 		body.Set("nodes", strings.Join(spec.Nodes, ","))
 	}
@@ -250,7 +284,9 @@ func (s *Service) UpdateACMEPlugin(ctx context.Context, id string, update *ACMEP
 	if err != nil {
 		return fmt.Errorf("nodes.UpdateACMEPlugin: %w", err)
 	}
-	applyPluginData(body, update.Data)
+	if err := applyPluginData(body, update.Data); err != nil {
+		return fmt.Errorf("nodes.UpdateACMEPlugin: %w", err)
+	}
 	if len(update.Nodes) > 0 {
 		body.Set("nodes", strings.Join(update.Nodes, ","))
 	}
@@ -280,26 +316,40 @@ func (s *Service) DeleteACMEPlugin(ctx context.Context, id string) error {
 // applyPluginData writes the api and data parameters for d, or leaves the form
 // untouched when d is nil (a standalone plugin, or an update that keeps the
 // stored credentials).
-func applyPluginData(body url.Values, d ACMEPluginData) {
+//
+// A non-nil d that renders nothing is an error, not a no-op. A provider struct
+// built from an environment variable that turned out to be unset is non-nil but
+// empty, and PVE accepts the resulting credential-less plugin happily — the
+// failure then surfaces days later as a certificate order that cannot answer its
+// challenge. On an update it is worse: the caller believes a rotation happened
+// while the old credentials stay live.
+func applyPluginData(body url.Values, d ACMEPluginData) error {
 	if d == nil {
-		return
+		return nil
 	}
-	body.Set("api", d.API())
-	if encoded := encodePluginData(d); encoded != "" {
-		body.Set("data", encoded)
+	api := d.API()
+	if api == "" {
+		return fmt.Errorf("data: provider name: %w", svcutil.ErrMissingField)
 	}
+	encoded := encodePluginData(d)
+	if encoded == "" {
+		return fmt.Errorf("data: %s credentials are all empty: %w", api, svcutil.ErrMissingField)
+	}
+	body.Set("api", api)
+	body.Set("data", encoded)
+	return nil
 }
 
-// GetChallengeSchema returns the challenge providers this node supports, each
+// GetACMEChallengeSchema returns the challenge providers this node supports, each
 // with the raw credential-field schema PVE publishes for it. Cluster-scoped.
 //
 // This is the authoritative source for a provider's id and field names: read it
-// to build a [RawPluginData] for a provider the SDK does not type, or to confirm
-// a typed provider's fields against the node itself.
-func (s *Service) GetChallengeSchema(ctx context.Context) ([]ChallengeSchemaEntry, error) {
-	var out []ChallengeSchemaEntry
+// to build an [ACMERawPluginData] for a provider the SDK does not type, or to
+// confirm a typed provider's fields against the node itself.
+func (s *Service) GetACMEChallengeSchema(ctx context.Context) ([]ACMEChallengeSchemaEntry, error) {
+	var out []ACMEChallengeSchemaEntry
 	if err := s.c.DoRequest(ctx, http.MethodGet, acmeChallengeSchemaPath(), nil, &out); err != nil {
-		return nil, fmt.Errorf("nodes.GetChallengeSchema: %w", err)
+		return nil, fmt.Errorf("nodes.GetACMEChallengeSchema: %w", err)
 	}
 	return out, nil
 }
@@ -334,8 +384,15 @@ func (s *Service) GetACMEMeta(ctx context.Context, opts ...ACMEMetaOption) (*ACM
 		opt(&cfg)
 	}
 	path := acmeMetaPath()
+	// GET bodies are not form-encoded, so options ride in the query string (the
+	// storage.ListContent precedent). Built through url.Values so a second
+	// option cannot introduce a "?" vs "&" bug.
+	query := url.Values{}
 	if cfg.directory != "" {
-		path += "?directory=" + url.QueryEscape(cfg.directory)
+		query.Set("directory", cfg.directory)
+	}
+	if enc := query.Encode(); enc != "" {
+		path += "?" + enc
 	}
 	var meta ACMEMeta
 	if err := s.c.DoRequest(ctx, http.MethodGet, path, nil, &meta); err != nil {

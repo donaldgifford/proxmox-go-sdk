@@ -9,24 +9,24 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/nodes"
 )
 
-func TestGetChallengeSchema(t *testing.T) {
+func TestGetACMEChallengeSchema(t *testing.T) {
 	t.Parallel()
 	svc := newService(t, mockpve.New())
 
-	entries, err := svc.GetChallengeSchema(context.Background())
+	entries, err := svc.GetACMEChallengeSchema(context.Background())
 	if err != nil {
 		t.Fatalf("GetChallengeSchema: %v", err)
 	}
 	if len(entries) < 2 {
 		t.Fatalf("GetChallengeSchema returned %d entries, want at least 2", len(entries))
 	}
-	byID := make(map[string]nodes.ChallengeSchemaEntry, len(entries))
+	byID := make(map[string]nodes.ACMEChallengeSchemaEntry, len(entries))
 	for _, e := range entries {
 		byID[e.ID] = e
 	}
 	// The ids are exactly what a plugin's api field expects, so the typed
 	// providers' API() values must appear here.
-	for _, want := range []string{nodes.Cloudflare{}.API(), nodes.Namecheap{}.API()} {
+	for _, want := range []string{nodes.ACMECloudflare{}.API(), nodes.ACMENamecheap{}.API()} {
 		entry, ok := byID[want]
 		if !ok {
 			t.Fatalf("challenge schema has no entry for %q", want)

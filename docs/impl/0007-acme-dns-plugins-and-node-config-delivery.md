@@ -232,6 +232,65 @@ self-service.
   the eight cluster-ACME rows, 0 unmatched. The two node-config rows land in
   Phase 2 for the planned 258.
 
+**Phase-review remediation (2026-08-18).** A style/API pass and a
+credential-leak pass over the phase diff produced six changes, all landed before
+Phase 2 started:
+
+1. **A real bug — a non-nil-but-empty provider wrote a credential-less plugin.**
+   `applyPluginData` set `data` only when the render was non-empty, so
+   `Data: ACMECloudflare{Token: os.Getenv("CF_TOKEN")}` with the variable unset
+   sailed past the `Data == nil` guard and PVE stored a plugin it could never
+   drive. On an update it was worse: the call returned nil having changed
+   nothing, so a caller rotating a token believed it had rotated while the old
+   one stayed live. `applyPluginData` now returns an error for both an empty
+   render and an empty provider name. `TestACMEPluginRejectsEmptyCredentials`
+   covers create, the silent-rotation case (asserting the stored payload is
+   untouched), and the unnamed raw provider.
+2. **Renamed the un-prefixed exports** — `Cloudflare`→`ACMECloudflare`,
+   `Namecheap`→`ACMENamecheap`, `RawPluginData`→`ACMERawPluginData`,
+   `ChallengeSchemaEntry`→`ACMEChallengeSchemaEntry`,
+   `GetChallengeSchema`→`GetACMEChallengeSchema`. DESIGN-0006 named them
+   unprefixed; `nodes` is the SDK's grab-bag package (interfaces, apt, disks,
+   SMART, certs) and all nine pre-existing ACME identifiers carry the prefix, so
+   `nodes.RawPluginData` read like a _storage_ plugin. Pre-v1 this costs a
+   rename; post-tag it would be a consumer break.
+3. **`ACMEChallengeType` is now a defined type** (the `ha.RuleType` /
+   `sdn.FabricProtocol` convention) **and unknown values are refused**. A
+   capital-D `"DNS"` previously missed the dns comparison, so the
+   credentials-required guard never fired and the typo reached the cluster
+   config. Added `svcutil.ErrInvalidValue` for this class of refusal, beside the
+   existing `ErrNilSpec`/`ErrMissingField`.
+4. **Redaction under `fmt`.** The write path had only a doc comment protecting
+   it: `%+v` of a spec printed a live token, and the first consumer is a service
+   whose logs go to a pipeline. The three providers and `ACMEPlugin` now have
+   `String` methods; the provider receivers must be **values**, since fmt will
+   not call a pointer method on the non-addressable value inside an interface.
+   The tests format through an `any` — that is how a value reaches slog, and it
+   is the only form that exercises fmt's dispatch rather than calling `String`
+   directly (it also sidesteps gocritic's `redundantSprint`).
+5. **Corrected a dishonest doc line.** `ACMEPlugin` claimed that offering no
+   decode helper meant "printing an ACMEPlugin cannot spill plaintext
+   credentials" — true and misleading, since base64 is one `base64 -d` from
+   plaintext. It now says so.
+6. Smaller: `ACMEPluginUpdate.Nodes` documented as REPLACE-with-empty-means-keep
+   (it inverts `ACMEPluginSpec.Nodes`, where empty means every node — an
+   operator widening a restriction would silently no-op); `GetACMEMeta` builds
+   its query with `url.Values`; the mock's form helper takes `url.Values` like
+   its six siblings.
+
+**Carried into Phase 3 task 1** (recorder redaction), confirmed by both reviews
+against the real payload shapes: `redactInteraction` currently scrubs none of
+the three places `data` appears (request body, go-vcr's parsed `Request.Form`,
+response body — the GET returns the stored credential). Critically, **the scrub
+must be URL-scoped to `/cluster/acme/plugins`**: a blanket `"data"` JSON rule
+also matches the envelope's `{"data":"UPID:…"}` and would destroy the UPID in
+every existing task-returning cassette.
+
+**Not actioned, for Donald:** `govulncheck` reports 6 reachable stdlib
+vulnerabilities on go 1.26.4 (two `crypto/tls`, three `net/http`), fixed in
+1.26.6. That is a `go.mod`+`mise.toml` bump Renovate owns, and folding a
+toolchain change into a feature PR would muddy both.
+
 ---
 
 ### Phase 2: Node ACME config

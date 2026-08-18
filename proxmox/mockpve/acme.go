@@ -3,6 +3,7 @@ package mockpve
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -200,10 +201,10 @@ func (s *Server) handleACMEPluginUpdate(w http.ResponseWriter, r *http.Request) 
 // applyACMEPluginForm mutates rec with the form's set fields, then applies the
 // delete list. Deletes run last so a single request that both sets and unsets is
 // unambiguous, matching how PVE processes its delete parameter.
-func applyACMEPluginForm(rec *acmePluginRecord, form map[string][]string) {
+func applyACMEPluginForm(rec *acmePluginRecord, form url.Values) {
 	set := func(key string, dst *string) {
-		if v := form[key]; len(v) > 0 && v[0] != "" {
-			*dst = v[0]
+		if v := form.Get(key); v != "" {
+			*dst = v
 		}
 	}
 	set("type", &rec.Type)
@@ -213,8 +214,8 @@ func applyACMEPluginForm(rec *acmePluginRecord, form map[string][]string) {
 	set("nodes", &rec.Nodes)
 	set("disable", &rec.Disable)
 
-	if del := form["delete"]; len(del) > 0 {
-		for _, key := range strings.Split(del[0], ",") {
+	if del := form.Get("delete"); del != "" {
+		for _, key := range strings.Split(del, ",") {
 			switch strings.TrimSpace(key) {
 			case "validation-delay":
 				rec.ValidationDelay = ""
