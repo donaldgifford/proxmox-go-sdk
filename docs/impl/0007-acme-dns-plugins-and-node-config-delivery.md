@@ -413,7 +413,25 @@ will execute, and the release PR.
      account on the target node → order → await task → verify the served
      certificate's SAN → revoke → restore node config + delete plugin/account.
      Teardown uses `cleanupCtx`, never `context.Background()`. Compile-verified
-     via `go vet -tags=integration ./proxmox/integration/`.
+     via `go vet -tags=integration ./proxmox/integration/`. _(Done 2026-08-18:
+     `integration/acme_test.go`. Both tests are one shared `runACMEDNSLifecycle`
+     with different credentials — running the SAME sequence through two
+     providers is what actually demonstrates the model is provider-generic
+     rather than Cloudflare-shaped. Three decisions worth recording. (a) The
+     staging directory is **resolved from the node's own
+     `ListACMEDirectories`**, and the helper `t.Fatal`s if no staging entry
+     exists rather than falling through to production — a misconfigured run must
+     not burn LE rate limits. (b) The final assertion **dials the node's :8006
+     and inspects the presented certificate** rather than reading the API back:
+     PVE reporting a finished task only proves it stored something. The probe
+     skips TLS verification on purpose (a staging cert chains to an untrusted
+     root by design) and checks the SAN plus that the issuer really is a staging
+     CA. (c) The ACME **account is reused, not recreated** — it holds the CA
+     registration key, and re-registering every run is what burns rate limits —
+     while the plugin and the node config ARE restored, the latter slot-by-slot
+     from the pre-run read. Both skip with an actionable message when their env
+     is absent, and under `PVE_REPLAY` too, since no cassette can stand in for a
+     TLS dial. `go vet -tags=integration` clean.)_
 - [ ] 3. TESTING.md: an ACME DNS section — domain + scoped-token prep, the env
      set, Let's Encrypt staging, the sequential provider dance (Cloudflare run →
      nameserver switch + propagation wait → Namecheap run), and the cassette
