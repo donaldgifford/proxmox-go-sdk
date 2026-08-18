@@ -19,6 +19,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 - *(nodes)* Refuse an ACME plugin whose credentials render empty
 - *(integration)* Scrub the ACME plugin credential blob from cassettes
+- *(nodes)* Bound acmedomain slots to PVE's real range, and 9 review fixes
 
 ### Documentation
 
