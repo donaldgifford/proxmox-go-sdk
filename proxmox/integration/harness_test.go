@@ -187,11 +187,14 @@ func newLiveClient(t *testing.T, record bool) *proxmox.Client {
 		if insecure {
 			rt = insecureTransport()
 		}
-		// Scrub the live endpoint host and node name — plus any extra
-		// live=placeholder pairs (the other cluster members' IPs and the site
-		// DNS domain, via PVE_SCRUB_EXTRA) — from the cassette so a committed
-		// fixture does not expose lab topology.
-		scrub, serr := newTopologyScrub(endpoint, testNode()).withExtraPairs(os.Getenv(envScrubExtra))
+		// Scrub the live endpoint host and node name, the ACME test domain
+		// (PVE_TEST_ACME_DOMAIN — a real zone, and it rides certificate SANs
+		// and order task logs), plus any extra live=placeholder pairs (the
+		// other cluster members' IPs and the site DNS domain, via
+		// PVE_SCRUB_EXTRA) — so a committed fixture does not expose topology.
+		scrub, serr := newTopologyScrub(endpoint, testNode()).
+			withACMEDomain(os.Getenv(envACMEDomain)).
+			withExtraPairs(os.Getenv(envScrubExtra))
 		if serr != nil {
 			t.Fatalf("%s: %v", envScrubExtra, serr)
 		}

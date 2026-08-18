@@ -189,6 +189,13 @@ const (
 	placeholderHost     = "pve.example:8006"
 	placeholderBareHost = "pve.example"
 	placeholderNode     = "pve"
+	// The ACME tests certify a real FQDN in a zone Donald controls, and it
+	// reaches a cassette in more places than the plugin credentials do: the
+	// node's acmedomain config, the order task's log, the certificate's SAN
+	// list, and the DNS-01 challenge records the CA reports. Scrubbing it is
+	// not optional cleanup after the fact.
+	placeholderACMEDomain = "pve.acme.example"
+	placeholderACMEZone   = "acme.example"
 )
 
 // topologyScrub rewrites live topology values to fixed placeholders across a
@@ -219,6 +226,28 @@ func newTopologyScrub(endpoint, node string) topologyScrub {
 	if node != "" {
 		s.pairs = append(s.pairs, [2]string{node, placeholderNode})
 	}
+	return s
+}
+
+// withACMEDomain returns the scrub extended with the ACME test domain: the FQDN
+// being certified, and its parent zone when that is still more than one label
+// (the zone shows up on its own in challenge and CAA records).
+//
+// The pairs are PREPENDED, not appended. A node is usually the first label of
+// the FQDN it certifies (pve1-dogfood in pve1-dogfood.lab.example.com), so the
+// node pair applied first would rewrite that label and leave the domain pair
+// matching nothing — publishing the zone. Longest, most specific match first,
+// for the same reason host:port precedes the bare host.
+func (s topologyScrub) withACMEDomain(domain string) topologyScrub {
+	domain = strings.TrimSpace(domain)
+	if domain == "" {
+		return s
+	}
+	pairs := [][2]string{{domain, placeholderACMEDomain}}
+	if _, zone, ok := strings.Cut(domain, "."); ok && strings.Contains(zone, ".") {
+		pairs = append(pairs, [2]string{zone, placeholderACMEZone})
+	}
+	s.pairs = append(pairs, s.pairs...)
 	return s
 }
 
@@ -496,6 +525,60 @@ func TestScrubTopology(t *testing.T) {
 // IPs (corosync ring addresses) and the site DNS domain inside fqdns —
 // PVE_SCRUB_EXTRA pairs must rewrite them all, and a malformed pair must error
 // rather than silently leak.
+// TestScrubACMEDomain covers the Phase-4 recording shape: the certified FQDN
+// reaches a cassette through the node's acmedomain config, the order task log,
+// and the issued certificate's SANs, and the node name is the FQDN's first
+// label — the ordering hazard the prepend exists for. The zone must go too:
+// a DNS-01 challenge names _acme-challenge.<zone>, which publishes the zone on
+// its own even after the FQDN is rewritten.
+func TestScrubACMEDomain(t *testing.T) {
+	scrub := newTopologyScrub("https://10.0.0.11:8006", "pve1-dogfood").
+		withACMEDomain("pve1-dogfood.lab.example.com")
+
+	i := &cassette.Interaction{
+		Request: cassette.Request{
+			Method: http.MethodPut,
+			URL:    "https://10.0.0.11:8006/api2/json/nodes/pve1-dogfood/config",
+			Body:   "acmedomain0=pve1-dogfood.lab.example.com%2Cplugin%3Dcf",
+		},
+		Response: cassette.Response{
+			Body: `{"data":"UPID:pve1-dogfood:00001234:acmeorder::root@pam:` +
+				`_acme-challenge.lab.example.com TXT added; ` +
+				`SAN=pve1-dogfood.lab.example.com"}`,
+		},
+	}
+	scrub.apply(i)
+
+	for _, leak := range []string{"pve1-dogfood.lab.example.com", "lab.example.com", "10.0.0.11"} {
+		if strings.Contains(i.Request.URL+i.Request.Body, leak) || strings.Contains(i.Response.Body, leak) {
+			t.Errorf("%q survived scrub: url=%q body=%q resp=%q",
+				leak, i.Request.URL, i.Request.Body, i.Response.Body)
+		}
+	}
+	if !strings.Contains(i.Request.Body, placeholderACMEDomain) {
+		t.Errorf("scrubbed request body = %q, want the domain placeholder", i.Request.Body)
+	}
+	if !strings.Contains(i.Response.Body, "_acme-challenge."+placeholderACMEZone) {
+		t.Errorf("scrubbed response = %q, want the zone placeholder", i.Response.Body)
+	}
+	if !strings.Contains(i.Response.Body, "UPID:"+placeholderNode+":") {
+		t.Errorf("scrubbed response = %q, want the placeholder node in the UPID", i.Response.Body)
+	}
+
+	// A single-label parent is left alone: rewriting "com" would shred every
+	// unrelated hostname in the cassette.
+	shallow := newTopologyScrub("", "").withACMEDomain("host.example")
+	j := &cassette.Interaction{Response: cassette.Response{Body: "host.example and example alone"}}
+	shallow.apply(j)
+	if j.Response.Body != placeholderACMEDomain+" and example alone" {
+		t.Errorf("shallow-domain scrub = %q", j.Response.Body)
+	}
+	// An unset env var is a no-op, not an empty-string replacement.
+	if got := (topologyScrub{}).withACMEDomain(""); len(got.pairs) != 0 {
+		t.Errorf("withACMEDomain(\"\") added %d pair(s), want 0", len(got.pairs))
+	}
+}
+
 func TestScrubTopologyMultiPair(t *testing.T) {
 	scrub, err := newTopologyScrub("https://10.0.0.11:8006", "pve1-dogfood").
 		withExtraPairs("10.0.0.12=192.0.2.11, 10.0.0.13=192.0.2.12,lab.internal=lab.example")

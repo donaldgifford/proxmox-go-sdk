@@ -655,9 +655,15 @@ the Phase-3 PR:
      precisely, so run it before the lifecycle test rather than discovering
      drift after a failed DNS-01 exchange.)_
 - [ ] 3. Cassette leak review + commit: `data` REDACTED in both directions,
-     token absent, topology scrubbed (domain rewritten by the existing scrub;
-     add a `PVE_SCRUB_EXTRA` pair if the real domain leaks anywhere unexpected);
-     wire the cassettes into `just test-replay`; replay green in CI.
+     token absent, topology scrubbed. _(Amended 2026-08-18: the domain is no
+     longer left to the reviewer's eye. `withACMEDomain` derives scrub pairs
+     from `PVE_TEST_ACME_DOMAIN` — the FQDN and its parent zone — and prepends
+     them, because the node is usually the FQDN's first label and the node pair
+     would otherwise rewrite that label and leave the zone published. The zone
+     needs its own pair regardless: a DNS-01 challenge names
+     `_acme-challenge.<zone>`. `TestScrubACMEDomain` pins both, and
+     `PVE_SCRUB_EXTRA` stays available for anything unforeseen.)_ wire the
+     cassettes into `just test-replay`; replay green in CI.
 - [ ] 4. Namecheap run: switch the domain's nameservers to Namecheap DNS, wait
      out propagation, run `TestACMEDNSNamecheap` with `PVE_RECORD=1` (Namecheap
      API allowlist needs the node's egress IP); confirm the `Namecheap` field
