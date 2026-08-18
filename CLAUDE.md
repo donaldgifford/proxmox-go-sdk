@@ -721,10 +721,16 @@ environment.** This shapes how we test and what "done" means:
   (both 2026-07-12, IMPL-0002 Phase 3), and the INV-0004 remediation wave
   (2026-07-23, IMPL-0004/0005 Phase 3): the HA arm/disarm cycle, blocked migrate
   with cause `resource-affinity`, HA/SDN status reads, and the OpenFabric fabric
-  lifecycle with FRR convergence. **Nothing on the SDK surface remains
-  written-but-unverified.** Volume-chain snapshots are **not** a gap — confirmed
-  via `r740a`'s own `apidoc.js` that PVE has no storage-level snapshot endpoint,
-  so they were honestly reclassified to `pverr.ErrUnsupported`.
+  lifecycle with FRR convergence. **Everything that shipped through IMPL-0006 is
+  live-verified.** The one exception is the newest surface: the **IMPL-0007 ACME
+  plugin/node-config ops are mock-verified only** until that ledger's Phase 4
+  runs (it needs a domain, DNS-provider credentials, and a disposable node — an
+  ACME order replaces the node's pveproxy certificate, so it never targets
+  r740a). Its task-vs-sync shapes are settled from the 9.2 apidoc, not guessed;
+  what is unobserved is live issuance. Volume-chain snapshots are **not** a gap
+  — confirmed via `r740a`'s own `apidoc.js` that PVE has no storage-level
+  snapshot endpoint, so they were honestly reclassified to
+  `pverr.ErrUnsupported`.
 - **Task exit status `WARNINGS: N` is success, not failure.** PVE finishes some
   tasks (routinely an LXC create on a modern-systemd template — e.g. debian-13's
   "Systemd 257 detected. You may need to enable nesting.") with exit status
@@ -820,6 +826,13 @@ environment.** This shapes how we test and what "done" means:
   unused method receivers and unused func params: drop the receiver name
   (`func (*T) m()`) and rename unused handler params to `_`
   (`func(w http.ResponseWriter, _ *http.Request)`).
+- **`just fmt` and `just lint` disagree about folded YAML by one column.**
+  yamlfmt refills a `>-` scalar to 121 columns where yamllint's `line-length`
+  warns above 120, so a multi-line folded string cannot be both formatted and
+  warning-free (lowering yamlfmt's `max_line_length` would rewrap every workflow
+  file). Keep a folded value short enough to sit on one line — in
+  `coverage-annotations.yaml` the long argument lives in a `#` comment above the
+  entry, since comments are left alone.
 
 ## Renovate
 
