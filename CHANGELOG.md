@@ -14,6 +14,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(nodes)* Add ACME plugin CRUD
 - *(nodes)* Add ACME discovery reads
 - *(nodes)* Type the node ACME config both ways
+- *(integration)* Scrub the ACME domain out of recordings automatically
 
 ### Bug Fixes
 
