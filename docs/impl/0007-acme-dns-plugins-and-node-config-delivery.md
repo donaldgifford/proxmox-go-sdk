@@ -569,6 +569,35 @@ Executes on real PVE with the shared domain (DESIGN-0006 OQ-6). Everything here
 is Donald-run; SDK-side findings fold back as fixes + cassette commits. Until
 this phase completes, the ACME surface is mock-verified and says so.
 
+**Prepared 2026-08-18 (the parts that did not need a node).** Two additions ride
+the Phase-3 PR:
+
+- **`TestACMEPreflight`** — read-only, safe anywhere, and it front-loads the two
+  checks that would otherwise fail an expensive order. It proves the **node**
+  can reach Let's Encrypt staging (`GetACMEMeta` makes the node fetch the
+  directory, so reachability is measured from where it matters rather than from
+  the workstation), and it compares each typed provider's credential keys
+  against what the node's challenge schema publishes — DESIGN-0006's
+  confirm-live item, task 2's second half, performed without ordering anything.
+  The asymmetry is deliberate: an SDK key the provider does not publish FAILS
+  (acme.sh ignores it and the challenge fails with a message that names nothing
+  useful), while a published field the SDK does not model only logs. The schema
+  envelope is not in the apidoc, so `schemaFieldNames` tries both plausible
+  shapes and, failing both, hands over the raw JSON rather than guessing — which
+  is how the real shape gets recorded on the first run. `TestSchemaFieldNames`
+  covers the parser without a node, so a parser bug cannot surface as a
+  confusing failure mid-phase.
+- **`PVE_TEST_ACME_DISPOSABLE=1`, a second gate on the ordering tests.** Found
+  empirically while running the tagged suite here: the harness autoloads a
+  repo-root `.env` via godotenv, and **that file points at r740a** — so
+  credentials alone were enough to fire an order, and ACME variables added to
+  the wrong env file would have replaced the real node's pveproxy certificate
+  with an untrusted staging one. Prose in TESTING.md was the only thing
+  preventing it. The flag mirrors `PVE_TEST_HA_ARM`, the repo's existing answer
+  to exactly this hazard: the operator asserting "this node is disposable",
+  which no environment can imply on its own. The preflight is NOT gated on it —
+  it writes nothing.
+
 #### Tasks
 
 - [ ] 1. Environment prep: the shared domain's zone on Cloudflare DNS with a
@@ -576,12 +605,17 @@ this phase completes, the ACME surface is mock-verified and says so.
      alongside the existing `PVE_*` set; target node per OQ-4 (pvelab nested
      node recommended — verify its outbound reachability to the Let's Encrypt
      staging directory and the Cloudflare API early, before burning an order
-     attempt).
+     attempt). _(The reachability half is now mechanical: run
+     `TestACMEPreflight` first — see the phase note above. Also set
+     `PVE_TEST_ACME_DISPOSABLE=1`, and put the ACME variables in the LAB's env
+     file, never the repo-root `.env` that points at r740a.)_
 - [ ] 2. Cloudflare run: `TestACMEDNSCloudflare` with `PVE_RECORD=1` — staging
      account, cf plugin, order, SAN verify, revoke, cleanup. Confirm the typed
-     `Cloudflare` field names against the node's live `GetChallengeSchema`
+     `Cloudflare` field names against the node's live `GetACMEChallengeSchema`
      output; fix the struct if drift is found (this is the design's confirm-live
-     item).
+     item). _(`TestACMEPreflight` performs this comparison and names any drift
+     precisely, so run it before the lifecycle test rather than discovering
+     drift after a failed DNS-01 exchange.)_
 - [ ] 3. Cassette leak review + commit: `data` REDACTED in both directions,
      token absent, topology scrubbed (domain rewritten by the existing scrub;
      add a `PVE_SCRUB_EXTRA` pair if the real domain leaks anywhere unexpected);

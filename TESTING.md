@@ -137,6 +137,7 @@ export PVE_TEST_ACME_CF_TOKEN="…"       # Cloudflare scoped token (Zone.DNS ed
 export PVE_TEST_ACME_NC_USERNAME="…"    # Namecheap run (second provider)
 export PVE_TEST_ACME_NC_API_KEY="…"
 export PVE_TEST_ACME_NC_SOURCE_IP="…"   # the address PVE calls out from, allowlisted at Namecheap
+export PVE_TEST_ACME_DISPOSABLE=1       # ACME ordering — DISPOSABLE nodes only (pvelab)
 ```
 
 Every variable:
@@ -172,6 +173,7 @@ Every variable:
 | `PVE_TEST_ACME_NC_API_KEY`    | gate     | Namecheap API key                                                            |
 | `PVE_TEST_ACME_NC_SOURCE_IP`  | gate     | caller address allowlisted in the Namecheap account                          |
 | `PVE_TEST_ACME_ACCOUNT_EMAIL` | no       | contact for the staging account (default: `sdk-tests@$PVE_TEST_ACME_DOMAIN`) |
+| `PVE_TEST_ACME_DISPOSABLE`    | gate     | `1` to allow ordering — DISPOSABLE nodes only (pvelab!)                      |
 | `PVE_SCRUB_EXTRA`             | no       | extra `live=placeholder` recording-scrub pairs (CSV)                         |
 
 \* one credential pair is required: `PVE_TOKEN_ID`+`PVE_TOKEN_SECRET` (wins when
@@ -320,6 +322,27 @@ refuses. The test always uses Let's Encrypt **staging** (resolved from the
 node's own `ListACMEDirectories`, and it fails outright rather than falling
 through to production), so the certificate it installs is untrusted by design —
 which is exactly why it must not land on a node you actually use.
+
+That is why credentials alone do not fire an order: `PVE_TEST_ACME_DISPOSABLE=1`
+is a second, deliberate gate, the same shape as `PVE_TEST_HA_ARM`. The harness
+autoloads a repo-root `.env`, and that file points at the real node — so ACME
+variables added to the wrong file would otherwise be enough on their own. Put
+them in the lab's env (`.pvelab.env`), and set the disposable flag in the shell
+you run the test from rather than in a file.
+
+**Start with the preflight.** It is read-only and safe anywhere:
+
+```sh
+go test -tags=integration ./proxmox/integration/... -run TestACMEPreflight -v
+```
+
+It checks the two things that would otherwise fail an expensive order: that the
+**node** can reach Let's Encrypt staging (`GetACMEMeta` makes the node fetch the
+directory, so it proves reachability from where it matters, not from your
+workstation), and that the typed providers' field names match what the node
+publishes — DESIGN-0006's confirm-live item, done without ordering anything. A
+failed order costs a staging rate-limit slot and a re-record; this costs
+seconds.
 
 What you need before the first run:
 

@@ -5,8 +5,11 @@ package integration
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -38,6 +41,15 @@ const (
 	envACMENCAPIKey    = "PVE_TEST_ACME_NC_API_KEY"    // Namecheap API key
 	envACMENCSourceIP  = "PVE_TEST_ACME_NC_SOURCE_IP"  // Namecheap allowlisted caller IP
 	envACMEAccountMail = "PVE_TEST_ACME_ACCOUNT_EMAIL" // contact address for the staging account
+
+	// envACMEDisposable is a deliberate second gate on the ordering tests,
+	// mirroring PVE_TEST_HA_ARM. Credentials alone must not be enough to fire
+	// an order: the harness autoloads a repo-root .env, and that file points at
+	// the REAL node — so a set of ACME variables added to the wrong file would
+	// otherwise replace a production pveproxy certificate with an untrusted
+	// staging one. Setting this is the operator saying "this node is
+	// disposable", which no environment can imply on its own.
+	envACMEDisposable = "PVE_TEST_ACME_DISPOSABLE"
 )
 
 // TestACMEDNSCloudflare is the flagship live run: wire a node for DNS-01 through
@@ -46,7 +58,8 @@ const (
 func TestACMEDNSCloudflare(t *testing.T) {
 	token := os.Getenv(envACMECFToken)
 	if token == "" {
-		t.Skipf("Cloudflare ACME test disabled (set %s and %s)", envACMECFToken, envACMEDomain)
+		t.Skipf("Cloudflare ACME test disabled (set %s, %s and %s)",
+			envACMECFToken, envACMEDomain, envACMEDisposable)
 	}
 	runACMEDNSLifecycle(t, "sdk-cf", nodes.ACMECloudflare{
 		Token:     token,
@@ -63,8 +76,9 @@ func TestACMEDNSCloudflare(t *testing.T) {
 func TestACMEDNSNamecheap(t *testing.T) {
 	username, apiKey := os.Getenv(envACMENCUsername), os.Getenv(envACMENCAPIKey)
 	if username == "" || apiKey == "" {
-		t.Skipf("Namecheap ACME test disabled (set %s, %s, %s and %s)",
-			envACMENCUsername, envACMENCAPIKey, envACMENCSourceIP, envACMEDomain)
+		t.Skipf("Namecheap ACME test disabled (set %s, %s, %s, %s and %s)",
+			envACMENCUsername, envACMENCAPIKey, envACMENCSourceIP, envACMEDomain,
+			envACMEDisposable)
 	}
 	runACMEDNSLifecycle(t, "sdk-nc", nodes.ACMENamecheap{
 		Username: username,
@@ -87,6 +101,11 @@ func runACMEDNSLifecycle(t *testing.T, pluginID string, data nodes.ACMEPluginDat
 	domain := os.Getenv(envACMEDomain)
 	if domain == "" {
 		t.Skipf("ACME test disabled (set %s to an FQDN in the provider's zone)", envACMEDomain)
+	}
+	if os.Getenv(envACMEDisposable) != "1" {
+		t.Skipf("ordering is gated on %s=1 — an ACME order REPLACES this node's "+
+			"pveproxy certificate with an untrusted staging one, so set it only for a "+
+			"disposable node (pvelab), never r740a", envACMEDisposable)
 	}
 	c := newClient(t)
 	node := testNode()
@@ -357,3 +376,194 @@ func assertServedCertificate(t *testing.T, domain string) {
 
 // ptr is a local helper for the pointer-valued optional spec fields.
 func ptr[T any](v T) *T { return &v }
+
+// TestACMEPreflight is the cheap, read-only check to run BEFORE the lifecycle
+// tests: it verifies the two things that would otherwise fail an expensive
+// order, and it does so without ordering anything.
+//
+//   - The node can reach the CA. GetACMEMeta asks the NODE to fetch the
+//     directory's metadata, so a successful call proves outbound reachability to
+//     Let's Encrypt staging from where it actually matters — the node, not this
+//     workstation (IMPL-0007 Phase 4 task 1).
+//   - The typed providers' field names match what the node publishes. That is
+//     DESIGN-0006's confirm-live item, and doing it here means finding drift in
+//     seconds rather than after a failed DNS-01 exchange (Phase 4 task 2).
+//
+// A failed ACME order burns Let's Encrypt staging rate limits and needs
+// re-recording, so cheap-check-first is worth the extra test.
+func TestACMEPreflight(t *testing.T) {
+	if os.Getenv(envReplay) == "1" {
+		t.Skip("preflight is live-only: it exists to check a real node's reachability")
+	}
+	c := newClient(t)
+	svc := c.Nodes()
+
+	staging := stagingDirectory(t, svc)
+	meta, err := svc.GetACMEMeta(testCtx(t), nodes.WithACMEDirectory(staging))
+	if err != nil {
+		t.Fatalf("the node cannot reach %s: %v\n"+
+			"Fix this before ordering — an order would fail after the DNS-01 exchange, "+
+			"having already spent a staging rate-limit slot.", staging, err)
+	}
+	if meta.TermsOfService == "" {
+		t.Errorf("%s returned no terms-of-service URL; account registration needs one", staging)
+	}
+	t.Logf("node reaches %s (terms: %s)", staging, meta.TermsOfService)
+
+	// Confirm the typed providers against what the node publishes.
+	schema, err := svc.GetACMEChallengeSchema(testCtx(t))
+	if err != nil {
+		t.Fatalf("GetACMEChallengeSchema: %v", err)
+	}
+	for _, provider := range []nodes.ACMEPluginData{
+		nodes.ACMECloudflare{},
+		nodes.ACMENamecheap{},
+	} {
+		checkProviderFields(t, schema, provider)
+	}
+}
+
+// checkProviderFields compares one typed provider's credential keys against the
+// field names the node publishes for it.
+//
+// The asymmetry is deliberate. A key the SDK sends that the provider does not
+// know is a real defect — acme.sh ignores it, the challenge fails, and the
+// message says nothing about a misspelled variable. A field the provider
+// publishes that the SDK does not model is merely an option nobody has needed;
+// it is logged, not failed, and ACMERawPluginData reaches it meanwhile.
+func checkProviderFields(t *testing.T, schema []nodes.ACMEChallengeSchemaEntry, provider nodes.ACMEPluginData) {
+	t.Helper()
+	id := provider.API()
+
+	var entry *nodes.ACMEChallengeSchemaEntry
+	for i := range schema {
+		if schema[i].ID == id {
+			entry = &schema[i]
+			break
+		}
+	}
+	if entry == nil {
+		ids := make([]string, 0, len(schema))
+		for _, e := range schema {
+			ids = append(ids, e.ID)
+		}
+		t.Errorf("provider %q is not in the node's challenge schema (%d providers: %s)",
+			id, len(schema), strings.Join(ids, ", "))
+		return
+	}
+
+	live, err := schemaFieldNames(entry.Schema)
+	if err != nil {
+		// Not Donald's problem to fix in the field: this means the SDK guessed
+		// the schema's shape wrong, so hand over the raw JSON to fix it with.
+		t.Errorf("cannot read %q's field names — the SDK's assumption about the "+
+			"challenge-schema shape is wrong. Raw schema:\n%s\nerror: %v",
+			id, entry.Schema, err)
+		return
+	}
+
+	for key := range provider.Data() {
+		if !live[key] {
+			names := make([]string, 0, len(live))
+			for name := range live {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			t.Errorf("%T sends %q, which %q does not publish. The node's fields are: %s",
+				provider, key, id, strings.Join(names, ", "))
+		}
+	}
+	for name := range live {
+		if _, ok := provider.Data()[name]; !ok {
+			t.Logf("note: %q publishes %q, which %T does not model "+
+				"(reachable today via ACMERawPluginData)", id, name, provider)
+		}
+	}
+}
+
+// schemaFieldNames extracts a provider's credential field names from the raw
+// challenge schema. The schema is provider-defined and its envelope is not in
+// the apidoc, so the two plausible shapes are both tried before giving up:
+// PVE's own UI reads a "fields" object, and a bare object of field definitions
+// is the obvious alternative.
+func schemaFieldNames(raw json.RawMessage) (map[string]bool, error) {
+	if len(raw) == 0 {
+		return nil, errors.New("empty schema")
+	}
+	var wrapped struct {
+		Fields map[string]json.RawMessage `json:"fields"`
+	}
+	if err := json.Unmarshal(raw, &wrapped); err == nil && len(wrapped.Fields) > 0 {
+		return keySet(wrapped.Fields), nil
+	}
+
+	var bare map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &bare); err != nil {
+		return nil, fmt.Errorf("schema is not a JSON object: %w", err)
+	}
+	delete(bare, "fields") // present but empty, if we got here.
+	if len(bare) == 0 {
+		return nil, errors.New("schema declares no fields")
+	}
+	return keySet(bare), nil
+}
+
+func keySet(m map[string]json.RawMessage) map[string]bool {
+	out := make(map[string]bool, len(m))
+	for k := range m {
+		out[k] = true
+	}
+	return out
+}
+
+// TestSchemaFieldNames covers the extraction against both shapes it accepts and
+// the ones it must reject. It needs no node, so the parser is tested before the
+// live run rather than by it — a parser bug would otherwise surface as a
+// confusing failure in the middle of Phase 4.
+func TestSchemaFieldNames(t *testing.T) {
+	tests := []struct {
+		name    string
+		raw     string
+		want    []string
+		wantErr bool
+	}{
+		{
+			name: "wrapped in fields",
+			raw:  `{"fields":{"CF_Token":{"type":"string"},"CF_Email":{"type":"string"}}}`,
+			want: []string{"CF_Email", "CF_Token"},
+		},
+		{
+			name: "bare object of definitions",
+			raw:  `{"CF_Token":{"type":"string"},"CF_Email":{"type":"string"}}`,
+			want: []string{"CF_Email", "CF_Token"},
+		},
+		{
+			name: "empty fields falls through to bare and finds nothing",
+			raw:  `{"fields":{}}`, wantErr: true,
+		},
+		{name: "not an object", raw: `["CF_Token"]`, wantErr: true},
+		{name: "empty", raw: ``, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := schemaFieldNames(json.RawMessage(tt.raw))
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("schemaFieldNames(%s) = %v, want an error", tt.raw, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("schemaFieldNames(%s): %v", tt.raw, err)
+			}
+			names := make([]string, 0, len(got))
+			for name := range got {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			if strings.Join(names, ",") != strings.Join(tt.want, ",") {
+				t.Errorf("fields = %v, want %v", names, tt.want)
+			}
+		})
+	}
+}
