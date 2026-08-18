@@ -29,6 +29,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(testing)* Add the ACME DNS-01 walkthrough
 - *(nodes)* Promote the package doc and add an ACME example
 - Mark DESIGN-0006 implemented and IMPL-0007 in progress
+- *(impl-0007)* Close phase 3 — CI green on PR #27
 
 ### Testing
 
