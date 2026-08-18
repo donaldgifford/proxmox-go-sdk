@@ -34,9 +34,10 @@ type NodeACME struct {
 // ACMEDomain is one "acmedomain[n]" property string: a domain on the node's
 // certificate together with the plugin that answers its challenge.
 type ACMEDomain struct {
-	// Index is the slot this domain occupies — acmedomain0, acmedomain1, and so
-	// on. It is preserved across a read/write round-trip so a sparse config
-	// (slots 0 and 3, with 1 and 2 unset) is not silently renumbered.
+	// Index is the slot this domain occupies — acmedomain0 through
+	// acmedomain[ACMEDomainMaxIndex]. It is preserved across a read/write
+	// round-trip so a sparse config (slots 0 and 3, with 1 and 2 unset) is not
+	// silently renumbered.
 	Index int
 	// Domain is the FQDN to certify. Required.
 	Domain string
@@ -65,9 +66,9 @@ type NodeConfig struct {
 	Extra map[string]string
 }
 
-// nodeConfigKnownFields lists the fixed JSON keys that map to typed NodeConfig
-// fields. The acmedomain slots are matched dynamically (their index is part of
-// the key), so they are not listed here.
+// nodeConfigKnownFields names the fixed JSON keys that map to typed NodeConfig
+// fields; it sizes the per-read set. The acmedomain slots are matched
+// dynamically (their index is part of the key), so they are not listed here.
 var nodeConfigKnownFields = map[string]bool{
 	"acme": true, "digest": true,
 }
@@ -85,22 +86,30 @@ func (c *NodeConfig) UnmarshalJSON(data []byte) error {
 	}
 
 	*c = NodeConfig{}
+	// known starts EMPTY and grows only as a key is successfully claimed by a
+	// typed field. Pre-seeding it would mean a key the SDK failed to decode is
+	// neither typed nor preserved in Extra — losing exactly what this type
+	// promises to keep.
 	known := make(map[string]bool, len(nodeConfigKnownFields))
-	for k, v := range nodeConfigKnownFields {
-		known[k] = v
-	}
 
 	for key, raw := range all {
 		var value string
 		if err := json.Unmarshal(raw, &value); err != nil {
-			continue // non-string key: leave it for Extra.
+			continue // non-string value: leave it for Extra.
 		}
 		switch key {
 		case "acme":
+			// A JSON null decodes into a string without error; treat it as
+			// absent so ACME stays nil, as documented.
+			if string(raw) == "null" {
+				continue
+			}
 			acme := parseNodeACME(value)
 			c.ACME = &acme
+			known[key] = true
 		case "digest":
 			c.Digest = value
+			known[key] = true
 		default:
 			index, ok := acmeDomainSlot(key)
 			if !ok {
@@ -179,13 +188,22 @@ func (s *Service) SetNodeConfig(ctx context.Context, node string, update *NodeCo
 		return fmt.Errorf("nodes.SetNodeConfig: %w", err)
 	}
 	if update.ACME != nil {
-		body.Set("acme", encodeNodeACME(*update.ACME))
+		acme := encodeNodeACME(*update.ACME)
+		// An empty acme= would CLEAR the account and the legacy domain list.
+		// This type promises clearing is explicit, so say so rather than doing
+		// it silently on what looks like a no-op.
+		if acme == "" {
+			return fmt.Errorf(
+				`nodes.SetNodeConfig: ACME is set but renders empty (use Delete: []string{"acme"} to clear it): %w`,
+				svcutil.ErrInvalidValue)
+		}
+		body.Set("acme", acme)
 	}
 	seen := make(map[int]bool, len(update.ACMEDomains))
 	for _, domain := range update.ACMEDomains {
-		if domain.Index < 0 {
-			return fmt.Errorf("nodes.SetNodeConfig: acmedomain index %d: %w",
-				domain.Index, svcutil.ErrInvalidValue)
+		if domain.Index < 0 || domain.Index > ACMEDomainMaxIndex {
+			return fmt.Errorf("nodes.SetNodeConfig: acmedomain index %d (PVE defines 0-%d): %w",
+				domain.Index, ACMEDomainMaxIndex, svcutil.ErrInvalidValue)
 		}
 		if domain.Domain == "" {
 			return fmt.Errorf("nodes.SetNodeConfig: acmedomain%d domain: %w",
@@ -198,7 +216,7 @@ func (s *Service) SetNodeConfig(ctx context.Context, node string, update *NodeCo
 				domain.Index, svcutil.ErrInvalidValue)
 		}
 		seen[domain.Index] = true
-		body.Set(acmeDomainKey(domain.Index), encodeACMEDomain(domain))
+		body.Set(ACMEDomainKey(domain.Index), encodeACMEDomain(domain))
 	}
 	if len(update.Delete) > 0 {
 		body.Set("delete", strings.Join(update.Delete, ","))
@@ -217,20 +235,36 @@ func (s *Service) SetNodeConfig(ctx context.Context, node string, update *NodeCo
 // acmeDomainKeyPrefix is the config-key stem the slot index is appended to.
 const acmeDomainKeyPrefix = "acmedomain"
 
-// acmeDomainKey renders the config key for slot index.
-func acmeDomainKey(index int) string {
+// ACMEDomainMaxIndex is the highest acmedomain slot PVE 9.x defines. The PUT
+// schema renders the key as the wildcard "acmedomain[n]", but it also sets
+// additionalProperties:0, and the GET's property filter enumerates the concrete
+// keys — acmedomain0 through acmedomain5. Writing to a higher slot is a
+// parameter-verification error, not a stored setting.
+const ACMEDomainMaxIndex = 5
+
+// ACMEDomainKey renders the node-config key for a slot: ACMEDomainKey(1) is
+// "acmedomain1". Use it to name a slot in [NodeConfigUpdate.Delete], since
+// clearing one is explicit.
+func ACMEDomainKey(index int) string {
 	return acmeDomainKeyPrefix + strconv.Itoa(index)
 }
 
 // acmeDomainSlot reports whether key is an acmedomain slot and returns its
-// index. PVE states no maximum index, so none is enforced here.
+// index.
+//
+// The read path is deliberately more permissive than the write path: it accepts
+// any slot number, including one above [ACMEDomainMaxIndex], because PVE returns
+// a hand-edited config file verbatim and a key the SDK refuses to write is still
+// a key it must not lose. The suffix must be canonical decimal, though —
+// "acmedomain00" is not slot 0, or two config keys would parse to one slot and
+// collide on write.
 func acmeDomainSlot(key string) (int, bool) {
 	suffix, ok := strings.CutPrefix(key, acmeDomainKeyPrefix)
 	if !ok || suffix == "" {
 		return 0, false
 	}
 	index, err := strconv.Atoi(suffix)
-	if err != nil || index < 0 {
+	if err != nil || index < 0 || strconv.Itoa(index) != suffix {
 		return 0, false
 	}
 	return index, true
@@ -280,15 +314,18 @@ func encodeNodeACME(a NodeACME) string {
 // Index is not set here — it comes from the config key, not the value.
 func parseACMEDomain(s string) (ACMEDomain, error) {
 	var out ACMEDomain
-	for i, part := range strings.Split(s, ",") {
+	for _, part := range strings.Split(s, ",") {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
 		}
 		key, value, ok := strings.Cut(part, "=")
 		if !ok {
-			// The bare default key is only the default in first position.
-			if i == 0 {
+			// PVE's property-string parser takes a bare token as the default
+			// key wherever it appears, not only in first position — its own
+			// writer emits it first, but a hand-edited config is stored
+			// verbatim and must still read back into the typed field.
+			if out.Domain == "" {
 				out.Domain = part
 			}
 			continue

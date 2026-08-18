@@ -380,8 +380,8 @@ func (s *Server) handleNodeConfigGet(w http.ResponseWriter, r *http.Request) {
 	s.writeData(w, out)
 }
 
-// handleNodeConfigSet applies a partial config change: every submitted key is
-// stored verbatim, then the delete list is applied. Like the plugin update it
+// handleNodeConfigSet applies a partial config change: the delete list is
+// applied first, then every submitted key is stored verbatim. Like the plugin update it
 // honours PVE's digest guard, and it never touches a key the request did not
 // name — the mock has to be as explicit as the real thing for the SDK's
 // "clears nothing implicitly" contract to mean anything.
@@ -403,18 +403,22 @@ func (s *Server) handleNodeConfigSet(w http.ResponseWriter, r *http.Request) {
 	if n.config == nil {
 		n.config = make(map[string]string)
 	}
+	// Deletes run FIRST, then the sets — the order real PVE uses (set_options
+	// walks its delete list before its parameters) and the same order the shared
+	// applyConfigForm uses for guests. Reversing it would make a request that
+	// both sets and deletes one key behave differently here than on a node.
+	if del := r.PostForm.Get("delete"); del != "" {
+		for _, key := range strings.Split(del, ",") {
+			delete(n.config, strings.TrimSpace(key))
+		}
+	}
 	for key, values := range r.PostForm {
 		switch key {
 		case "digest", "delete":
 			continue
 		}
-		if len(values) > 0 && values[0] != "" {
+		if len(values) > 0 {
 			n.config[key] = values[0]
-		}
-	}
-	if del := r.PostForm.Get("delete"); del != "" {
-		for _, key := range strings.Split(del, ",") {
-			delete(n.config, strings.TrimSpace(key))
 		}
 	}
 	s.st.mu.Unlock()

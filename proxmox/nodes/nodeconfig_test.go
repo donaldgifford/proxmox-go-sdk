@@ -251,3 +251,91 @@ func TestNodeConfigGuards(t *testing.T) {
 		t.Error("SetNodeConfig with a negative index: want an invalid-value error")
 	}
 }
+
+// TestNodeConfigSlotBounds pins PVE's actual slot range. The PUT schema renders
+// the key as the wildcard "acmedomain[n]", which reads as unbounded — but it
+// also sets additionalProperties:0, and the GET's property filter enumerates
+// acmedomain0..acmedomain5. Writing slot 6 is a parameter-verification error,
+// so the SDK refuses it rather than sending a request that cannot succeed.
+func TestNodeConfigSlotBounds(t *testing.T) {
+	t.Parallel()
+	svc := newService(t, mockpve.New())
+	ctx := context.Background()
+
+	if err := svc.SetNodeConfig(ctx, "pve", &nodes.NodeConfigUpdate{
+		ACMEDomains: []nodes.ACMEDomain{{Index: nodes.ACMEDomainMaxIndex, Domain: "last.example"}},
+	}); err != nil {
+		t.Errorf("SetNodeConfig at the maximum slot: %v", err)
+	}
+	err := svc.SetNodeConfig(ctx, "pve", &nodes.NodeConfigUpdate{
+		ACMEDomains: []nodes.ACMEDomain{{Index: nodes.ACMEDomainMaxIndex + 1, Domain: "over.example"}},
+	})
+	if err == nil {
+		t.Fatal("SetNodeConfig above the maximum slot succeeded, want an invalid-value error")
+	}
+	if !strings.Contains(err.Error(), "0-5") {
+		t.Errorf("error = %v, want it to state the range", err)
+	}
+}
+
+// TestNodeConfigDeleteBeforeSet pins the ordering PVE uses: a request that both
+// deletes a key and sets it leaves it SET. The mock has to agree, or a test
+// written against it would encode the opposite expectation.
+func TestNodeConfigDeleteBeforeSet(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.SetNodeConfigKey("pve", "acmedomain1", "old.example")
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	if err := svc.SetNodeConfig(ctx, "pve", &nodes.NodeConfigUpdate{
+		ACMEDomains: []nodes.ACMEDomain{{Index: 1, Domain: "new.example"}},
+		Delete:      []string{nodes.ACMEDomainKey(1)},
+	}); err != nil {
+		t.Fatalf("SetNodeConfig: %v", err)
+	}
+	cfg, err := svc.GetNodeConfig(ctx, "pve")
+	if err != nil {
+		t.Fatalf("GetNodeConfig: %v", err)
+	}
+	if len(cfg.ACMEDomains) != 1 || cfg.ACMEDomains[0].Domain != "new.example" {
+		t.Errorf("ACMEDomains = %+v, want slot 1 set to new.example — deletes apply before sets",
+			cfg.ACMEDomains)
+	}
+}
+
+// TestNodeConfigEmptyACMERefused covers a silent clear: an empty acme= wipes the
+// account and the legacy domain list on a real node, and this type promises that
+// clearing is explicit.
+func TestNodeConfigEmptyACMERefused(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.SetNodeConfigKey("pve", "acme", "account=live,domains=a.example")
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	if err := svc.SetNodeConfig(ctx, "pve", &nodes.NodeConfigUpdate{
+		ACME: &nodes.NodeACME{},
+	}); err == nil {
+		t.Error("SetNodeConfig with an empty ACME succeeded, want an invalid-value error")
+	}
+	cfg, err := svc.GetNodeConfig(ctx, "pve")
+	if err != nil {
+		t.Fatalf("GetNodeConfig: %v", err)
+	}
+	if cfg.ACME == nil || cfg.ACME.Account != "live" {
+		t.Errorf("ACME = %+v, want the stored account untouched", cfg.ACME)
+	}
+	// Clearing it is explicit, and that path works.
+	if err := svc.SetNodeConfig(ctx, "pve", &nodes.NodeConfigUpdate{
+		Delete: []string{"acme"},
+	}); err != nil {
+		t.Fatalf("SetNodeConfig delete acme: %v", err)
+	}
+	if cfg, err = svc.GetNodeConfig(ctx, "pve"); err != nil {
+		t.Fatalf("GetNodeConfig: %v", err)
+	}
+	if cfg.ACME != nil {
+		t.Errorf("ACME = %+v, want nil after an explicit delete", cfg.ACME)
+	}
+}

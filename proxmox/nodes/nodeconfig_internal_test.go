@@ -106,9 +106,13 @@ func TestParseACMEDomain(t *testing.T) {
 		// Malformed: the domain sub-key is required and has no default value.
 		{name: "no domain", in: "plugin=cf,alias=a.example", wantErr: true},
 		{name: "empty", in: "", wantErr: true},
-		// A bare value is only the default key in first position, so this one
-		// names no domain rather than silently adopting the trailing token.
-		{name: "bare value not first", in: "plugin=cf,host.example.com", wantErr: true},
+		// PVE takes a bare token as the default key wherever it appears — its
+		// own writer puts it first, but a hand-edited config need not.
+		{
+			name: "bare value not first", in: "plugin=cf,host.example.com",
+			wantDomain: "host.example.com", wantPlugin: "cf",
+		},
+		{name: "leading empty part", in: ",host.example.com", wantDomain: "host.example.com"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -181,11 +185,19 @@ func TestAcmeDomainSlot(t *testing.T) {
 	}{
 		{"acmedomain0", 0, true},
 		{"acmedomain1", 1, true},
+		{"acmedomain5", 5, true},
+		// Above PVE's maximum, but the READ path stays permissive: a key the
+		// SDK refuses to write is still one it must not lose.
 		{"acmedomain42", 42, true},
 		{"acmedomain", 0, false},  // the stem alone is not a slot.
 		{"acmedomainx", 0, false}, // non-numeric suffix.
 		{"acme", 0, false},        // the account key, not a slot.
 		{"acmedomain-1", 0, false},
+		// Non-canonical suffixes would collide: acmedomain0 and acmedomain00
+		// would both parse to slot 0, and feeding the read back would trip the
+		// writer's duplicate-index guard.
+		{"acmedomain00", 0, false},
+		{"acmedomain+1", 0, false},
 		{"description", 0, false},
 	}
 	for _, tt := range tests {
@@ -200,7 +212,7 @@ func TestAcmeDomainSlot(t *testing.T) {
 			}
 		})
 	}
-	if got := acmeDomainKey(3); got != "acmedomain3" {
-		t.Errorf("acmeDomainKey(3) = %q, want %q", got, "acmedomain3")
+	if got := ACMEDomainKey(3); got != "acmedomain3" {
+		t.Errorf("ACMEDomainKey(3) = %q, want %q", got, "acmedomain3")
 	}
 }

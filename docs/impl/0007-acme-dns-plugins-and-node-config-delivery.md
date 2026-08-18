@@ -100,9 +100,17 @@ Checked against the tree and the committed 9.2 apidoc, 2026-08-17:
 - The per-provider credential field names (`CF_Token`, `NAMECHEAP_API_KEY`, …)
   are **runtime** challenge-schema facts, not in the apidoc — the typed structs
   are written from acme.sh's documented variables and confirmed live in Phase 4.
-- `acmedomain[n]`'s maximum index is **not stated in the apidoc** (the
-  properties key is the wildcard `acmedomain[n]`); the SDK models slots without
-  a hard cap and lets the server enforce its limit.
+- ~~`acmedomain[n]`'s maximum index is **not stated in the apidoc**~~ — **WRONG,
+  corrected 2026-08-18.** The PUT's wildcard `acmedomain[n]` is the apidoc
+  generator's COLLAPSED rendering of concrete keys, and reading only that key is
+  what produced the error. Two other facts in the same schema state the bound:
+  the PUT sets `additionalProperties: 0`, and the GET's `property` filter
+  enumerates `acmedomain0`…`acmedomain5`. A grep for `acmedomain[0-9]*` across
+  the whole 4.3 MB apidoc returns exactly those six, once each. **Slots are
+  0–5**; `acmedomain6` is a parameter-verification 400. The SDK now exports
+  `ACMEDomainMaxIndex` and refuses a higher slot on write, while keeping the
+  READ permissive (PVE returns a hand-edited config verbatim, and a key the SDK
+  will not write is still one it must not lose).
 - The plugin `data` wire form is base64 of newline-joined `KEY=value` pairs;
   `GET …/plugins/{id}` returns the stored config, so response bodies carry the
   secret too — both directions need recorder redaction.
@@ -290,6 +298,65 @@ every existing task-returning cassette.
 vulnerabilities on go 1.26.4 (two `crypto/tls`, three `net/http`), fixed in
 1.26.6. That is a `go.mod`+`mise.toml` bump Renovate owns, and folding a
 toolchain change into a feature PR would muddy both.
+
+**Phase 2/3 review remediation (2026-08-18, after PR #27 went green).** A second
+review pass — this one told to verify my apidoc claims rather than trust them —
+found one wrong ground fact and nine defects. All fixed on the branch:
+
+1. **The slot bound above.** This is the INV-0004 failure class at PARAMETER
+   level rather than path level, which is exactly the gap the coverage
+   fabrication guard cannot see: the path is real, the parameter is not.
+   `TestAcmeDomainSlot` had actively blessed `acmedomain42`.
+2. **`parseACMEDomain` only honoured the bare default key in first position.**
+   PVE's `parse_property_string` takes a bare token wherever it appears, and a
+   hand-edited `plugin=cf,host.example` is stored verbatim. The slot silently
+   vanished from the typed field into `Extra`, so a read-modify-write would drop
+   the domain — including the integration test's own config restore.
+3. **The mock applied `delete` AFTER the sets**; real PVE (and this repo's own
+   shared `applyConfigForm`) does the opposite. A request that both sets and
+   deletes one key would have behaved differently here than on a node, so a test
+   written against the mock would have encoded the wrong expectation.
+4. **The lossless read was not lossless for a non-string `acme`/`digest`.** The
+   `known` map was pre-seeded, so a key that failed to decode was neither typed
+   nor preserved — the one thing the type promises. It now starts empty and
+   grows only as a key is successfully claimed, matching what the acmedomain
+   branch already did. A JSON `null` acme also no longer yields a non-nil empty
+   `ACME`.
+5. **`acmeDomainSlot` accepted non-canonical suffixes** (`acmedomain00`,
+   `acmedomain+1`), so two config keys could parse to one slot and produce a
+   read the SDK's own writer refuses.
+6. **`ACME: &NodeACME{}` sent `acme=`**, which on a real node CLEARS the account
+   and the legacy domain list — a silent destructive write from what reads like
+   a no-op, and reachable from the integration test's own cleanup. Now refused,
+   naming `Delete` as the way to clear it.
+7. **Recorder hardening (the highest-stakes item).** The URL-scoped rule covers
+   every request the SDK makes with a credential, but says nothing about a
+   response that echoes one back from elsewhere. The realistic case: a FAILED
+   order — the run most likely to be re-recorded while debugging — makes
+   `tasks.Wait` fetch `/nodes/{node}/tasks/{upid}/log`, a URL the rule ignores.
+   Added `scrubACMECredentialValues`, which scrubs the credential VALUES
+   (plaintext and base64) from every interaction regardless of URL, taking them
+   from the same env vars the tests read. Values under 12 characters are skipped
+   so a short one cannot rewrite unrelated text.
+8. **The integration test built a SECOND client inside
+   `registerStagingAccount`.** Under `PVE_RECORD` that starts a second recorder
+   on the same cassette path, and go-vcr's record-only mode rewrites the whole
+   file on stop — the two would have clobbered each other and quietly dropped
+   the registration interactions from the very cassette Phase 4 exists to
+   produce.
+9. **The revoke was not in a cleanup.** Any failure after the order landed —
+   most plausibly the SAN probe, which dials the public FQDN that may not
+   resolve to the node — would abort with the node already serving an untrusted
+   staging certificate, and the config-restore cleanup does not undo that.
+   Registered as a cleanup immediately after the order, so it runs first.
+10. `leaf.Issuer.Organization[0]` was indexed on the failure path, where an
+    issuer DN without an `O` would panic and replace the diagnosis with a stack
+    trace.
+
+The review also confirmed, by running them against real payload shapes, that the
+redaction regexes themselves are correct (`data` first/last/middle/alone,
+repeated keys, `metadata=` correctly untouched, both read shapes,
+`{"data":null}` spared) and that the sparse-slot handling is right end to end.
 
 ---
 

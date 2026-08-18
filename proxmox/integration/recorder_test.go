@@ -9,6 +9,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"net/http"
@@ -90,7 +91,49 @@ func redactInteraction(i *cassette.Interaction) error {
 	}
 
 	redactACMEPluginData(i)
+	scrubACMECredentialValues(i)
 	return nil
+}
+
+// acmeCredentialEnvs name the environment variables holding the live DNS
+// provider credentials the ACME tests use. Their values are scrubbed from every
+// interaction regardless of URL.
+var acmeCredentialEnvs = []string{
+	"PVE_TEST_ACME_CF_TOKEN",
+	"PVE_TEST_ACME_CF_ACCOUNT_ID",
+	"PVE_TEST_ACME_NC_API_KEY",
+	"PVE_TEST_ACME_NC_USERNAME",
+}
+
+// scrubACMECredentialValues is the belt to redactACMEPluginData's braces: it
+// scrubs the credential VALUES — plaintext and base64 — everywhere they appear,
+// not only under the plugin URL.
+//
+// The URL-scoped rule covers every request the SDK makes with a credential in
+// it, but says nothing about a response that echoes one back from somewhere
+// else. The concrete worry is a failed order: tasks.Wait surfaces the failure
+// with its log tail, which means reading /nodes/{node}/tasks/{upid}/log — a URL
+// the scoped rule ignores, on the run you are most likely to be recording while
+// debugging. Whether PVE's acme wrapper can put a provider credential in that
+// log is unproven; this makes the answer not matter.
+func scrubACMECredentialValues(i *cassette.Interaction) {
+	for _, name := range acmeCredentialEnvs {
+		value := os.Getenv(name)
+		// Short values would scrub half the cassette; a real API token is long.
+		if len(value) < 12 {
+			continue
+		}
+		for _, form := range []string{value, base64.StdEncoding.EncodeToString([]byte(value))} {
+			i.Request.URL = strings.ReplaceAll(i.Request.URL, form, redacted)
+			i.Request.Body = strings.ReplaceAll(i.Request.Body, form, redacted)
+			i.Response.Body = strings.ReplaceAll(i.Response.Body, form, redacted)
+			for key, values := range i.Request.Form {
+				for n, v := range values {
+					i.Request.Form[key][n] = strings.ReplaceAll(v, form, redacted)
+				}
+			}
+		}
+	}
 }
 
 // redactACMEPluginData scrubs the ACME plugin credential blob in all three
@@ -739,5 +782,64 @@ func TestRedactACMEDataSpareUPID(t *testing.T) {
 	}
 	if !strings.Contains(i.Response.Body, upid) {
 		t.Errorf("the UPID envelope was clobbered by the ACME scrub: %q", i.Response.Body)
+	}
+}
+
+// TestScrubACMECredentialValues covers the leak the URL-scoped rule cannot: a
+// credential echoed back under a URL that has nothing to do with ACME plugins.
+// A failed order's task log is the realistic case, and a failed order is exactly
+// what you re-record while debugging.
+func TestScrubACMECredentialValues(t *testing.T) {
+	const token = "cf-live-token-abcdefghijklmnop"
+	t.Setenv("PVE_TEST_ACME_CF_TOKEN", token)
+
+	i := &cassette.Interaction{
+		Request: cassette.Request{
+			URL:    "https://pve:8006/api2/json/nodes/pve/tasks/UPID:x/log",
+			Method: http.MethodGet,
+		},
+		Response: cassette.Response{
+			Body: `{"data":[{"n":1,"t":"using CF_Token=` + token + ` for the challenge"}]}`,
+		},
+	}
+	if err := redactInteraction(i); err != nil {
+		t.Fatalf("redactInteraction: %v", err)
+	}
+	if strings.Contains(i.Response.Body, token) {
+		t.Errorf("credential survived in a task log: %q", i.Response.Body)
+	}
+	if !strings.Contains(i.Response.Body, "for the challenge") {
+		t.Errorf("the surrounding log line was clobbered: %q", i.Response.Body)
+	}
+
+	// The base64 form is scrubbed too, since that is how it rides the wire.
+	encoded := base64.StdEncoding.EncodeToString([]byte(token))
+	j := &cassette.Interaction{
+		Request:  cassette.Request{URL: "https://pve:8006/api2/json/somewhere/else"},
+		Response: cassette.Response{Body: `{"data":{"blob":"` + encoded + `"}}`},
+	}
+	if err := redactInteraction(j); err != nil {
+		t.Fatalf("redactInteraction: %v", err)
+	}
+	if strings.Contains(j.Response.Body, encoded) {
+		t.Errorf("base64 credential survived: %q", j.Response.Body)
+	}
+}
+
+// TestScrubACMEIgnoresShortValues guards the other direction: a short or empty
+// env value must not turn into a scrub that rewrites unrelated text.
+func TestScrubACMEIgnoresShortValues(t *testing.T) {
+	t.Setenv("PVE_TEST_ACME_CF_ACCOUNT_ID", "abc")
+
+	body := `{"data":[{"node":"pve","status":"abc"}]}`
+	i := &cassette.Interaction{
+		Request:  cassette.Request{URL: "https://pve:8006/api2/json/nodes"},
+		Response: cassette.Response{Body: body},
+	}
+	if err := redactInteraction(i); err != nil {
+		t.Fatalf("redactInteraction: %v", err)
+	}
+	if i.Response.Body != body {
+		t.Errorf("a short env value scrubbed unrelated content: %q", i.Response.Body)
 	}
 }

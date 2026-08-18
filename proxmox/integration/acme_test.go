@@ -98,7 +98,7 @@ func runACMEDNSLifecycle(t *testing.T, pluginID string, data nodes.ACMEPluginDat
 
 	// 1. The staging account. Registering is a task; a leftover account from a
 	// previous run is reused rather than treated as a failure.
-	registerStagingAccount(t, svc, account, stagingURL)
+	registerStagingAccount(t, c, account, stagingURL)
 
 	// 2. The challenge plugin carrying the provider credentials.
 	if err := svc.CreateACMEPlugin(testCtx(t), &nodes.ACMEPluginSpec{
@@ -148,21 +148,32 @@ func runACMEDNSLifecycle(t *testing.T, pluginID string, data nodes.ACMEPluginDat
 		t.Fatalf("waiting for the ACME order: %v", err)
 	}
 
+	// The certificate is now installed and pveproxy is serving it, so the revoke
+	// is registered as a cleanup BEFORE the assertion that could abort the test.
+	// Registered last, it runs first (cleanups are LIFO), ahead of the node
+	// config restore. A failure here is reported, not fatal — leaving the node
+	// on an untrusted staging certificate is the outcome worth avoiding.
+	t.Cleanup(func() { revokeNodeCertificate(t, c, node) })
+
 	// 5. The assertion that matters: the node now SERVES a certificate covering
 	// the requested name. Reading it back from the API would only prove PVE
 	// stored something.
 	assertServedCertificate(t, domain)
+}
 
-	// 6. Revoke. The cleanup hooks restore the node config and remove the
-	// plugin/account; revoking here (not in a cleanup) keeps the failure visible
-	// if the CA refuses.
-	revokeRef, err := svc.RevokeNodeCertificate(testCtx(t), node)
+// revokeNodeCertificate revokes the node's ACME certificate and waits for the
+// worker. It tolerates an already-revoked certificate: this runs from a cleanup
+// that may follow a failure anywhere in the flow.
+func revokeNodeCertificate(t *testing.T, c *proxmox.Client, node string) {
+	t.Helper()
+	ref, err := c.Nodes().RevokeNodeCertificate(testCtx(t), node)
 	if err != nil {
-		t.Fatalf("RevokeNodeCertificate(%s): %v", node, err)
+		t.Errorf("RevokeNodeCertificate(%s): %v — the node may still serve the staging certificate", node, err)
+		return
 	}
-	revokeCtx, cancelRevoke := context.WithTimeout(context.Background(), 3*time.Minute)
-	defer cancelRevoke()
-	if _, err := c.Tasks().Wait(revokeCtx, revokeRef); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	if _, err := c.Tasks().Wait(ctx, ref); err != nil {
 		t.Errorf("waiting for the revoke: %v", err)
 	}
 }
@@ -189,8 +200,9 @@ func stagingDirectory(t *testing.T, svc *nodes.Service) string {
 // by an earlier run. The account is deliberately NOT removed on cleanup: it
 // holds the CA's registration key, and re-registering on every run is what
 // burns rate limits.
-func registerStagingAccount(t *testing.T, svc *nodes.Service, account, directory string) {
+func registerStagingAccount(t *testing.T, c *proxmox.Client, account, directory string) {
 	t.Helper()
+	svc := c.Nodes()
 	if _, err := svc.GetACMEAccount(testCtx(t), account); err == nil {
 		t.Logf("reusing the existing ACME account %q", account)
 		return
@@ -219,7 +231,11 @@ func registerStagingAccount(t *testing.T, svc *nodes.Service, account, directory
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	if _, err := newClient(t).Tasks().Wait(ctx, ref); err != nil {
+	// Reuse the caller's client: building a second one under PVE_RECORD would
+	// start a second recorder on the same cassette path, and go-vcr's
+	// record-only mode rewrites the whole file on stop — the two would clobber
+	// each other and quietly drop these interactions.
+	if _, err := c.Tasks().Wait(ctx, ref); err != nil {
 		t.Fatalf("waiting for the account registration: %v", err)
 	}
 }
@@ -311,7 +327,11 @@ func assertServedCertificate(t *testing.T, domain string) {
 		}
 	}()
 
-	state := conn.(*tls.Conn).ConnectionState()
+	tlsConn, ok := conn.(*tls.Conn)
+	if !ok {
+		t.Fatalf("expected a TLS connection, got %T", conn)
+	}
+	state := tlsConn.ConnectionState()
 	if len(state.PeerCertificates) == 0 {
 		t.Fatal("the node presented no certificate")
 	}
@@ -321,17 +341,19 @@ func assertServedCertificate(t *testing.T, domain string) {
 			domain, err, leaf.Issuer.CommonName, leaf.DNSNames)
 	}
 	// A staging certificate is the whole point: a production one here means the
-	// directory selection above silently fell through.
-	if !strings.Contains(strings.ToLower(leaf.Issuer.CommonName), "staging") &&
-		!strings.Contains(strings.ToLower(leaf.Issuer.Organization[0]), "staging") {
-		t.Errorf("certificate issuer %q is not a staging CA — check the directory selection",
-			leaf.Issuer.CommonName)
+	// directory selection above silently fell through. Issuer.Organization is
+	// empty for a DN without an O, so it is appended rather than indexed — this
+	// branch only runs when something is already wrong, and a panic here would
+	// replace the diagnosis with a stack trace.
+	issuer := leaf.Issuer.CommonName
+	if len(leaf.Issuer.Organization) > 0 {
+		issuer += " " + strings.Join(leaf.Issuer.Organization, " ")
+	}
+	if !strings.Contains(strings.ToLower(issuer), "staging") {
+		t.Errorf("certificate issuer %q is not a staging CA — check the directory selection", issuer)
 	}
 	t.Logf("node serves a certificate for %v issued by %q", leaf.DNSNames, leaf.Issuer.CommonName)
 }
 
 // ptr is a local helper for the pointer-valued optional spec fields.
 func ptr[T any](v T) *T { return &v }
-
-// compile-time guard that the client type is what the helpers above expect.
-var _ = func(c *proxmox.Client) *nodes.Service { return c.Nodes() }
