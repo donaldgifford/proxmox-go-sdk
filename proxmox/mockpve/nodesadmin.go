@@ -1,7 +1,6 @@
 package mockpve
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -138,30 +137,36 @@ type acmeAccountPayload struct {
 	// verbatim, and the contact addresses live inside it rather than in a
 	// top-level field — so a caller reading back a contact change has to look
 	// here, and the mock has to carry it for that to be testable.
-	Account json.RawMessage `json:"account,omitempty"`
+	Account *acmeCAAccount `json:"account,omitempty"`
 }
 
-// acmeAccountObject renders the CA-side account object for a record: the shape
-// an ACME server returns, with each contact as an RFC 8555 mailto URI.
-func acmeAccountObject(rec *acmeAccountRecord) json.RawMessage {
-	contacts := make([]string, 0, len(rec.Contact))
+// acmeCAAccount is the CA-side account object: what an ACME server returns for
+// a registration, which PVE passes through untouched.
+type acmeCAAccount struct {
+	Status  string   `json:"status"`
+	Contact []string `json:"contact"`
+}
+
+// acmeAccountObject renders the CA-side account object for a record, with each
+// contact as an RFC 8555 mailto URI. A nil record renders nothing, so the
+// payload's omitempty drops the field rather than the handler having to guard
+// the call (the record is passed by pointer because it is over gocritic's
+// hugeParam threshold, which makes nil reachable).
+func acmeAccountObject(rec *acmeAccountRecord) *acmeCAAccount {
+	if rec == nil {
+		return nil
+	}
+	out := &acmeCAAccount{Status: "valid", Contact: make([]string, 0, len(rec.Contact))}
 	for _, c := range rec.Contact {
-		if c == "" {
+		if c = strings.TrimSpace(c); c == "" {
 			continue
 		}
 		if !strings.HasPrefix(c, "mailto:") {
 			c = "mailto:" + c
 		}
-		contacts = append(contacts, c)
+		out.Contact = append(out.Contact, c)
 	}
-	obj, err := json.Marshal(map[string]any{
-		"status":  "valid",
-		"contact": contacts,
-	})
-	if err != nil {
-		return nil // unreachable: the map holds only strings and slices.
-	}
-	return obj
+	return out
 }
 
 // --- seeders ---
@@ -534,7 +539,7 @@ func (s *Server) handleACMEAccountUpdate(w http.ResponseWriter, r *http.Request)
 	rec := s.st.acmeAccounts[name]
 	if rec != nil {
 		if v := r.PostForm.Get("contact"); v != "" {
-			rec.Contact = strings.Split(v, ",")
+			rec.Contact = splitCSV(v)
 		}
 	}
 	s.st.mu.Unlock()

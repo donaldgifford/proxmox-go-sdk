@@ -213,7 +213,9 @@ func (s *Service) RegisterACMEAccount(ctx context.Context, spec *ACMEAccountSpec
 //
 // Applying the change means talking to the CA, which is why this is a task and
 // not a config write — and why an update with no new information is PVE's way of
-// refreshing the account from the CA.
+// refreshing the account from the CA. To ask for that refresh, pass an empty
+// update (&ACMEAccountUpdate{}); a nil update is an error, since discarding a
+// caller's nil by silently refreshing would hide the mistake.
 func (s *Service) UpdateACMEAccount(ctx context.Context, name string, update *ACMEAccountUpdate) (tasks.Ref, error) {
 	if update == nil {
 		return tasks.Ref{}, fmt.Errorf("nodes.UpdateACMEAccount: %w", svcutil.ErrNilSpec)

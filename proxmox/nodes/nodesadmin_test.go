@@ -354,4 +354,47 @@ func TestACMEAccountValidation(t *testing.T) {
 	if _, err := svc.GetACMEAccount(ctx, ""); err == nil {
 		t.Error("GetACMEAccount(empty) error = nil, want non-nil")
 	}
+	if _, err := svc.UpdateACMEAccount(ctx, "staging", nil); err == nil {
+		t.Error("UpdateACMEAccount(nil) error = nil, want non-nil")
+	}
+	if _, err := svc.UpdateACMEAccount(ctx, "", &nodes.ACMEAccountUpdate{}); err == nil {
+		t.Error("UpdateACMEAccount(no name) error = nil, want non-nil")
+	}
+}
+
+// TestACMEAccountRefresh covers the empty-but-non-nil update: PVE treats an
+// update carrying no new information as "re-read this account from the CA", and
+// that is the only way to ask for it — so it must not be turned away with the
+// nil update.
+func TestACMEAccountRefresh(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc, ts := newServiceAndTasks(t, mock)
+	ctx := context.Background()
+
+	ref, err := svc.RegisterACMEAccount(ctx, &nodes.ACMEAccountSpec{
+		Name: "staging", Contact: []string{"ops@example.com"},
+		Directory: "https://acme-staging.example/directory", TOSURL: "https://acme.example/tos",
+	})
+	if err != nil {
+		t.Fatalf("RegisterACMEAccount: %v", err)
+	}
+	if _, err := ts.Wait(ctx, ref); err != nil {
+		t.Fatalf("Wait(register acme): %v", err)
+	}
+
+	ref, err = svc.UpdateACMEAccount(ctx, "staging", &nodes.ACMEAccountUpdate{})
+	if err != nil {
+		t.Fatalf("UpdateACMEAccount(empty): %v", err)
+	}
+	if _, err := ts.Wait(ctx, ref); err != nil {
+		t.Fatalf("Wait(refresh acme): %v", err)
+	}
+	acct, err := svc.GetACMEAccount(ctx, "staging")
+	if err != nil {
+		t.Fatalf("GetACMEAccount: %v", err)
+	}
+	if !strings.Contains(string(acct.Account), "ops@example.com") {
+		t.Errorf("account object = %s, want the contact left alone", acct.Account)
+	}
 }

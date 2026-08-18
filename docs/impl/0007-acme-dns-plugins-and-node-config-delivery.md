@@ -626,6 +626,16 @@ the Phase-3 PR:
   **semicolon**-separated (`domain[;domain;...]`), which is what the codec
   emits.
 
+  **One thing to watch on the live run:** the UPID read is strict, so a node
+  that answers `null` here would turn a write that SUCCEEDED into an error.
+  Elsewhere the SDK hedges (`ApplyNetworkConfig` reads `*string` and returns a
+  zero `Ref`, `ConvertToTemplate` likewise) — but those hedge against PVE
+  behaviour that was actually observed to vary, and the schema here is
+  unambiguous. Adding a branch every caller must handle to guard a hypothesis is
+  the wrong trade before there is evidence, and the live run is the evidence. If
+  `UpdateACMEAccount` returns a malformed-UPID error on a node whose contact
+  change went through, that is the finding: make the read tolerant.
+
 #### Tasks
 
 - [ ] 1. Environment prep: the shared domain's zone on Cloudflare DNS with a
