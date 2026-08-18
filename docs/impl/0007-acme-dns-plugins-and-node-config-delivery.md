@@ -662,8 +662,14 @@ the Phase-3 PR:
      would otherwise rewrite that label and leave the zone published. The zone
      needs its own pair regardless: a DNS-01 challenge names
      `_acme-challenge.<zone>`. `TestScrubACMEDomain` pins both, and
-     `PVE_SCRUB_EXTRA` stays available for anything unforeseen.)_ wire the
-     cassettes into `just test-replay`; replay green in CI.
+     `PVE_SCRUB_EXTRA` stays available for anything unforeseen. Also: the
+     served-certificate probe does not go through the SDK client, so no cassette
+     can carry it and the placeholder domain resolves nowhere — it now skips
+     under `PVE_REPLAY=1`, the same live-only carve-out `TestConsoleRFB` has.
+     Replay covers the REST conversation and stops there; without the skip,
+     wiring these cassettes into `just test-replay` would fail on a DNS lookup
+     for `pve.acme.example`.)_ wire the cassettes into `just test-replay`;
+     replay green in CI.
 - [ ] 4. Namecheap run: switch the domain's nameservers to Namecheap DNS, wait
      out propagation, run `TestACMEDNSNamecheap` with `PVE_RECORD=1` (Namecheap
      API allowlist needs the node's egress IP); confirm the `Namecheap` field

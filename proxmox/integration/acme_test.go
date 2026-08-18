@@ -326,8 +326,18 @@ func wireNodeForACME(t *testing.T, svc *nodes.Service, node, account, domain, pl
 // The TLS handshake deliberately skips verification — a Let's Encrypt STAGING
 // certificate chains to an untrusted root by design, so verifying would fail on
 // a successful run. The check is on the presented SAN, not on trust.
+//
+// It is the one step of the flow that does NOT go through the SDK client, so
+// go-vcr never sees it and no cassette can carry it: on replay the only host
+// available is the scrub placeholder, which resolves nowhere. Replay therefore
+// covers the REST conversation and stops here — the served-certificate proof is
+// live-only by construction, like TestConsoleRFB's byte stream.
 func assertServedCertificate(t *testing.T, domain string) {
 	t.Helper()
+	if os.Getenv(envReplay) == "1" {
+		t.Log("replay: skipping the TLS probe (no live node; the domain is a scrub placeholder)")
+		return
+	}
 	dialer := &tls.Dialer{Config: &tls.Config{
 		InsecureSkipVerify: true, //nolint:gosec // a staging cert is untrusted by design; the SAN is what is being checked
 		MinVersion:         tls.VersionTLS12,
