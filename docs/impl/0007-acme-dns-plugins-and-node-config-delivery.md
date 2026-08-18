@@ -1,7 +1,7 @@
 ---
 id: IMPL-0007
 title: "ACME DNS plugins and node config delivery"
-status: Draft
+status: In Progress
 author: Donald Gifford
 created: 2026-08-17
 ---
@@ -10,8 +10,8 @@ created: 2026-08-17
 
 # IMPL 0007: ACME DNS plugins and node config delivery
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-08-17 (OQs decided
-2026-08-17: all a)
+**Status:** In Progress **Author:** Donald Gifford **Date:** 2026-08-17 (OQs
+decided 2026-08-17: all a)
 
 <!--toc:start-->
 

@@ -1,7 +1,7 @@
 ---
 id: DESIGN-0006
 title: "ACME DNS plugins and node ACME config with provider-generic credentials"
-status: Approved
+status: Implemented
 author: Donald Gifford
 created: 2026-08-16
 ---
@@ -10,7 +10,7 @@ created: 2026-08-16
 
 # DESIGN 0006: ACME DNS plugins and node ACME config with provider-generic credentials
 
-**Status:** Approved **Author:** Donald Gifford **Date:** 2026-08-16 (OQs
+**Status:** Implemented **Author:** Donald Gifford **Date:** 2026-08-16 (OQs
 decided 2026-08-17: all a; OQ-6 amended — one shared domain for both providers,
 sequential runs)
 
