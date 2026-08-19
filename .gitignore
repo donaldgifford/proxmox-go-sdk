@@ -63,8 +63,9 @@ dist/
 
 # pvelab dogfood lab (IMPL-0002): the real config names env vars and site
 # topology; the state/env files carry runtime handoff (env holds a password).
-# Only pvelab.example.yaml is committed.
+# Only the *.example.yaml files are committed.
 pvelab.yaml
+pvelab-acme.yaml
 .pvelab-state.json
 .pvelab.env
 # Transient lab run logs (`just dogfood-up > dogfood-run.log`) — they name lab

@@ -1,0 +1,92 @@
+---
+# pvelab-acme.example.yaml — the ACME-DNS variant of pvelab.example.yaml.
+#
+# Copy to pvelab-acme.yaml (git-ignored) and fill in your site. This is the
+# SAME lab as pvelab.example.yaml plus the nested.acme block, deliberately kept
+# as a second file rather than a flag: a failed run tells you which half broke
+# only if the two halves are configured separately. Provision the plain config
+# first — if that cluster forms and this one does not, the certificate path is
+# the difference.
+#
+# DNS is a prerequisite this file cannot check. Every node needs an A record at
+# <name>.<domain> before `up` runs, and the configured credentials must be able
+# to edit that zone: PVE proves control by writing a TXT record under
+# _acme-challenge.<fqdn>.
+#
+# SECRETS ARE NEVER VALUES IN THIS FILE: every *_env key names an environment
+# variable pvelab resolves at runtime, and config load fails fast if any named
+# variable is unset. Keep them in .pvelab.env (0600, git-ignored).
+
+outer:
+  # The physical PVE host the lab runs on.
+  endpoint: https://pve.example:8006
+  node: pve  # its PVE node name (node-scoped API calls need it)
+  token_id_env: PVE_TOKEN_ID  # env var NAMES, not values
+  token_secret_env: PVE_TOKEN_SECRET
+  insecure_tls: true
+  storage: local-zfs  # nested node VM disks
+  iso_storage: local  # base + prepared installer ISOs
+  bridge: vmbr0
+  ssh:  # for `pvelab iso` (proxmox/ssh side-channel)
+    user: root
+    known_hosts: ~/.ssh/known_hosts  # host-key verification is mandatory
+    key_file: ~/.ssh/id_ed25519  # key and/or password_env (key preferred)
+    # password_env: PVELAB_SSH_PW
+
+nested:
+  pve_version: "9.2"  # names the prepared ISO (one per version)
+  base_iso: /var/lib/vz/template/iso/proxmox-ve_9.2-1.iso  # on the outer host, inside iso_storage
+  cluster_name: dogfood
+  domain: lab.example  # node fqdn = <name>.<domain>; the name IS the PVE node name
+  root_password_env: PVELAB_ROOT_PW  # nested root@pam password (answer files + readiness)
+  gateway: 192.0.2.1
+  dns: 192.0.2.1
+  # answer_url is baked into the http-mode ISO at `pvelab iso` time and must
+  # reach the workstation running `pvelab up` FROM the nested VMs (the
+  # embedded answer server binds answer_listen, default ":8442").
+  answer_url: http://192.0.2.10:8442
+  # answer_listen: ":8442"
+  # cores: 4 # sizing defaults (Phase 0 spike values)
+  # memory_mb: 8192
+  # disk_gb: 32
+  # template reserves the VMID/CIDR `pvelab template build` installs into for
+  # THIS pve_version. The template's name is always pvelab-tmpl-<pve_version>
+  # (computed, never configured). VMIDs 9210-9219 are the template sub-range —
+  # one template per PVE minor can coexist on the outer host; a version-matrix
+  # setup keeps one config file per minor, each picking a distinct VMID here.
+  # Optional: without this block `up` always ISO-installs.
+  # template:
+  #   vmid: 9210
+  #   cidr: 192.0.2.210/24
+  # ACME certificates for every node, after the cluster forms. Omit this whole
+  # block to get pvelab.example.yaml's behaviour (self-signed, no CA contact).
+  acme:
+    # staging (default) or production. Staging certificates are untrusted —
+    # fine for exercising the flow, and it keeps a re-provisioning loop away
+    # from production's 50-certificates-per-week-per-domain limit. Use
+    # production only for a lab you intend to keep.
+    directory: staging
+    # PVE account name; defaults to pvelab-<directory>. An account is
+    # registered against ONE CA, so staging and production must not share one.
+    # account: pvelab-staging
+    contact: sdk-tests@lab.example
+    # dns-01 is the only kind that works here: standalone (http-01) needs the
+    # CA to reach the node on port 80, and these nodes are on private addresses.
+    challenge: dns-01
+    # provider is acme.sh's plugin name — whatever PVE's api parameter accepts
+    # ("cf", "namecheap", "route53", ... 160 of them on 9.2). credentials maps
+    # that plugin's acme.sh variable names to the env vars holding their values,
+    # so a different provider is a config change and no Go code at all. Ask the
+    # node for a plugin's field names rather than guessing:
+    #   pvelab env    # then: GetACMEChallengeSchema
+    provider: cf
+    credentials:
+      CF_Token: PVELAB_ACME_CF_TOKEN
+      CF_Account_ID: PVELAB_ACME_CF_ACCOUNT_ID
+      # PVE plugin id created on the nested cluster; defaults to
+      # pvelab-<provider>.
+      # plugin_id: pvelab-cf
+  nodes:  # >=3 for quorum; VMIDs must sit in the reserved 9200-9399 block
+    - {name: pve1-dogfood, vmid: 9201, cidr: 192.0.2.201/24}
+    - {name: pve2-dogfood, vmid: 9202, cidr: 192.0.2.202/24}
+    - {name: pve3-dogfood, vmid: 9203, cidr: 192.0.2.203/24}

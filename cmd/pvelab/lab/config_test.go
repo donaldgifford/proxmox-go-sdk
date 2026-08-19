@@ -1,6 +1,8 @@
 package lab
 
 import (
+	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -328,5 +330,198 @@ func TestLoadSSHPasswordEnvChecked(t *testing.T) {
 	t.Setenv("PVELAB_TEST_SSH_PW", "hunter2")
 	if _, err := loadYAML(t, doc); err != nil {
 		t.Errorf("Load with ssh password env set = %v, want nil", err)
+	}
+}
+
+// exampleEnv sets the variables the committed example configs reference. The
+// values are throwaway: LoadConfig only checks that the names resolve.
+func exampleEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("PVE_TOKEN_ID", "root@pam!lab")
+	t.Setenv("PVE_TOKEN_SECRET", "secret")
+	t.Setenv("PVELAB_ROOT_PW", "throwaway")
+	t.Setenv("PVELAB_ACME_CF_TOKEN", "throwaway-token")
+	t.Setenv("PVELAB_ACME_CF_ACCOUNT_ID", "throwaway-account")
+}
+
+// TestExampleACMEConfigValid pins pvelab-acme.example.yaml to the schema, the
+// same way TestExampleConfigValid pins the plain one. Two configs are the point
+// of the pair — the plain lab must keep validating with no acme block at all,
+// which is what makes a failure attributable to the cluster or to the
+// certificate path rather than to "the lab".
+func TestExampleACMEConfigValid(t *testing.T) {
+	exampleEnv(t)
+	cfg, err := LoadConfig("../../../pvelab-acme.example.yaml")
+	if err != nil {
+		t.Fatalf("pvelab-acme.example.yaml does not validate: %v", err)
+	}
+	a := cfg.Nested.ACME
+	if a == nil {
+		t.Fatal("example has no nested.acme block")
+	}
+	if a.Directory != DirectoryStaging {
+		t.Errorf("directory = %q, want the committed example to stay on staging", a.Directory)
+	}
+	if a.DirectoryURL() != stagingDirectoryURL {
+		t.Errorf("DirectoryURL = %q, want staging", a.DirectoryURL())
+	}
+	if a.Account != "pvelab-staging" || a.PluginID != "pvelab-cf" {
+		t.Errorf("defaults not applied: account=%q plugin=%q", a.Account, a.PluginID)
+	}
+	if len(cfg.Nested.Nodes) != 3 {
+		t.Errorf("node count = %d, want the same 3-node lab as the plain example", len(cfg.Nested.Nodes))
+	}
+}
+
+// TestPlainExampleHasNoACME is the other half of the pair: the baseline config
+// must stay free of the ACME block, or the "provision without certificates
+// first" bisect step quietly stops being a different test.
+func TestPlainExampleHasNoACME(t *testing.T) {
+	exampleEnv(t)
+	cfg, err := LoadConfig("../../../pvelab.example.yaml")
+	if err != nil {
+		t.Fatalf("pvelab.example.yaml does not validate: %v", err)
+	}
+	if cfg.Nested.ACME != nil {
+		t.Error("the baseline example grew an acme block; it must stay the no-CA path")
+	}
+}
+
+// validACMEYAML is the block appended to validYAML by the cases below.
+const validACMEYAML = `  acme:
+    contact: ops@lab.example
+    provider: cf
+    credentials:
+      CF_Token: PVELAB_TEST_CF_TOKEN
+`
+
+func TestACMEValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		acme    string
+		wantErr string
+	}{
+		{name: "minimal block is valid", acme: validACMEYAML},
+		{
+			name: "standalone is refused with the reason",
+			acme: validACMEYAML + "    challenge: standalone\n",
+			// The message has to say why, not just "invalid": http-01 is a
+			// perfectly good challenge, just not reachable in this lab.
+			wantErr: "port 80",
+		},
+		{
+			name:    "unknown challenge",
+			acme:    validACMEYAML + "    challenge: tls-alpn-01\n",
+			wantErr: `want "dns-01"`,
+		},
+		{
+			name:    "unknown directory",
+			acme:    validACMEYAML + "    directory: letsencrypt\n",
+			wantErr: "nested.acme.directory",
+		},
+		{
+			name: "contact required",
+			acme: "  acme:\n    provider: cf\n    credentials:\n" +
+				"      CF_Token: PVELAB_TEST_CF_TOKEN\n",
+			wantErr: "contact is required",
+		},
+		{
+			name:    "provider required",
+			acme:    "  acme:\n    contact: ops@lab.example\n    credentials:\n      CF_Token: PVELAB_TEST_CF_TOKEN\n",
+			wantErr: "nested.acme.provider is required",
+		},
+		{
+			name:    "credentials required",
+			acme:    "  acme:\n    contact: ops@lab.example\n    provider: cf\n",
+			wantErr: "nested.acme.credentials is required",
+		},
+		{
+			name:    "referenced env var must be set",
+			acme:    "  acme:\n    contact: ops@lab.example\n    provider: cf\n    credentials:\n      CF_Token: PVELAB_TEST_CF_UNSET\n",
+			wantErr: "PVELAB_TEST_CF_UNSET",
+		},
+		{
+			name:    "unknown key is rejected by strict decoding",
+			acme:    validACMEYAML + "    dns_vendor: cloudflare\n",
+			wantErr: "dns_vendor",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setTestEnv(t)
+			t.Setenv("PVELAB_TEST_CF_TOKEN", "throwaway-token")
+			_, err := loadYAML(t, strings.Replace(validYAML, "  nodes:", tt.acme+"  nodes:", 1))
+			switch {
+			case tt.wantErr == "" && err != nil:
+				t.Fatalf("LoadConfig() = %v, want nil", err)
+			case tt.wantErr != "" && err == nil:
+				t.Fatalf("LoadConfig() = nil, want an error mentioning %q", tt.wantErr)
+			case tt.wantErr != "" && !strings.Contains(err.Error(), tt.wantErr):
+				t.Errorf("LoadConfig() = %v, want it to mention %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestACMEPluginDataIsProviderAgnostic is the point of the generic credential
+// map: an unrelated provider the config has never heard of round-trips to the
+// SDK with no code change here.
+func TestACMEPluginDataIsProviderAgnostic(t *testing.T) {
+	t.Setenv("PVELAB_TEST_R53_KEY", "key-value")
+	t.Setenv("PVELAB_TEST_R53_SECRET", "secret-value")
+	a := &ACMESpec{
+		Provider: "aws",
+		Credentials: map[string]string{
+			"AWS_ACCESS_KEY_ID":     "PVELAB_TEST_R53_KEY",
+			"AWS_SECRET_ACCESS_KEY": "PVELAB_TEST_R53_SECRET",
+		},
+	}
+	data, err := a.PluginData()
+	if err != nil {
+		t.Fatalf("PluginData: %v", err)
+	}
+	if data.API() != "aws" {
+		t.Errorf("API() = %q, want aws", data.API())
+	}
+	want := map[string]string{"AWS_ACCESS_KEY_ID": "key-value", "AWS_SECRET_ACCESS_KEY": "secret-value"}
+	if got := data.Data(); !maps.Equal(got, want) {
+		t.Errorf("Data() = %v, want %v", got, want)
+	}
+	// The credentials must not be recoverable from a formatted value: pvelab
+	// logs config structs, and this one now carries live secrets.
+	if s := fmt.Sprintf("%v", data); strings.Contains(s, "key-value") || strings.Contains(s, "secret-value") {
+		t.Errorf("plugin data leaked a credential under %%v: %s", s)
+	}
+}
+
+// TestACMEPluginDataMissingEnv names every unset variable at once rather than
+// failing on the first: an operator fixing a .pvelab.env wants the whole list.
+func TestACMEPluginDataMissingEnv(t *testing.T) {
+	a := &ACMESpec{
+		Provider:    "cf",
+		Credentials: map[string]string{"CF_Token": "PVELAB_TEST_UNSET_A", "CF_Zone_ID": "PVELAB_TEST_UNSET_B"},
+	}
+	_, err := a.PluginData()
+	if err == nil {
+		t.Fatal("PluginData() = nil error, want one naming the unset variables")
+	}
+	for _, want := range []string{"PVELAB_TEST_UNSET_A", "PVELAB_TEST_UNSET_B"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %v does not mention %s", err, want)
+		}
+	}
+}
+
+// TestACMEDirectoryURL pins the mapping, including that an empty directory
+// resolves to staging rather than to the empty string.
+func TestACMEDirectoryURL(t *testing.T) {
+	for _, tt := range []struct{ dir, want string }{
+		{DirectoryStaging, stagingDirectoryURL},
+		{DirectoryProduction, productionDirectoryURL},
+		{"", stagingDirectoryURL},
+	} {
+		if got := (&ACMESpec{Directory: tt.dir}).DirectoryURL(); got != tt.want {
+			t.Errorf("DirectoryURL(%q) = %q, want %q", tt.dir, got, tt.want)
+		}
 	}
 }
