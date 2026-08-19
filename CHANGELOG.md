@@ -59,6 +59,10 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(nodes)* Mock-verify the ACME DNS call sequence end to end
 - *(integration)* Rehearse the ACME cassette leak review
 
+### Miscellaneous Tasks
+
+- *(pvelab)* Ignore .pvelab.secrets.env, say what .pvelab.env is
+
 ## [0.10.0] - 2026-07-26
 
 ### Features
