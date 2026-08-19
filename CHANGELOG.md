@@ -19,6 +19,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(mockpve)* An ACME order installs a certificate, a revoke removes it
 - *(pvelab)* Optional ACME block, providers as config not code
 - *(pvelab)* Derive handoff file paths from the config
+- *(pvelab)* Refuse to start when answer_url is not this machine
 
 ### Bug Fixes
 
