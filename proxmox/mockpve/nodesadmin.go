@@ -492,7 +492,25 @@ func (s *Server) handleCertACME(w http.ResponseWriter, r *http.Request) {
 	}
 	s.st.mu.Unlock()
 
-	s.writeData(w, s.finishedTask(node, "acmecert", "acmecert"))
+	// The verb rides the UPID's id field: a synthetic UPID is (node, type, id,
+	// second), so an order and the revoke that follows it within the same second
+	// would otherwise share a UPID and overwrite each other's task record —
+	// leaving a caller polling the order to read the revoke's result.
+	s.writeData(w, s.finishedTask(node, "acmecert", acmeCertVerb(r.Method)))
+}
+
+// acmeCertVerb names the operation an HTTP method performs on the ACME
+// certificate, for the synthetic UPID. It is not a claim about PVE's worker
+// type names, which the apidoc does not carry.
+func acmeCertVerb(method string) string {
+	switch method {
+	case http.MethodPost:
+		return "order"
+	case http.MethodPut:
+		return "renew"
+	default:
+		return "revoke"
+	}
 }
 
 // The filename PVE installs an ACME certificate under, and the issuer this mock

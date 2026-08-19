@@ -8,6 +8,7 @@ import (
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/mockpve"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/nodes"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/tasks"
 )
 
 // TestACMEDNSLifecycleEndToEnd walks the exact call sequence the live DNS-01
@@ -324,5 +325,42 @@ func TestACMEOrderOverwritesCustomCertificate(t *testing.T) {
 	}
 	if !certCoversDomain(certs, "pve.acme.example") {
 		t.Errorf("after the order, no certificate covers the domain: %+v", certs)
+	}
+}
+
+// TestACMECertTasksAreDistinct pins that the certificate verbs get their own
+// task records. A synthetic UPID is (node, type, id, second), so three verbs
+// sharing one id collide whenever they run inside the same second — which the
+// lifecycle test does — and the later task overwrites the earlier one, leaving a
+// caller polling the order to read the revoke's result.
+func TestACMECertTasksAreDistinct(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.SetNodeConfigKey(testNode, "acmedomain0", "pve.acme.example,plugin=cf")
+	svc, ts := newServiceAndTasks(t, mock)
+	ctx := context.Background()
+
+	order, err := svc.OrderNodeCertificate(ctx, testNode)
+	if err != nil {
+		t.Fatalf("OrderNodeCertificate: %v", err)
+	}
+	renew, err := svc.RenewNodeCertificate(ctx, testNode)
+	if err != nil {
+		t.Fatalf("RenewNodeCertificate: %v", err)
+	}
+	revoke, err := svc.RevokeNodeCertificate(ctx, testNode)
+	if err != nil {
+		t.Fatalf("RevokeNodeCertificate: %v", err)
+	}
+
+	seen := map[string]bool{}
+	for _, ref := range []tasks.Ref{order, renew, revoke} {
+		if seen[ref.UPID] {
+			t.Fatalf("two certificate verbs share the UPID %q", ref.UPID)
+		}
+		seen[ref.UPID] = true
+		if _, err := ts.Wait(ctx, ref); err != nil {
+			t.Errorf("Wait(%s): %v", ref.UPID, err)
+		}
 	}
 }
