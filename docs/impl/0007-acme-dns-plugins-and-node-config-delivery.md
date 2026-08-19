@@ -636,6 +636,17 @@ the Phase-3 PR:
   `UpdateACMEAccount` returns a malformed-UPID error on a node whose contact
   change went through, that is the finding: make the read tolerant.
 
+- **The call sequence is mock-verified** (`TestACMEDNSLifecycleEndToEnd`, added
+  2026-08-18). It walks the same steps as the live test — register account,
+  create plugin, wire the node config, order, then revoke → restore config →
+  delete plugin — and asserts each read-back and the teardown. It cannot prove
+  issuance (no CA, no DNS, no certificate), which is the whole point of Phase 4;
+  what it removes is the class of failure a live run should not be spending an
+  order attempt on: a step that does not see what the previous one wrote, or a
+  teardown that does not reverse the setup. The latter is the expensive one — a
+  botched teardown leaves the node on an untrusted certificate or leaves a live
+  provider credential in the cluster config.
+
 #### Tasks
 
 - [ ] 1. Environment prep: the shared domain's zone on Cloudflare DNS with a
