@@ -453,12 +453,90 @@ func (s *Server) handleCertDelete(w http.ResponseWriter, r *http.Request) {
 
 // handleCertACME serves order (POST) / renew (PUT) / revoke (DELETE); all return
 // a worker task.
+//
+// It moves the node's certificate state, because on real PVE that is the whole
+// point of the call: an order installs a certificate the node then serves, and a
+// revoke takes it away. A mock that answered with a task and changed nothing
+// would let a consumer's ACME automation pass its tests while never checking the
+// thing it exists to check.
 func (s *Server) handleCertACME(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
 	}
 	node := r.PathValue("node")
+
+	s.st.mu.Lock()
+	n := s.ensureNodeLocked(node)
+	n.certs = withoutACMECert(n.certs)
+	if r.Method != http.MethodDelete {
+		if san := acmeSANsLocked(n); len(san) > 0 {
+			n.certs = append(n.certs, nodeCertRecord{
+				Filename: acmeCertFilename, Fingerprint: "AC:AC:AC",
+				Subject: "CN=" + san[0], Issuer: mockACMEIssuer,
+				NotAfter: 4102444800, SAN: san,
+			})
+		}
+	}
+	s.st.mu.Unlock()
+
 	s.writeData(w, s.finishedTask(node, "acmecert", "acmecert"))
+}
+
+// The filename PVE installs an ACME certificate under, and the issuer this mock
+// stamps on it — deliberately not a real CA name, so a test asserting on a
+// trusted issuer cannot pass here and fail live.
+const (
+	acmeCertFilename = "pveproxy-ssl.pem"
+	mockACMEIssuer   = "CN=mockpve ACME CA"
+	// PVE declares acmedomain0..acmedomain5 (the GET's property enum, with
+	// additionalProperties:0 on the PUT), so six is the whole range.
+	acmeDomainSlots = 6
+)
+
+// withoutACMECert returns recs with any mock-issued ACME certificate removed. A
+// custom uploaded certificate shares the filename, so the issuer is what
+// distinguishes them: an order replaces an ACME cert, not the operator's own.
+func withoutACMECert(recs []nodeCertRecord) []nodeCertRecord {
+	out := recs[:0:0]
+	for _, rec := range recs {
+		if rec.Filename == acmeCertFilename && rec.Issuer == mockACMEIssuer {
+			continue
+		}
+		out = append(out, rec)
+	}
+	return out
+}
+
+// acmeSANsLocked collects the names an order would certify from the node's own
+// config: the acmedomain slots, then the legacy acme=domains list. Caller holds
+// mu. An empty result means the node was never wired for ACME, which is why an
+// order there installs nothing.
+func acmeSANsLocked(n *nodeState) []string {
+	var san []string
+	seen := make(map[string]bool)
+	add := func(domain string) {
+		if domain = strings.TrimSpace(domain); domain != "" && !seen[domain] {
+			seen[domain] = true
+			san = append(san, domain)
+		}
+	}
+	for i := range acmeDomainSlots {
+		v, ok := n.config["acmedomain"+strconv.Itoa(i)]
+		if !ok {
+			continue
+		}
+		// "domain=host,plugin=cf" or the bare-default-key "host,plugin=cf".
+		first, _, _ := strings.Cut(v, ",")
+		add(strings.TrimPrefix(first, "domain="))
+	}
+	for _, part := range strings.Split(n.config["acme"], ",") {
+		if rest, ok := strings.CutPrefix(strings.TrimSpace(part), "domains="); ok {
+			for _, d := range strings.Split(rest, ";") {
+				add(d)
+			}
+		}
+	}
+	return san
 }
 
 func (s *Server) handleACMEAccountList(w http.ResponseWriter, r *http.Request) {

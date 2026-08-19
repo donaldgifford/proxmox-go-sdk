@@ -645,7 +645,15 @@ the Phase-3 PR:
   order attempt on: a step that does not see what the previous one wrote, or a
   teardown that does not reverse the setup. The latter is the expensive one — a
   botched teardown leaves the node on an untrusted certificate or leaves a live
-  provider credential in the cluster config.
+  provider credential in the cluster config. To make the order observable at
+  all, mockpve's ACME certificate handler now MOVES state rather than just
+  answering with a task: an order installs a certificate whose SANs come from
+  the node's own acmedomain slots, a revoke removes it. That is what PVE does,
+  and it is what makes step 3 → step 4 a real dependency in the test instead of
+  two calls in sequence — the config has to be right for the certificate to
+  cover the domain. The issuer is stamped `CN=mockpve ACME CA`, deliberately not
+  a real CA name, so a test asserting on a trusted issuer cannot pass against
+  the mock and fail live.
 
 #### Tasks
 

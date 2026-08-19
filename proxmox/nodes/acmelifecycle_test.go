@@ -2,6 +2,7 @@ package nodes_test
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -78,13 +79,22 @@ func TestACMEDNSLifecycleEndToEnd(t *testing.T) {
 	}
 
 	// 4. Order. Live this is the slow step (the whole DNS-01 exchange rides the
-	// task); here it only has to return an awaitable ref.
+	// task). The mock installs a certificate covering the configured names, so
+	// the read that follows checks the order consumed the config written in
+	// step 3 — the dependency that actually links these calls.
 	ref, err = svc.OrderNodeCertificate(ctx, testNode)
 	if err != nil {
 		t.Fatalf("OrderNodeCertificate: %v", err)
 	}
 	if _, err := ts.Wait(ctx, ref); err != nil {
 		t.Fatalf("Wait(order): %v", err)
+	}
+	certs, err := svc.GetNodeCertificates(ctx, testNode)
+	if err != nil {
+		t.Fatalf("GetNodeCertificates: %v", err)
+	}
+	if !certCoversDomain(certs, domain) {
+		t.Fatalf("after the order, no certificate covers %s: %+v", domain, certs)
 	}
 
 	// 5. Teardown, in the order the live cleanups run (LIFO): revoke first, so
@@ -96,6 +106,12 @@ func TestACMEDNSLifecycleEndToEnd(t *testing.T) {
 	}
 	if _, err := ts.Wait(ctx, ref); err != nil {
 		t.Fatalf("Wait(revoke): %v", err)
+	}
+	if certs, err = svc.GetNodeCertificates(ctx, testNode); err != nil {
+		t.Fatalf("GetNodeCertificates after revoke: %v", err)
+	}
+	if certCoversDomain(certs, domain) {
+		t.Errorf("the revoked certificate still covers %s: %+v", domain, certs)
 	}
 
 	// The node config is restored by DELETING the keys, not by writing empty
@@ -147,4 +163,15 @@ func TestACMEDNSLifecycleEndToEnd(t *testing.T) {
 	if strings.Contains(strings.Join(names, ","), account) {
 		t.Errorf("account %q survived deactivation: %v", account, names)
 	}
+}
+
+// certCoversDomain reports whether any of the node's certificates lists domain
+// among its SANs.
+func certCoversDomain(certs []nodes.Certificate, domain string) bool {
+	for i := range certs {
+		if slices.Contains(certs[i].SAN, domain) {
+			return true
+		}
+	}
+	return false
 }
