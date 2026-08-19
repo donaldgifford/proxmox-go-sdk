@@ -342,8 +342,20 @@ func (s topologyScrub) withACMEDomain(domain string) topologyScrub {
 		return s
 	}
 	pairs := [][2]string{{domain, placeholderACMEDomain}}
-	if _, zone, ok := strings.Cut(domain, "."); ok && strings.Contains(zone, ".") {
-		pairs = append(pairs, [2]string{zone, placeholderACMEZone})
+	// Every parent suffix, not just the immediate one: a lab domain is commonly
+	// three levels deep (pve1.dogfood.example.dev), and the registrable domain
+	// at the top is the half that identifies the operator. It appears on its own
+	// wherever the provider talks about the zone rather than the record — an
+	// ACME worker's task log, which tasks.Wait reads and the cassette keeps.
+	// Stop before the public suffix: a bare TLD carries nothing and rewriting it
+	// would corrupt every unrelated hostname in the interaction.
+	for zone := domain; ; {
+		_, parent, ok := strings.Cut(zone, ".")
+		if !ok || !strings.Contains(parent, ".") {
+			break
+		}
+		pairs = append(pairs, [2]string{parent, placeholderACMEZone})
+		zone = parent
 	}
 	s.pairs = append(pairs, s.pairs...)
 	return s
@@ -1349,5 +1361,31 @@ func TestRecorderACMEFlowRedaction(t *testing.T) {
 		if !bytes.Contains(data, []byte(want)) {
 			t.Errorf("cassette is missing %q — recorded nothing, or scrubbed too much", want)
 		}
+	}
+}
+
+// TestScrubACMEDomainDeepZone covers the lab's actual shape: a node under a
+// delegated subdomain, where the registrable domain at the top is the part that
+// names the operator. Scrubbing only the immediate parent leaves it in the
+// cassette.
+func TestScrubACMEDomainDeepZone(t *testing.T) {
+	scrub := newTopologyScrub("https://10.0.0.9:8006", "pve1").
+		withACMEDomain("pve1.dogfood.example.dev")
+
+	i := &cassette.Interaction{}
+	i.Response.Body = "ordered pve1.dogfood.example.dev; zone dogfood.example.dev " +
+		"delegated from example.dev; unrelated host cdn.other.dev stays"
+	scrub.apply(i)
+
+	for _, leak := range []string{"dogfood.example.dev", "example.dev"} {
+		if strings.Contains(i.Response.Body, leak) {
+			t.Errorf("%q survived the scrub: %q", leak, i.Response.Body)
+		}
+	}
+	// The TLD is not a pair, so a hostname in an unrelated domain is untouched
+	// apart from its own suffix — proof the walk stops at the public suffix
+	// instead of rewriting every ".dev" in sight.
+	if !strings.Contains(i.Response.Body, "cdn.other.dev") {
+		t.Errorf("an unrelated hostname was rewritten: %q", i.Response.Body)
 	}
 }

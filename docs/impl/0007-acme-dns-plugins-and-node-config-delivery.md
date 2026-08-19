@@ -721,6 +721,30 @@ the Phase-3 PR:
      The flow does not read certificates back, and the note now says a rule
      replacing the PEM wholesale is the prerequisite for adding one.
 
+**Lab domain settled + scrub depth fix (2026-08-19).** The Phase-4 domain is
+real now: a Cloudflare-hosted zone with `pve{1,2,3}.<lab>.<domain>` A records on
+the lab subnet, credentials in `.env` as 1Password references. Preflighted
+without a node by driving Cloudflare's API directly — the token carries
+`#dns_records:edit` on the zone, and a TXT create → read-back → delete at
+`_acme-challenge.pve1.…` round-tripped clean, which is precisely what acme.sh
+does for DNS-01. (`/user/tokens/verify` returns "Invalid API Token" for a
+zone-scoped token that cannot read itself; acme.sh never calls it, so it is
+noise.) The acme.sh variable names the SDK ships were confirmed against upstream
+`dnsapi/dns_cf.sh` and `dns_namecheap.sh`: all five `CF_*` and all three
+`NAMECHEAP_*` match. PVE vendors its own snapshot of those scripts, so
+`GetACMEChallengeSchema` on the node stays the runtime authority — worth one
+call during the run.
+
+That domain is three labels deep, which exposed a real gap: `withACMEDomain`
+scrubbed the FQDN and its immediate parent only, so the registrable domain — the
+half that names the operator — survived on its own. It appears wherever the
+provider discusses the zone rather than the record, including an ACME worker's
+task log, which `tasks.Wait` reads and the cassette keeps. The scrub now walks
+every parent suffix and stops before the public suffix, so an unrelated hostname
+sharing the TLD is left alone. `TestScrubACMEDomainDeepZone` pins both halves,
+verified by reverting to the single-parent form and watching the registrable
+domain survive.
+
 **Leak-review rehearsal (2026-08-19).** Task 3's leak review is a human read of
 a YAML file, and everything guarding it so far checked hooks against hand-built
 `cassette.Interaction` values. That proves the rules transform structs
