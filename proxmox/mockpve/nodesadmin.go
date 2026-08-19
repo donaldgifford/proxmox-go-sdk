@@ -428,8 +428,11 @@ func (s *Server) handleCertUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	s.st.mu.Lock()
 	n := s.ensureNodeLocked(node)
-	n.certs = append(n.certs, nodeCertRecord{
-		Filename: "pveproxy-ssl.pem", Subject: "CN=custom", Issuer: "CN=custom",
+	// Replace, do not append: PVE serves one file at this path, so a second
+	// upload overwrites the first rather than adding a row to the certificate
+	// listing. Appending let the mock report a state the node cannot be in.
+	n.certs = append(withoutFrontendCert(n.certs), nodeCertRecord{
+		Filename: acmeCertFilename, Subject: "CN=custom", Issuer: "CN=custom",
 		NotAfter: 4102444800, PEM: r.PostForm.Get("certificates"),
 	})
 	out := certRecordsToPayload(n.certs)
@@ -444,8 +447,10 @@ func (s *Server) handleCertDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	node := r.PathValue("node")
 	s.st.mu.Lock()
+	// Only the front-end file goes: the cluster CA's pve-ssl.pem is not the
+	// operator's to delete, and PVE keeps serving it.
 	if n := s.st.nodes[node]; n != nil {
-		n.certs = nil
+		n.certs = withoutFrontendCert(n.certs)
 	}
 	s.st.mu.Unlock()
 	s.writeData(w, nil)
@@ -465,7 +470,8 @@ func (s *Server) handleCertDelete(w http.ResponseWriter, r *http.Request) {
 // reports OK. Real PVE fails that — but whether it fails the API call or the
 // worker task is unverified (IMPL-0007 Phase 4 exercises the happy path), and
 // guessing would hand consumers an error shape to code against that may not be
-// the real one.
+// the real one. That OK is therefore an absence of modelling, not a promise:
+// do not write a test asserting an unconfigured order succeeds.
 func (s *Server) handleCertACME(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
@@ -474,7 +480,7 @@ func (s *Server) handleCertACME(w http.ResponseWriter, r *http.Request) {
 
 	s.st.mu.Lock()
 	n := s.ensureNodeLocked(node)
-	n.certs = withoutACMECert(n.certs)
+	n.certs = withoutFrontendCert(n.certs)
 	if r.Method != http.MethodDelete {
 		if san := acmeSANsLocked(n); len(san) > 0 {
 			n.certs = append(n.certs, nodeCertRecord{
@@ -500,18 +506,42 @@ const (
 	acmeDomainSlots = 6
 )
 
-// withoutACMECert returns recs with any mock-issued ACME certificate removed. A
-// custom uploaded certificate shares the filename, so the issuer is what
-// distinguishes them: an order replaces an ACME cert, not the operator's own.
-func withoutACMECert(recs []nodeCertRecord) []nodeCertRecord {
+// withoutFrontendCert returns recs with the API/web front-end certificate
+// removed, whoever issued it. PVE keeps ONE file at that path
+// (pveproxy-ssl.pem) — an ACME order overwrites whatever is there, including a
+// certificate the operator uploaded, and a custom upload overwrites an ACME one
+// — so anything that distinguishes them (the issuer, say) would let the mock
+// hold two entries for a single file, a state the real node cannot reach. The
+// cluster CA's own pve-ssl.pem is a different file and is left alone.
+func withoutFrontendCert(recs []nodeCertRecord) []nodeCertRecord {
 	out := recs[:0:0]
 	for _, rec := range recs {
-		if rec.Filename == acmeCertFilename && rec.Issuer == mockACMEIssuer {
+		if rec.Filename == acmeCertFilename {
 			continue
 		}
 		out = append(out, rec)
 	}
 	return out
+}
+
+// slotDomain extracts the domain from an "acmedomain[n]" property string.
+// The domain is PVE's default key, so it may be bare ("host,plugin=cf") or
+// keyed ("plugin=cf,domain=host") — and keyed does not imply first, which is
+// what a naive read of the leading token gets wrong. A slot naming no domain
+// yields "", and an order certifies nothing for it: the SDK's own parser treats
+// that string as unparseable and keeps it in Extra, so issuing a certificate for
+// "plugin=cf" would have the mock and the SDK reading one config two ways.
+func slotDomain(v string) string {
+	for i, part := range strings.Split(v, ",") {
+		part = strings.TrimSpace(part)
+		if rest, ok := strings.CutPrefix(part, "domain="); ok {
+			return rest
+		}
+		if i == 0 && !strings.Contains(part, "=") {
+			return part
+		}
+	}
+	return ""
 }
 
 // acmeSANsLocked collects the names an order would certify from the node's own
@@ -532,9 +562,7 @@ func acmeSANsLocked(n *nodeState) []string {
 		if !ok {
 			continue
 		}
-		// "domain=host,plugin=cf" or the bare-default-key "host,plugin=cf".
-		first, _, _ := strings.Cut(v, ",")
-		add(strings.TrimPrefix(first, "domain="))
+		add(slotDomain(v))
 	}
 	for _, part := range strings.Split(n.config["acme"], ",") {
 		if rest, ok := strings.CutPrefix(strings.TrimSpace(part), "domains="); ok {

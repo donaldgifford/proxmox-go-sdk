@@ -208,3 +208,121 @@ func TestACMEOrderUsesLegacyDomainList(t *testing.T) {
 		}
 	}
 }
+
+// TestACMEOrderMatchesSDKParsing pins mockpve's reading of an acmedomain slot to
+// the SDK's own. PVE's default key means the domain may come first and bare or
+// later and keyed, and a mock that reads only the leading token certifies
+// "plugin=cf" — so the same config would mean two different things depending on
+// which side of the test you asked, which is worse than either being wrong.
+func TestACMEOrderMatchesSDKParsing(t *testing.T) {
+	t.Parallel()
+	for name, slot := range map[string]string{
+		"bare domain first":  "pve.acme.example,plugin=cf",
+		"keyed domain first": "domain=pve.acme.example,plugin=cf",
+		"keyed domain last":  "plugin=cf,domain=pve.acme.example",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			mock := mockpve.New()
+			mock.SetNodeConfigKey(testNode, "acmedomain0", slot)
+			svc, ts := newServiceAndTasks(t, mock)
+			ctx := context.Background()
+
+			cfg, err := svc.GetNodeConfig(ctx, testNode)
+			if err != nil {
+				t.Fatalf("GetNodeConfig: %v", err)
+			}
+			if len(cfg.ACMEDomains) != 1 || cfg.ACMEDomains[0].Domain != "pve.acme.example" {
+				t.Fatalf("SDK parsed %+v, want the one domain", cfg.ACMEDomains)
+			}
+
+			ref, err := svc.OrderNodeCertificate(ctx, testNode)
+			if err != nil {
+				t.Fatalf("OrderNodeCertificate: %v", err)
+			}
+			if _, err := ts.Wait(ctx, ref); err != nil {
+				t.Fatalf("Wait(order): %v", err)
+			}
+			certs, err := svc.GetNodeCertificates(ctx, testNode)
+			if err != nil {
+				t.Fatalf("GetNodeCertificates: %v", err)
+			}
+			if !certCoversDomain(certs, "pve.acme.example") {
+				t.Errorf("certificate does not cover the domain the SDK parsed: %+v", certs)
+			}
+		})
+	}
+}
+
+// TestACMEOrderSkipsDomainlessSlot covers the slot PVE would reject: a property
+// string with a plugin and no domain. The SDK keeps it in Extra rather than
+// pretending to parse it, and the mock must not invent a certificate for it.
+func TestACMEOrderSkipsDomainlessSlot(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.SetNodeConfigKey(testNode, "acmedomain0", "plugin=cf")
+	svc, ts := newServiceAndTasks(t, mock)
+	ctx := context.Background()
+
+	ref, err := svc.OrderNodeCertificate(ctx, testNode)
+	if err != nil {
+		t.Fatalf("OrderNodeCertificate: %v", err)
+	}
+	if _, err := ts.Wait(ctx, ref); err != nil {
+		t.Fatalf("Wait(order): %v", err)
+	}
+	certs, err := svc.GetNodeCertificates(ctx, testNode)
+	if err != nil {
+		t.Fatalf("GetNodeCertificates: %v", err)
+	}
+	if len(certs) != 0 {
+		t.Errorf("order issued a certificate for a slot naming no domain: %+v", certs)
+	}
+}
+
+// TestACMEOrderOverwritesCustomCertificate pins the file model: PVE serves ONE
+// front-end certificate, so an order replaces whatever is installed there,
+// including one the operator uploaded. A mock that kept both would report a
+// state the node cannot be in — and would hide from a consumer that ordering
+// costs them their own certificate.
+func TestACMEOrderOverwritesCustomCertificate(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.SetNodeConfigKey(testNode, "acmedomain0", "pve.acme.example,plugin=cf")
+	svc, ts := newServiceAndTasks(t, mock)
+	ctx := context.Background()
+
+	// Twice, because the upload handler appended rather than replaced: PVE
+	// serves one file at that path, so the second upload overwrites the first.
+	for range 2 {
+		if _, err := svc.UploadCustomCertificate(ctx, testNode, &nodes.CustomCertificateSpec{
+			Certificates: "-----BEGIN CERTIFICATE-----\nmock\n-----END CERTIFICATE-----\n",
+		}); err != nil {
+			t.Fatalf("UploadCustomCertificate: %v", err)
+		}
+	}
+	ref, err := svc.OrderNodeCertificate(ctx, testNode)
+	if err != nil {
+		t.Fatalf("OrderNodeCertificate: %v", err)
+	}
+	if _, err := ts.Wait(ctx, ref); err != nil {
+		t.Fatalf("Wait(order): %v", err)
+	}
+
+	certs, err := svc.GetNodeCertificates(ctx, testNode)
+	if err != nil {
+		t.Fatalf("GetNodeCertificates: %v", err)
+	}
+	byFile := make(map[string]int, len(certs))
+	for i := range certs {
+		byFile[certs[i].Filename]++
+	}
+	for filename, n := range byFile {
+		if n > 1 {
+			t.Errorf("%d certificates share the filename %q; PVE has one file", n, filename)
+		}
+	}
+	if !certCoversDomain(certs, "pve.acme.example") {
+		t.Errorf("after the order, no certificate covers the domain: %+v", certs)
+	}
+}

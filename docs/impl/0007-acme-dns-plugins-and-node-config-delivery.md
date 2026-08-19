@@ -655,6 +655,23 @@ the Phase-3 PR:
   a real CA name, so a test asserting on a trusted issuer cannot pass against
   the mock and fail live.
 
+  **A review of that handler found three defects in it, all fixed.** (1) The SAN
+  derivation read only the leading comma token, so `plugin=cf,domain=host` —
+  which PVE accepts, because `domain` is the default key and property strings
+  are order-independent — certified the literal string `plugin=cf`. The SDK's
+  own parser gets this right, so the mock and the SDK were reading one config
+  two ways, which is worse than either being wrong alone. (2) A slot naming no
+  domain at all still produced a certificate, where the SDK correctly treats the
+  string as unparseable and keeps it in `Extra`. (3) The order preserved an
+  operator-uploaded certificate alongside the new one, giving two entries for a
+  single file: PVE serves ONE front-end certificate, so an order overwrites
+  whatever is there — including the operator's. The same invariant was already
+  broken next door (the upload handler appended, so two uploads produced two
+  rows) and the delete handler dropped the cluster CA's `pve-ssl.pem` along with
+  the front-end file; both fixed with it. The tests missed all of this because
+  they wrote config through `SetNodeConfig`, whose encoder always emits
+  `domain=` first — so the happy branch was the only branch exercised.
+
 - **Redaction audit (2026-08-18), before any capture.** An adversarial pass over
   the whole scrub pipeline — go-vcr's serialized fields against what the hooks
   actually rewrite, plus a grep over the 17 committed cassettes — found one

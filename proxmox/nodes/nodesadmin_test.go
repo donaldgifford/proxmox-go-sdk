@@ -194,7 +194,10 @@ func TestInitializeDiskValidation(t *testing.T) {
 func TestNodeCertificates(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()
-	mock.AddNodeCertificate(testNode, "pveproxy-ssl.pem")
+	// pve-ssl.pem is the cluster CA's own certificate — a different file from
+	// the front-end pveproxy-ssl.pem an upload or an ACME order writes, and it
+	// is what proves the write touches only the file it owns.
+	mock.AddNodeCertificate(testNode, "pve-ssl.pem")
 	svc := newService(t, mock)
 	ctx := context.Background()
 
@@ -202,8 +205,8 @@ func TestNodeCertificates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetNodeCertificates: %v", err)
 	}
-	if len(certs) != 1 || certs[0].Filename != "pveproxy-ssl.pem" {
-		t.Fatalf("GetNodeCertificates = %+v, want one pveproxy-ssl.pem", certs)
+	if len(certs) != 1 || certs[0].Filename != "pve-ssl.pem" {
+		t.Fatalf("GetNodeCertificates = %+v, want one pve-ssl.pem", certs)
 	}
 
 	after, err := svc.UploadCustomCertificate(ctx, testNode, &nodes.CustomCertificateSpec{
@@ -213,7 +216,7 @@ func TestNodeCertificates(t *testing.T) {
 		t.Fatalf("UploadCustomCertificate: %v", err)
 	}
 	if len(after) != 2 {
-		t.Errorf("cert count after upload = %d, want 2", len(after))
+		t.Errorf("cert count after upload = %d, want the CA cert plus the uploaded one", len(after))
 	}
 
 	if err := svc.DeleteCustomCertificate(ctx, testNode); err != nil {
@@ -223,8 +226,8 @@ func TestNodeCertificates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetNodeCertificates after delete: %v", err)
 	}
-	if len(certs) != 0 {
-		t.Errorf("cert count after delete = %d, want 0", len(certs))
+	if len(certs) != 1 || certs[0].Filename != "pve-ssl.pem" {
+		t.Errorf("after delete = %+v, want the cluster CA certificate left alone", certs)
 	}
 }
 
