@@ -90,6 +90,21 @@ when the repos split (DESIGN-0001). New public packages are admitted under
   **stable-pinned** pvelab (`justfile` var `pvelab_pin`, IMPL-0002 Phase 4:
   released code provisions, branch code is what gets tested); set `PVELAB_DEV=1`
   to run the branch's `./cmd/pvelab` when developing the harness itself.
+- **One config per lab shape**: `-config` defaults to `pvelab.yaml`;
+  `pvelab-acme.example.yaml` is the same cluster plus a `nested.acme` block,
+  kept separate so a failure is attributable (cluster vs certificate path).
+  Handoff files derive from the config's basename
+  (`.pvelab.env`/`.pvelab-state.json` vs
+  `.pvelab-acme.env`/`.pvelab-acme-state.json`), overridable via
+  `env_path`/`state_path`; pass the same `-config` to every subcommand.
+  `just dogfood-test` picks its env file from `PVELAB_ENV`. ACME providers are
+  **data, not code** — `provider` is acme.sh's plugin name and `credentials`
+  maps that plugin's variable names to env var NAMES, resolved into
+  `nodes.ACMERawPluginData`, so a new provider is a config change only. The
+  block is **inert at provision time so far** (config surface only; the `up`
+  wiring that registers the account, creates the plugin and orders per node is
+  not written). Node VMIDs must avoid the 9210-9219 template sub-range —
+  validation rejects them.
 - Config is `pvelab.yaml` (git-ignored; copy `pvelab.example.yaml`). Secrets are
   env-var NAMES in the config, resolved+validated at load; site topology stays
   out of the repo. `TestExampleConfigValid` pins the example to the schema.

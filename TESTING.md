@@ -436,10 +436,21 @@ and (conveniently, though one node suffices) the RFB read. `pvelab` (IMPL-0002)
 provisions an ephemeral 3-node nested-PVE cluster on a single outer host so
 those run without touching real guests.
 
-**Prereqs:** an outer PVE host with nested virtualization enabled
-(`kvm_intel nested=Y`), ~24 GiB RAM headroom, an API token for the outer host,
-SSH root access to it (for the ISO preparation step), and a reserved VMID block
-(9200–9399 — pvelab refuses anything else).
+**Outer-host prereqs**, all of which a host reinstall takes with it — check each
+after rebuilding one:
+
+| Requirement           | Notes                                                                                                                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nested virtualization | `kvm_intel nested=Y`, ~24 GiB RAM headroom                                                                                                                                |
+| API token             | `pveum user token add root@pam sdk --privsep 0` (Step 1)                                                                                                                  |
+| SSH root access       | key in `authorized_keys`, **and** a current `known_hosts` entry — host-key verification is mandatory, so a rebuilt host fails until you `ssh-keygen -R <host>` and re-pin |
+| Base PVE ISO          | at `nested.base_iso`, inside `outer.iso_storage`                                                                                                                          |
+| Storages              | `outer.storage` and `outer.iso_storage` must exist under the names in the config                                                                                          |
+| Reserved VMIDs        | 9200–9399, and node VMIDs must avoid the 9210–9219 template sub-range                                                                                                     |
+
+`proxmox-auto-install-assistant` is installed by `pvelab iso` when missing, and
+a missing template just means `up` ISO-installs instead of cloning — neither
+needs preparing by hand.
 
 ```sh
 cp pvelab.example.yaml pvelab.yaml   # edit: outer endpoint/node, nested IPs, domain
@@ -450,8 +461,58 @@ just dogfood-iso    # one-time per PVE version: prepare the auto-install ISO
 just dogfood        # up -> inner suite (records cassettes) -> down
 ```
 
+### One config per lab shape
+
+`-config` selects the lab and defaults to `pvelab.yaml`. A second config is the
+supported way to vary the lab — `pvelab-acme.example.yaml` is the same 3-node
+cluster plus a `nested.acme` block that requests real certificates. Keeping the
+shapes in separate files is what makes a failure attributable: provision the
+plain one first, and if that cluster forms while the other does not, the
+difference is the certificate path rather than "the lab".
+
+Each config gets its own handoff files, derived from its basename, so two shapes
+never overwrite each other's answer to _what is currently up?_:
+
+| config             | env file           | state file                |
+| ------------------ | ------------------ | ------------------------- |
+| `pvelab.yaml`      | `.pvelab.env`      | `.pvelab-state.json`      |
+| `pvelab-acme.yaml` | `.pvelab-acme.env` | `.pvelab-acme-state.json` |
+
+Set `env_path` / `state_path` to override. Pass the **same** `-config` to `iso`,
+`up`, `status`, `env` and `down`; tearing down with the wrong one leaves the
+other's state file orphaned.
+
+`just dogfood-test` reads `PVELAB_ENV` to pick the file it sources
+(`PVELAB_ENV=.pvelab-acme.env just dogfood-test`).
+
+**While a config field is unreleased**, `just dogfood-*` must run with
+`PVELAB_DEV=1`: the recipes default to the pinned `pvelab@<pvelab_pin>` release,
+config decoding is strict, and a pinned binary rejects any key it has never
+heard of. This is a deliberate, temporary break from the rule that released code
+provisions the lab that tests branch code — reinstate the pin once the field
+ships in a tag.
+
+### Where the credentials live
+
+Two jobs, two files, and they must not be combined in one command — both define
+the same variable names (`PVE_ENDPOINT`, `PVE_NODE`, `PVE_TEST_*`), so whichever
+is applied last decides which node the suite talks to:
+
+| file                                    | holds                                                                                                               | used by                                                   |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `.env`                                  | outer-host token, nested root password, DNS-provider credentials — plus the env for testing the outer host directly | `pvelab iso/up/down`, and non-nested test runs            |
+| `.pvelab.1p.env`, `.pvelab-acme.1p.env` | how to reach the **nested** cluster, per lab shape                                                                  | `go test -tags=integration`                               |
+| `.pvelab.env`, `.pvelab-acme.env`       | generated by `up`                                                                                                   | reference — diff against the file above when values drift |
+
+A convenient shape is a 1Password-mounted file per row, run through
+`op run --env-file=…`. The generated files exist so the mounted ones can be
+checked rather than hand-derived: `PVE_SCRUB_EXTRA` in particular names the node
+IPs and lab domain a recording replaces with placeholders, so a stale copy does
+not fail a test — it ships the real topology into a committed cassette. Renaming
+a node or moving the lab's subnet is enough to cause that.
+
 `dogfood-up` installs three nested nodes from the prepared ISO, forms a quorate
-cluster, and writes `.pvelab.env` — the inner suite's environment:
+cluster, and writes its config's env file — the inner suite's environment:
 `PVE_ENDPOINT` (first nested node), `PVE_USERNAME`/`PVE_PASSWORD` (root@pam —
 API tokens do not survive a cluster join), the placement/console gates, and
 `PVE_SCRUB_EXTRA` (the recording-scrub pairs for the other nodes' IPs, the site
