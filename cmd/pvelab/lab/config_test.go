@@ -571,3 +571,25 @@ func TestLoadResolvesHandoffPaths(t *testing.T) {
 		t.Errorf("env=%q state=%q, want the acme-derived pair", cfg.EnvPath, cfg.StatePath)
 	}
 }
+
+// TestNodeVMIDRejectsTemplateSubRange guards a gap validateTemplate cannot
+// close: it only compares nodes against the template THIS config declares, so
+// a node parked elsewhere in the reserved sub-range validates today and
+// collides later with a per-version template build from another config.
+func TestNodeVMIDRejectsTemplateSubRange(t *testing.T) {
+	setTestEnv(t)
+	doc := strings.Replace(validYAML, "vmid: 9201", "vmid: 9211", 1)
+	_, err := loadYAML(t, doc)
+	if err == nil {
+		t.Fatal("LoadConfig() = nil, want a node-in-template-sub-range error")
+	}
+	if !strings.Contains(err.Error(), "template sub-range") {
+		t.Errorf("error %v does not explain the template sub-range", err)
+	}
+	// The boundaries are the point: 9209 and 9220 must stay legal.
+	for _, vmid := range []string{"9209", "9220"} {
+		if _, err := loadYAML(t, strings.Replace(validYAML, "vmid: 9201", "vmid: "+vmid, 1)); err != nil {
+			t.Errorf("vmid %s should be legal, got %v", vmid, err)
+		}
+	}
+}

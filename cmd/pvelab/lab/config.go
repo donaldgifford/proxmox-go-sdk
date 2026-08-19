@@ -471,6 +471,12 @@ func (c *Config) validateNodes() []error {
 	}
 	names := make(map[string]bool, len(c.Nested.Nodes))
 	vmids := make(map[int]bool, len(c.Nested.Nodes))
+	// The template sub-range is reserved whether or not THIS config declares a
+	// template: it holds one template per PVE minor, so a node parked there
+	// collides with a version this config has never heard of. Checking only
+	// against the configured template VMID (validateTemplate) misses that —
+	// the collision arrives later, from another config, as a template build
+	// that cannot have its VMID.
 	cidrs := make(map[string]bool, len(c.Nested.Nodes))
 	for _, n := range c.Nested.Nodes {
 		if n.Name == "" {
@@ -485,6 +491,9 @@ func (c *Config) validateNodes() []error {
 		if n.VMID < vmidRangeLo || n.VMID > vmidRangeHi {
 			errs = append(errs, fmt.Errorf("node %s: vmid %d outside the reserved pvelab block %d-%d",
 				n.Name, n.VMID, vmidRangeLo, vmidRangeHi))
+		} else if n.VMID >= templateVMIDLo && n.VMID <= templateVMIDHi {
+			errs = append(errs, fmt.Errorf("node %s: vmid %d is inside the template sub-range %d-%d; pick one outside it",
+				n.Name, n.VMID, templateVMIDLo, templateVMIDHi))
 		}
 		if vmids[n.VMID] {
 			errs = append(errs, fmt.Errorf("duplicate vmid %d", n.VMID))
