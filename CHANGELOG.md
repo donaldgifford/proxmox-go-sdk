@@ -25,6 +25,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(nodes)* Bound acmedomain slots to PVE's real range, and 9 review fixes
 - *(integration)* Restore the TestVersionRoundTrip cassette
 - *(nodes)* UpdateACMEAccount returns the task it was discarding
+- *(integration)* Scrub the HTTP reason phrase, and guard the field list
 
 ### Refactor
 
