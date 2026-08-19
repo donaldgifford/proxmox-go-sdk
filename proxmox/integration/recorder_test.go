@@ -16,9 +16,11 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"gopkg.in/dnaeon/go-vcr.v4/pkg/cassette"
@@ -38,7 +40,9 @@ const redacted = "REDACTED"
 // the Authorization header, a mint password rides the ticket-request form, and
 // the minted ticket / CSRF token / new token value ride the response body.
 var (
-	formSecretRe = regexp.MustCompile(`(?i)(password|secret|otp)=[^&]*`)
+	// "key" catches the PEM private key UploadCustomCertificate sends as key=,
+	// and any provider apikey= — it does not match sshkeys= (that is "keys=").
+	formSecretRe = regexp.MustCompile(`(?i)(password|secret|otp|key)=[^&]*`)
 	jsonSecretRe = regexp.MustCompile(`(?i)"(ticket|csrfpreventiontoken|value|password)"\s*:\s*"[^"]*"`)
 )
 
@@ -52,6 +56,11 @@ var (
 // name of PVE's response envelope, so a blanket rule would rewrite
 // {"data":"UPID:…"} and destroy the task id in every task-returning cassette.
 var (
+	acmeAccountURLPart = "/cluster/acme/account"
+	contactFormRe      = regexp.MustCompile(`contact=[^&]*`)
+	// RFC 8555 contacts are mailto URIs inside the CA's account object.
+	mailtoRe = regexp.MustCompile(`mailto:[^"\s,\]]+`)
+
 	acmePluginURLPart = "/cluster/acme/plugins"
 	acmeDataFormRe    = regexp.MustCompile(`(^|&)data=[^&]*`)
 	acmeDataJSONRe    = regexp.MustCompile(`"data"\s*:\s*"[^"]*"`)
@@ -84,16 +93,56 @@ func redactInteraction(i *cassette.Interaction) error {
 	// Secret fields ride response bodies from more than just /access/ticket: a
 	// console mint (POST .../vncproxy or .../spiceproxy) returns a one-time VNC
 	// ticket + password, and token creation returns a value. Scrub these field
-	// names wherever they appear. This is safe for replay — matchReplayRequest keys
-	// on method+path, not body — and PVE config/listing responses never legitimately
-	// carry these keys (they are write-only), so nothing needed is clobbered.
+	// names wherever they appear. This is safe for replay — matchReplayRequest
+	// keys on method+path, not body.
+	//
+	// "value" is the one name that also appears as legitimate DATA: PVE's SMART
+	// attribute tables and the qemu pending-config listing both use it. Neither
+	// is recorded today, and the pattern only matches a quoted string (SMART
+	// values decode as ints), so nothing needed is clobbered — but a future
+	// cassette on those surfaces would come back corrupted, and this is the
+	// comment that should stop the search.
 	if i.Response.Body != "" {
 		i.Response.Body = jsonSecretRe.ReplaceAllString(i.Response.Body, `"${1}":"`+redacted+`"`)
 	}
+	// The reason phrase carries PVE's own error text — "500 create ha rule
+	// failed: 400 Rule '...' is invalid." is in a committed cassette — so it can
+	// carry a node name, a hostname, or the detail of a failed ACME write. It is
+	// stored as its own field, so neither the body scrub nor the topology scrub
+	// reached it before.
+	if i.Response.Status != "" {
+		i.Response.Status = formSecretRe.ReplaceAllString(i.Response.Status, "${1}="+redacted)
+		i.Response.Status = jsonSecretRe.ReplaceAllString(i.Response.Status, `"${1}":"`+redacted+`"`)
+	}
 
 	redactACMEPluginData(i)
+	redactACMEAccountContact(i)
 	scrubACMECredentialValues(i)
 	return nil
+}
+
+// redactACMEAccountContact scrubs the ACME account's contact address under
+// /cluster/acme/account, in the register/update form and in the CA account
+// object a read returns (PVE passes that through verbatim, contacts included).
+//
+// The topology scrub also rewrites the address when PVE_TEST_ACME_ACCOUNT_EMAIL
+// is set — but the account is registered ONCE and reused across runs, so a
+// re-record takes the "reusing the existing account" path and needs no email
+// variable at all. That is precisely the run where a personal address set months
+// earlier would ship. Structural beats conditional for something whose absence
+// is silent.
+//
+// The account's location URL is deliberately kept: it names the CA-side account,
+// not the operator, and replay reads it back.
+func redactACMEAccountContact(i *cassette.Interaction) {
+	if !strings.Contains(i.Request.URL, acmeAccountURLPart) {
+		return
+	}
+	i.Request.Body = contactFormRe.ReplaceAllString(i.Request.Body, "contact="+redacted)
+	if _, ok := i.Request.Form["contact"]; ok {
+		i.Request.Form["contact"] = []string{redacted}
+	}
+	i.Response.Body = mailtoRe.ReplaceAllString(i.Response.Body, "mailto:"+redacted)
 }
 
 // acmeCredentialEnvs name the environment variables holding the live DNS
@@ -107,8 +156,16 @@ var acmeCredentialEnvs = []string{
 }
 
 // scrubACMECredentialValues is the belt to redactACMEPluginData's braces: it
-// scrubs the credential VALUES — plaintext and base64 — everywhere they appear,
-// not only under the plugin URL.
+// scrubs the credential VALUES everywhere they appear, not only under the plugin
+// URL.
+//
+// It also tries the base64 of each value, but that half is opportunistic and
+// must not be relied on: the SDK base64-encodes the WHOLE blob (sorted KEY=value
+// lines), and base64 works in 3-byte groups, so base64(value) is a substring of
+// base64(blob) only when the value happens to land on a 3-aligned offset and run
+// to the end. For a multi-field provider it usually does not. The URL-scoped
+// rule is what actually covers the encoded blob; this is for a raw value echoed
+// somewhere else.
 //
 // The URL-scoped rule covers every request the SDK makes with a credential in
 // it, but says nothing about a response that echoes one back from somewhere
@@ -118,10 +175,17 @@ var acmeCredentialEnvs = []string{
 // debugging. Whether PVE's acme wrapper can put a provider credential in that
 // log is unproven; this makes the answer not matter.
 func scrubACMECredentialValues(i *cassette.Interaction) {
+	var skipped []string
 	for _, name := range acmeCredentialEnvs {
 		value := os.Getenv(name)
 		// Short values would scrub half the cassette; a real API token is long.
-		if len(value) < 12 {
+		// A Namecheap username is not, though, so a SET variable that falls under
+		// the floor is announced rather than silently unprotected — the operator
+		// is the only one who can decide whether that value matters.
+		if len(value) < minCredentialLen {
+			if value != "" {
+				skipped = append(skipped, name)
+			}
 			continue
 		}
 		for _, form := range []string{value, base64.StdEncoding.EncodeToString([]byte(value))} {
@@ -135,7 +199,23 @@ func scrubACMECredentialValues(i *cassette.Interaction) {
 			}
 		}
 	}
+	if len(skipped) > 0 {
+		shortCredentialWarning.Do(func() {
+			fmt.Fprintf(os.Stderr,
+				"recorder: NOT value-scrubbing %s — under %d characters, "+
+					"so scrubbing it would shred unrelated text. Check the cassette by hand.\n",
+				strings.Join(skipped, ", "), minCredentialLen)
+		})
+	}
 }
+
+// minCredentialLen is the floor below which a value is too short to scrub by
+// value without corrupting the cassette around it.
+const minCredentialLen = 12
+
+// shortCredentialWarning keeps the skipped-value warning to one line per run
+// rather than one per recorded interaction.
+var shortCredentialWarning sync.Once
 
 // redactACMEPluginData scrubs the ACME plugin credential blob in all three
 // places it appears: the request form body, go-vcr's separately-stored parsed
@@ -215,6 +295,15 @@ const (
 // and the task-poll URLs the SDK derives from them, so it must be replaced
 // everywhere for a replay to stay internally consistent. The zero value (no
 // pairs) is a no-op, so unit tests and the mockpve self-tests record verbatim.
+//
+// What this does NOT promise: scrubbing all topology. It knows one endpoint and
+// one node; sibling node names and cluster names reach committed cassettes and
+// are accepted policy (TESTING.md's review checklist lists node names, IPs, MACs
+// and storage names as details the reviewer signs off on). Anything beyond the
+// one node is the operator's call via PVE_SCRUB_EXTRA. Nor does it reach inside
+// base64: a certificate PEM carries its subject and SANs in DER, where no string
+// pair matches — so a test that reads certificates back needs its own rule that
+// replaces the PEM wholesale, not a pair.
 type topologyScrub struct {
 	pairs [][2]string // ordered {live, placeholder} replacements.
 }
@@ -240,11 +329,12 @@ func newTopologyScrub(endpoint, node string) topologyScrub {
 // being certified, and its parent zone when that is still more than one label
 // (the zone shows up on its own in challenge and CAA records).
 //
-// The pairs are PREPENDED, not appended. A node is usually the first label of
-// the FQDN it certifies (pve1-dogfood in pve1-dogfood.lab.example.com), so the
-// node pair applied first would rewrite that label and leave the domain pair
-// matching nothing — publishing the zone. Longest, most specific match first,
-// for the same reason host:port precedes the bare host.
+// A node is usually the first label of the FQDN it certifies (pve1-dogfood in
+// pve1-dogfood.lab.example.com), so a node pair applied before the domain pair
+// would rewrite that label, leave the domain pair matching nothing, and publish
+// the zone. apply sorts longest-live-value-first, which is what prevents that;
+// the pairs are prepended here as well so the intent survives a reader who has
+// not got to apply yet, not because ordering at this point decides anything.
 func (s topologyScrub) withACMEDomain(domain string) topologyScrub {
 	domain = strings.TrimSpace(domain)
 	if domain == "" {
@@ -257,6 +347,9 @@ func (s topologyScrub) withACMEDomain(domain string) topologyScrub {
 	s.pairs = append(pairs, s.pairs...)
 	return s
 }
+
+// minScrubPairLen is the shortest live value a PVE_SCRUB_EXTRA pair may carry.
+const minScrubPairLen = 3
 
 // withACMEIdentity returns the scrub extended with the ACME account contact
 // address and the source IP a DNS provider allowlists (Namecheap requires one).
@@ -293,6 +386,13 @@ func (s topologyScrub) withExtraPairs(csv string) (topologyScrub, error) {
 		if !ok || live == "" || placeholder == "" {
 			return s, fmt.Errorf("scrub pair %q: want live=placeholder", entry)
 		}
+		// A one- or two-character live value is a typo, not topology: it would
+		// match inside unrelated words and shred the cassette, and a scrub that
+		// mangles everything is as unreviewable as one that scrubs nothing.
+		if len(live) < minScrubPairLen {
+			return s, fmt.Errorf("scrub pair %q: live value must be at least %d characters",
+				entry, minScrubPairLen)
+		}
 		s.pairs = append(s.pairs, [2]string{live, placeholder})
 	}
 	return s, nil
@@ -322,6 +422,10 @@ func (s topologyScrub) apply(i *cassette.Interaction) {
 	i.Request.URL = rep(i.Request.URL)
 	i.Request.Body = rep(i.Request.Body)
 	i.Response.Body = rep(i.Response.Body)
+	// The HTTP reason phrase is a separate field carrying PVE's error text
+	// verbatim, and a failing write is exactly when a hostname or node name ends
+	// up in it. TestScrubCoversEveryStringField keeps this list honest.
+	i.Response.Status = rep(i.Response.Status)
 	// The Host header is stored separately from the URL and carries the live
 	// endpoint verbatim — found in review of the first nested-cluster cassette
 	// (2026-07-12; the earlier committed batch was hand-fixed without noticing
@@ -567,6 +671,156 @@ func TestScrubTopology(t *testing.T) {
 // label — the ordering hazard the prepend exists for. The zone must go too:
 // a DNS-01 challenge names _acme-challenge.<zone>, which publishes the zone on
 // its own even after the FQDN is rewritten.
+// scrubExemptFields names the serialized cassette fields topologyScrub does not
+// rewrite, each with the reason it is safe. Everything else must be reached, and
+// TestScrubCoversEveryStringField fails when a new field appears here or in a
+// go-vcr upgrade — the gap that let Response.Status ship PVE's error text
+// verbatim was not a bug in any rule, it was a field nobody had enumerated.
+var scrubExemptFields = map[string]string{
+	// Fixed protocol values, never topology.
+	"Request.Proto":  "HTTP/1.1",
+	"Response.Proto": "HTTP/1.1",
+	"Request.Method": "the HTTP verb",
+	// Set only on SERVER-side requests; Go leaves both empty on a client
+	// request, and all 17 committed cassettes confirm they are absent.
+	"Request.RemoteAddr": "server-side only",
+	"Request.RequestURI": "server-side only",
+}
+
+// TestScrubCoversEveryStringField walks the cassette structs by reflection and
+// asserts every string field either gets rewritten or is exempt with a stated
+// reason. It is deliberately structural: the pipeline is an allowlist, and an
+// allowlist with no completeness check is one dependency upgrade away from
+// silently letting a new field through.
+func TestScrubCoversEveryStringField(t *testing.T) {
+	const live = "10.0.0.11"
+	scrub := newTopologyScrub("https://"+live+":8006", "pve1-dogfood")
+
+	for _, side := range []struct {
+		name string
+		typ  reflect.Type
+	}{
+		{"Request", reflect.TypeOf(cassette.Request{})},
+		{"Response", reflect.TypeOf(cassette.Response{})},
+	} {
+		for idx := range side.typ.NumField() {
+			f := side.typ.Field(idx)
+			if f.Type.Kind() != reflect.String {
+				continue // headers/forms are covered by their own assertions below
+			}
+			qualified := side.name + "." + f.Name
+			if reason, ok := scrubExemptFields[qualified]; ok {
+				if reason == "" {
+					t.Errorf("%s is exempt with no stated reason", qualified)
+				}
+				continue
+			}
+
+			i := &cassette.Interaction{}
+			target := reflect.ValueOf(i).Elem().FieldByName(side.name).FieldByName(f.Name)
+			target.SetString("host " + live + " failed")
+			scrub.apply(i)
+			if strings.Contains(target.String(), live) {
+				t.Errorf("%s is not scrubbed (%q survived) — add a rule in apply, "+
+					"or add it to scrubExemptFields with the reason it is safe",
+					qualified, target.String())
+			}
+		}
+	}
+
+	// The two map-shaped fields, asserted directly: reflection above skips them.
+	i := &cassette.Interaction{
+		Request: cassette.Request{
+			Form:    map[string][]string{"node": {live}},
+			Headers: http.Header{"X-Probe": []string{live}},
+		},
+		Response: cassette.Response{Headers: http.Header{"Location": []string{live}}},
+	}
+	scrub.apply(i)
+	if i.Request.Form.Get("node") == live {
+		t.Error("Request.Form is not scrubbed")
+	}
+	if i.Request.Headers.Get("X-Probe") == live {
+		t.Error("Request.Headers is not scrubbed")
+	}
+	if i.Response.Headers.Get("Location") == live {
+		t.Error("Response.Headers is not scrubbed")
+	}
+}
+
+// TestRedactACMEAccountContact pins the structural contact scrub: it must fire
+// on an account read whether or not the operator set the email variable, which
+// is the case the env-derived topology pair misses (the account is registered
+// once and reused, so a re-record has no reason to set it).
+func TestRedactACMEAccountContact(t *testing.T) {
+	i := &cassette.Interaction{
+		Request: cassette.Request{
+			Method: http.MethodGet,
+			URL:    "https://pve.example:8006/api2/json/cluster/acme/account/staging",
+		},
+		Response: cassette.Response{
+			Body: `{"data":{"location":"https://acme-staging.example/acct/12345",` +
+				`"account":{"status":"valid","contact":["mailto:donald@personal.example"]}}}`,
+		},
+	}
+	if err := redactInteraction(i); err != nil {
+		t.Fatalf("redactInteraction: %v", err)
+	}
+	if strings.Contains(i.Response.Body, "donald@personal.example") {
+		t.Errorf("account body = %q, want the contact redacted", i.Response.Body)
+	}
+	if !strings.Contains(i.Response.Body, "acme-staging.example/acct/12345") {
+		t.Errorf("account body = %q, want the CA location kept", i.Response.Body)
+	}
+
+	// The register form carries it too, and a mailto: in an unrelated response
+	// must be left alone — the rule is URL-scoped for the same reason the plugin
+	// data rule is.
+	reg := &cassette.Interaction{
+		Request: cassette.Request{
+			Method: http.MethodPost,
+			URL:    "https://pve.example:8006/api2/json/cluster/acme/account",
+			Body:   "contact=donald%40personal.example&directory=https%3A%2F%2Facme",
+			Form:   map[string][]string{"contact": {"donald@personal.example"}},
+		},
+	}
+	if err := redactInteraction(reg); err != nil {
+		t.Fatalf("redactInteraction(register): %v", err)
+	}
+	if strings.Contains(reg.Request.Body, "personal.example") ||
+		strings.Contains(strings.Join(reg.Request.Form["contact"], ","), "personal.example") {
+		t.Errorf("register body = %q form = %v, want the contact redacted",
+			reg.Request.Body, reg.Request.Form)
+	}
+
+	other := &cassette.Interaction{
+		Request:  cassette.Request{URL: "https://pve.example:8006/api2/json/cluster/status"},
+		Response: cassette.Response{Body: `{"data":"mailto:root@pam"}`},
+	}
+	if err := redactInteraction(other); err != nil {
+		t.Fatalf("redactInteraction(other): %v", err)
+	}
+	if !strings.Contains(other.Response.Body, "mailto:root@pam") {
+		t.Errorf("unrelated body = %q, want it untouched", other.Response.Body)
+	}
+}
+
+// TestRedactStatusLine pins the reason-phrase scrub against the shape that is
+// already in a committed cassette: PVE answers a rejected write with its own
+// error text in the status line, where neither the body scrub nor a header rule
+// reaches it.
+func TestRedactStatusLine(t *testing.T) {
+	i := &cassette.Interaction{Response: cassette.Response{
+		Status: "500 create ha rule failed: password=hunter2 rejected",
+	}}
+	if err := redactInteraction(i); err != nil {
+		t.Fatalf("redactInteraction: %v", err)
+	}
+	if strings.Contains(i.Response.Status, "hunter2") {
+		t.Errorf("status = %q, want the secret redacted", i.Response.Status)
+	}
+}
+
 func TestScrubACMEDomain(t *testing.T) {
 	scrub := newTopologyScrub("https://10.0.0.11:8006", "pve1-dogfood").
 		withACMEDomain("pve1-dogfood.lab.example.com")
@@ -688,6 +942,11 @@ func TestScrubTopologyMultiPair(t *testing.T) {
 	// A malformed entry errors — a typo must not silently leak topology.
 	if _, err := (topologyScrub{}).withExtraPairs("10.0.0.12"); err == nil {
 		t.Error("withExtraPairs with a pairless entry succeeded, want error")
+	}
+	// So does a live value too short to be topology: matching "1" everywhere
+	// would corrupt the whole cassette.
+	if _, err := (topologyScrub{}).withExtraPairs("1=192.0.2.11"); err == nil {
+		t.Error("withExtraPairs with a one-character live value succeeded, want error")
 	}
 	if _, err := (topologyScrub{}).withExtraPairs("=x"); err == nil {
 		t.Error("withExtraPairs with an empty live value succeeded, want error")

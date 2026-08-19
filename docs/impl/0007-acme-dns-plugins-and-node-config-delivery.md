@@ -655,6 +655,47 @@ the Phase-3 PR:
   a real CA name, so a test asserting on a trusted issuer cannot pass against
   the mock and fail live.
 
+- **Redaction audit (2026-08-18), before any capture.** An adversarial pass over
+  the whole scrub pipeline — go-vcr's serialized fields against what the hooks
+  actually rewrite, plus a grep over the 17 committed cassettes — found one
+  confirmed hole and several weaker claims. All fixed on the branch:
+  1. **`Response.Status` was never scrubbed or redacted.** PVE puts its own
+     error text in the HTTP reason phrase, and a committed cassette proves it
+     (`TestResourceAffinityPlacement.yaml`:
+     `status: '500 create ha rule failed: 400 Rule ... is invalid.'`). A failing
+     ACME write — the run most likely to be re-recorded while debugging — would
+     have shipped hostnames or node names there while the body beside it was
+     clean. Now covered by both the redaction and the topology scrub.
+  2. **The real fix is structural**: `TestScrubCoversEveryStringField` walks the
+     cassette structs by reflection and fails on any string field that is
+     neither scrubbed nor listed in `scrubExemptFields` with a stated reason.
+     The gap was not a bug in a rule, it was a field nobody had enumerated — and
+     an allowlist with no completeness check is one dependency upgrade from the
+     next one. Verified by removing the new rule and watching the guard fail.
+  3. **The account contact is now scrubbed structurally**, under
+     `/cluster/acme/account`, not via `PVE_TEST_ACME_ACCOUNT_EMAIL`. The account
+     is registered once and REUSED, so a re-record takes the reuse path and
+     never sets that variable — exactly the run where an address chosen months
+     earlier ships inside the CA account object PVE returns verbatim.
+  4. `key=` joined the form-secret pattern (`UploadCustomCertificate` sends a
+     PEM private key under that name; nothing records it today, and it is one
+     `t.Run` away on the surface this ledger extends).
+  5. A set-but-too-short credential value now WARNS instead of being silently
+     skipped — a Namecheap username is realistically under the 12-character
+     floor, and the operator is the only one who can judge whether it matters.
+  6. Two comments were claiming coverage that does not exist and are corrected:
+     the base64 half of the value scrub only works when the value happens to
+     land 3-aligned at the end of the blob (so the URL-scoped rule is what
+     actually covers an encoded credential), and `"value"` IS a legitimate PVE
+     data key (SMART tables, qemu pending) rather than write-only. Left
+     deliberately: sibling node names and cluster names stay in cassettes — the
+     TESTING.md checklist already asks the reviewer to accept them — but the
+     `topologyScrub` doc no longer promises otherwise. And a certificate PEM
+     carries its subject and SANs in DER where no string pair reaches; the
+     cassette from `TestConsoleMint` already contains the cluster UUID that way.
+     The flow does not read certificates back, and the note now says a rule
+     replacing the PEM wholesale is the prerequisite for adding one.
+
 #### Tasks
 
 - [ ] 1. Environment prep: the shared domain's zone on Cloudflare DNS with a
