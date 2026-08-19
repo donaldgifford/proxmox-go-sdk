@@ -885,6 +885,52 @@ must keep identical layouts; the comment on `certPayload` says so.
   None of these block Phases 1–3.
 - No new Go module dependencies.
 
+## Follow-up: move the destructive integration tests off r740a
+
+**Raised 2026-08-19, not scheduled.** r740a is heading for production as part of
+a real cluster, and the integration suite currently creates and destroys guests
+on it: the QEMU and LXC lifecycles (scratch VMIDs 9101/9102), the ISO upload,
+the console-mint scratch VM, and — the reason this came up — an ACME order,
+which replaces the node's pveproxy certificate. Now that pvelab provisions a
+quorate 3-node nested cluster on demand, most of that has somewhere safer to
+run.
+
+**This is not a blanket move.** Split by what a test needs from the hardware:
+
+- **Move (mutating):** QEMU/LXC lifecycle, ISO upload, console mint, ACME. The
+  env gate names are identical between the two targets, so pointing them at the
+  nested cluster is an env-file change, not a code change — which is the clue
+  that the relocation is operational work, not new surface.
+- **Keep on r740a (read-only):** the hardware-shaped reads nested cannot fake —
+  `ListDisks`/`GetDiskSMART` return virtual disks with no SMART table, ZFS pool
+  ops want real vdevs, Ceph wants real OSDs. Reads against production are
+  defensible, and once r740a is clustered the cluster-scoped reads get _better_
+  coverage than a single node gives today.
+- **Already nested:** HA placement/migrate/arm-disarm, SDN fabrics, console RFB.
+
+**The real deliverable is the gate, not the relocation.** Today exactly two
+destructive tests can tell whether their target is disposable
+(`PVE_TEST_ACME_DISPOSABLE`, `PVE_TEST_HA_ARM`); every other mutating test fires
+wherever `PVE_ENDPOINT` happens to point. Moving tests makes an accident less
+likely; a single disposable-node assertion that every mutating test honours
+makes it structurally impossible, and it keeps working when someone runs one
+test by hand with the wrong env file. That assertion is the piece worth
+designing — whether it is an explicit env gate, a check against the configured
+lab node list, or something the node itself can answer.
+
+**Prerequisites before any of it lands:**
+
+1. Storage parity — `nestedTestStorage` is a pvelab constant; the nested
+   template's storage must actually support what the moved tests do.
+2. Re-record the affected cassettes from the nested cluster and re-review them
+   for leaks; `PVE_SCRUB_EXTRA` already covers the lab topology, and
+   `certification.yaml` records provenance (a mixed-origin corpus is already the
+   norm).
+3. Decide the circularity policy: the nested cluster is provisioned BY this SDK,
+   so a broken SDK cannot build its own test bed. The `pvelab_pin` stable-pin
+   rule exists for exactly this and should be reaffirmed rather than quietly
+   dropped when `PVELAB_DEV=1` becomes habitual.
+
 ## Open Questions
 
 1. **Does `GetACMEMeta` ride along in Phase 1?** **Decision (2026-08-17): a.**
