@@ -29,6 +29,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(mockpve)* Read acmedomain the way PVE does, and keep one front-end cert
 - *(mockpve)* Give each ACME certificate verb its own task record
 - *(mockpve)* Serve certificates shaped like real PVE
+- *(integration)* Scrub every parent zone, not just the immediate one
 
 ### Refactor
 
