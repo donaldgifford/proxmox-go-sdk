@@ -7,6 +7,14 @@
 # variable is unset. Site topology (real domain, IPs) belongs only in your
 # local copy.
 
+# Handoff files `up` writes and `down` removes. Both default to this config's
+# own basename — pvelab.yaml gives .pvelab.env and .pvelab-state.json,
+# pvelab-acme.yaml gives .pvelab-acme.env and .pvelab-acme-state.json — so two
+# labs never overwrite each other's answer to "what is currently up?". Set
+# either explicitly to override.
+# env_path: .pvelab.env
+# state_path: .pvelab-state.json
+
 outer:
   # The physical PVE host the lab runs on.
   endpoint: https://pve.example:8006

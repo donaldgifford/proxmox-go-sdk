@@ -525,3 +525,49 @@ func TestACMEDirectoryURL(t *testing.T) {
 		}
 	}
 }
+
+// TestHandoffPathsDeriveFromConfig pins the pairing: each config gets its own
+// handoff files, and the default config keeps the names it has always had, so
+// an existing lab is not orphaned by this becoming configurable.
+func TestHandoffPathsDeriveFromConfig(t *testing.T) {
+	tests := []struct{ config, env, state string }{
+		{"pvelab.yaml", ".pvelab.env", ".pvelab-state.json"},
+		{"pvelab-acme.yaml", ".pvelab-acme.env", ".pvelab-acme-state.json"},
+		{"/somewhere/else/pvelab-9.1.yml", ".pvelab-9.1.env", ".pvelab-9.1-state.json"},
+	}
+	for _, tt := range tests {
+		var c Config
+		c.resolveHandoffPaths(tt.config)
+		if c.EnvPath != tt.env || c.StatePath != tt.state {
+			t.Errorf("%s -> env %q state %q, want %q and %q",
+				tt.config, c.EnvPath, c.StatePath, tt.env, tt.state)
+		}
+	}
+}
+
+// TestHandoffPathsExplicitWins covers the escape hatch: an operator who wants
+// a specific filename is not overridden by the derivation.
+func TestHandoffPathsExplicitWins(t *testing.T) {
+	c := Config{EnvPath: "/tmp/custom.env", StatePath: "/tmp/custom.json"}
+	c.resolveHandoffPaths("pvelab-acme.yaml")
+	if c.EnvPath != "/tmp/custom.env" || c.StatePath != "/tmp/custom.json" {
+		t.Errorf("explicit paths overwritten: env=%q state=%q", c.EnvPath, c.StatePath)
+	}
+}
+
+// TestLoadResolvesHandoffPaths proves the resolution happens during load, so
+// every command reads it off the config rather than each deciding for itself.
+func TestLoadResolvesHandoffPaths(t *testing.T) {
+	setTestEnv(t)
+	path := filepath.Join(t.TempDir(), "pvelab-acme.yaml")
+	if err := os.WriteFile(path, []byte(validYAML), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.EnvPath != ".pvelab-acme.env" || cfg.StatePath != ".pvelab-acme-state.json" {
+		t.Errorf("env=%q state=%q, want the acme-derived pair", cfg.EnvPath, cfg.StatePath)
+	}
+}

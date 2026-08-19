@@ -54,6 +54,10 @@ run *args:
 
 pvelab_pin := "v0.6.0"
 pvelab_pkg := if env("PVELAB_DEV", "") == "1" { "./cmd/pvelab" } else { "github.com/donaldgifford/proxmox-go-sdk/cmd/pvelab@" + pvelab_pin }
+# Handoff file the inner suite sources. `up` derives it from the config it ran
+# (pvelab.yaml -> .pvelab.env, pvelab-acme.yaml -> .pvelab-acme.env), so point
+# PVELAB_ENV at the matching one when running the ACME lab.
+pvelab_env := env("PVELAB_ENV", ".pvelab.env")
 
 # Prepare the auto-install ISO on the outer host (assistant over SSH)
 dogfood-iso *args:
@@ -67,14 +71,15 @@ dogfood-up *args:
 dogfood-down *args:
     go run {{pvelab_pkg}} down {{args}}
 
-# Run the inner suite against the nested lab: sources .pvelab.env (written by
-# dogfood-up) and records cassettes (PVE_RECORD=1). Default -run targets the
-# two IMPL-0001 live-only criteria; pass extra `go test` flags via args.
+# Run the inner suite against the nested lab: sources the handoff env (written
+# by dogfood-up) and records cassettes (PVE_RECORD=1). Default -run targets the
+# two IMPL-0001 live-only criteria; pass extra `go test` flags via args. Set
+# PVELAB_ENV for a non-default lab (e.g. PVELAB_ENV=.pvelab-acme.env).
 dogfood-test *args:
     #!/usr/bin/env bash
     set -euo pipefail
-    [ -f .pvelab.env ] || { echo "no .pvelab.env — run 'just dogfood-up' first" >&2; exit 1; }
-    source .pvelab.env
+    [ -f {{pvelab_env}} ] || { echo "no {{pvelab_env}} — run 'just dogfood-up' first" >&2; exit 1; }
+    source {{pvelab_env}}
     PVE_RECORD=1 go test -tags=integration ./proxmox/integration/ -v -timeout 30m \
       -run 'TestResourceAffinityPlacement|TestConsoleRFB' {{args}}
 

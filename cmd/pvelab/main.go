@@ -236,10 +236,10 @@ func cmdUp(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := lab.WriteEnvFile(lab.DefaultEnvPath, env); err != nil {
+	if err := lab.WriteEnvFile(cfg.EnvPath, env); err != nil {
 		return err
 	}
-	slog.Info("lab is up", "nodes", len(cfg.Nested.Nodes), "env", lab.DefaultEnvPath)
+	slog.Info("lab is up", "nodes", len(cfg.Nested.Nodes), "env", cfg.EnvPath)
 	return nil
 }
 
@@ -301,7 +301,7 @@ func upViaClone(ctx context.Context, client *proxmox.Client, cfg *lab.Config, te
 	slog.Info("template found — provisioning via linked clones (ISO install skipped)",
 		"template", lab.TemplateName(cfg), "vmid", templateVMID)
 
-	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+	if _, err := lab.UpdateState(cfg.StatePath, func(st *lab.State) {
 		st.ClusterName = cfg.Nested.ClusterName
 		st.PVEVersion = cfg.Nested.PVEVersion
 		st.SeedNodes(cfg.Nested.Nodes)
@@ -312,7 +312,7 @@ func upViaClone(ctx context.Context, client *proxmox.Client, cfg *lab.Config, te
 	if err := lab.CloneNodeVMs(ctx, client, cfg, templateVMID, slog.Default()); err != nil {
 		return err
 	}
-	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+	if _, err := lab.UpdateState(cfg.StatePath, func(st *lab.State) {
 		for i := range st.Nodes {
 			st.Nodes[i].Created = true
 		}
@@ -321,7 +321,7 @@ func upViaClone(ctx context.Context, client *proxmox.Client, cfg *lab.Config, te
 	}
 
 	readiness, reidErr := lab.ReidentifyClones(ctx, client, cfg, rootPW, slog.Default())
-	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+	if _, err := lab.UpdateState(cfg.StatePath, func(st *lab.State) {
 		// The pass is serialized, so on failure only the nodes it reported
 		// ready are known-started; `pvelab status` shows the outer power
 		// state for the rest.
@@ -341,7 +341,7 @@ func upViaClone(ctx context.Context, client *proxmox.Client, cfg *lab.Config, te
 	if err := lab.FormCluster(ctx, cfg, rootPW, slog.Default()); err != nil {
 		return err
 	}
-	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+	if _, err := lab.UpdateState(cfg.StatePath, func(st *lab.State) {
 		st.Clustered = true
 	}); err != nil {
 		return err
@@ -353,7 +353,7 @@ func upViaClone(ctx context.Context, client *proxmox.Client, cfg *lab.Config, te
 // updating the state file after every stage (design OQ-7: a mid-up failure
 // leaves evidence on disk).
 func provisionLab(ctx context.Context, client *proxmox.Client, cfg *lab.Config, isoVolid, rootPW string) error {
-	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+	if _, err := lab.UpdateState(cfg.StatePath, func(st *lab.State) {
 		st.ClusterName = cfg.Nested.ClusterName
 		st.PVEVersion = cfg.Nested.PVEVersion
 		st.ISOVolid = isoVolid
@@ -365,7 +365,7 @@ func provisionLab(ctx context.Context, client *proxmox.Client, cfg *lab.Config, 
 	if err := lab.CreateNodeVMs(ctx, client, cfg, isoVolid, slog.Default()); err != nil {
 		return err
 	}
-	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+	if _, err := lab.UpdateState(cfg.StatePath, func(st *lab.State) {
 		for i := range st.Nodes {
 			st.Nodes[i].Created = true
 		}
@@ -376,7 +376,7 @@ func provisionLab(ctx context.Context, client *proxmox.Client, cfg *lab.Config, 
 	if err := lab.StartNodeVMs(ctx, client, cfg, slog.Default()); err != nil {
 		return err
 	}
-	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+	if _, err := lab.UpdateState(cfg.StatePath, func(st *lab.State) {
 		for i := range st.Nodes {
 			st.Nodes[i].Started = true
 		}
@@ -385,7 +385,7 @@ func provisionLab(ctx context.Context, client *proxmox.Client, cfg *lab.Config, 
 	}
 
 	readiness, waitErr := lab.WaitReady(ctx, cfg, rootPW, slog.Default())
-	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+	if _, err := lab.UpdateState(cfg.StatePath, func(st *lab.State) {
 		st.ApplyReadiness(readiness)
 	}); err != nil {
 		return errors.Join(waitErr, err)
@@ -397,7 +397,7 @@ func provisionLab(ctx context.Context, client *proxmox.Client, cfg *lab.Config, 
 	if err := lab.FormCluster(ctx, cfg, rootPW, slog.Default()); err != nil {
 		return err
 	}
-	if _, err := lab.UpdateState(lab.DefaultStatePath, func(st *lab.State) {
+	if _, err := lab.UpdateState(cfg.StatePath, func(st *lab.State) {
 		st.Clustered = true
 	}); err != nil {
 		return err
@@ -490,7 +490,7 @@ func cmdDown(args []string) error {
 		return err
 	}
 	if !*noState {
-		for _, p := range []string{lab.DefaultStatePath, lab.DefaultEnvPath} {
+		for _, p := range []string{cfg.StatePath, cfg.EnvPath} {
 			if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
 				slog.Warn("lab is down but a handoff file could not be removed", "path", p, "err", err)
 			}
@@ -518,7 +518,7 @@ func cmdStatus(args []string) error {
 	if err != nil {
 		return err
 	}
-	st, err := lab.LoadState(lab.DefaultStatePath)
+	st, err := lab.LoadState(cfg.StatePath)
 	if err != nil && !errors.Is(err, lab.ErrNoState) {
 		return err
 	}

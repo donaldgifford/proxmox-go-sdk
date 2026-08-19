@@ -17,6 +17,14 @@
 # variable pvelab resolves at runtime, and config load fails fast if any named
 # variable is unset. Keep them in .pvelab.env (0600, git-ignored).
 
+# Handoff files `up` writes and `down` removes. Both default to this config's
+# own basename — pvelab.yaml gives .pvelab.env and .pvelab-state.json,
+# pvelab-acme.yaml gives .pvelab-acme.env and .pvelab-acme-state.json — so two
+# labs never overwrite each other's answer to "what is currently up?". Set
+# either explicitly to override.
+# env_path: .pvelab-acme.env
+# state_path: .pvelab-acme-state.json
+
 outer:
   # The physical PVE host the lab runs on.
   endpoint: https://pve.example:8006

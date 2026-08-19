@@ -77,6 +77,35 @@ const (
 type Config struct {
 	Outer  Outer  `yaml:"outer"`
 	Nested Nested `yaml:"nested"`
+	// EnvPath and StatePath are where `up` writes its handoff files and
+	// `down` removes them. Both default to the config's own basename
+	// (pvelab.yaml -> .pvelab.env and .pvelab-state.json; pvelab-acme.yaml ->
+	// .pvelab-acme.env and .pvelab-acme-state.json), which is what keeps two
+	// labs from overwriting each other's answer to "what is currently up?".
+	//
+	// They were fixed names until the ACME variant arrived and made a second
+	// config normal. A shared state file is the worse half of that: it records
+	// what `up` created, so the wrong one silently describes the other lab.
+	EnvPath   string `yaml:"env_path"`
+	StatePath string `yaml:"state_path"`
+}
+
+// resolveHandoffPaths fills EnvPath/StatePath from the config's filename when
+// the operator has not set them. Deriving from the config rather than from a
+// flag means the pairing cannot be got wrong by forgetting an argument, and
+// the default config keeps the names it has always had.
+func (c *Config) resolveHandoffPaths(configPath string) {
+	base := filepath.Base(configPath)
+	base = strings.TrimSuffix(base, filepath.Ext(base))
+	if base == "" || base == "." {
+		base = "pvelab"
+	}
+	if c.EnvPath == "" {
+		c.EnvPath = "." + base + ".env"
+	}
+	if c.StatePath == "" {
+		c.StatePath = "." + base + "-state.json"
+	}
 }
 
 // Outer locates and authenticates the physical PVE host the lab runs on.
@@ -257,6 +286,7 @@ func LoadConfig(path string) (*Config, error) {
 	if err := dec.Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("parse config %s: %w", path, err)
 	}
+	cfg.resolveHandoffPaths(path)
 	cfg.applyDefaults()
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("validate config %s: %w", path, err)
