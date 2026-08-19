@@ -46,6 +46,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(impl-0007)* Record the surface-wide return-shape audit
 - *(claude)* ACME is mock-verified, and the YAML formatter/linter gotcha
 - *(mockpve)* Say what the ACME cert handler does NOT model
+- *(impl-0007)* Record the colliding-UPID fix
 
 ### Testing
 
