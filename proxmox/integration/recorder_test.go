@@ -29,6 +29,7 @@ import (
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/mockpve"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/nodes"
 )
 
 // redacted is the placeholder written over every secret before a cassette is
@@ -1256,5 +1257,97 @@ func TestScrubACMEIgnoresShortValues(t *testing.T) {
 	}
 	if i.Response.Body != body {
 		t.Errorf("a short env value scrubbed unrelated content: %q", i.Response.Body)
+	}
+}
+
+// TestRecorderACMEFlowRedaction rehearses Phase 4's leak review without a node.
+//
+// Every other ACME redaction test here hands a hand-built cassette.Interaction
+// to a hook and checks the struct that comes back. That proves the rules are
+// right; it does not prove the bytes on disk are clean, and those are two
+// different claims. A credential can survive in a field the recorder serializes
+// but no hook visits — which is exactly how Response.Status went unscrubbed
+// through sixteen committed cassettes. So this records the ACME flow through
+// the real recorder against mockpve and greps the resulting YAML.
+//
+// The flow is the one the live run performs: register a plugin carrying a
+// provider credential, read it back (PVE returns the credential base64-encoded
+// in data, so the read is a second chance to leak), and point a node's config
+// at the domain. The credential is checked base64 because that is the only form
+// that ever reaches the wire — the SDK encodes it before sending — so the raw
+// check is there to catch a future change to that encoding, not today's bytes.
+//
+// Both halves were verified by mutation: disabling redactACMEPluginData leaks
+// the encoded credential, and dropping the domain pair publishes the zone even
+// though the node pair still matches its first label. That second one is the
+// ordering rationale in withACMEDomain, demonstrated rather than asserted.
+func TestRecorderACMEFlowRedaction(t *testing.T) {
+	const (
+		token    = "cf-scoped-token-do-not-leak-abcdef123456"
+		liveZone = "acme-live.example.net"
+		pluginID = "cf-rehearsal"
+		// The node is the first label of the FQDN it certifies — the ordering
+		// hazard withACMEDomain documents, rehearsed here rather than asserted
+		// on a synthetic interaction.
+		liveNode = "pve1-dogfood"
+	)
+	liveDomain := liveNode + "." + liveZone
+
+	mock := mockpve.New()
+	ts := mock.Serve()
+	defer ts.Close()
+
+	ctx := context.Background()
+	creds := api.TokenCredentials("root@pam!sdk", "unrelated-api-token-secret")
+	cassettePath := filepath.Join(t.TempDir(), "acme-rehearsal")
+
+	scrub := newTopologyScrub(ts.URL, liveNode).withACMEDomain(liveDomain)
+	rec := newRecorder(t, cassettePath, recorder.ModeRecordOnly, http.DefaultTransport, scrub)
+	c, err := proxmox.NewClient(ctx, ts.URL, creds, proxmox.WithHTTPClient(rec.GetDefaultClient()))
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	svc := c.Nodes()
+
+	if err := svc.CreateACMEPlugin(ctx, &nodes.ACMEPluginSpec{
+		ID:   pluginID,
+		Data: nodes.ACMECloudflare{Token: token},
+	}); err != nil {
+		t.Fatalf("CreateACMEPlugin: %v", err)
+	}
+	if _, err := svc.GetACMEPlugin(ctx, pluginID); err != nil {
+		t.Fatalf("GetACMEPlugin: %v", err)
+	}
+	if err := svc.SetNodeConfig(ctx, liveNode, &nodes.NodeConfigUpdate{
+		ACMEDomains: []nodes.ACMEDomain{{Index: 0, Domain: liveDomain, Plugin: pluginID}},
+	}); err != nil {
+		t.Fatalf("SetNodeConfig: %v", err)
+	}
+	if err := rec.Stop(); err != nil {
+		t.Fatalf("flush cassette: %v", err)
+	}
+
+	data, err := os.ReadFile(cassettePath + ".yaml")
+	if err != nil {
+		t.Fatalf("read cassette: %v", err)
+	}
+	for _, leak := range []struct{ what, value string }{
+		{"provider credential", token},
+		{"base64 provider credential", base64.StdEncoding.EncodeToString([]byte("CF_Token=" + token))},
+		{"certified FQDN", liveDomain},
+		{"DNS zone", liveZone},
+		{"node name", liveNode},
+	} {
+		if bytes.Contains(data, []byte(leak.value)) {
+			t.Errorf("SECURITY: %s reached the recorded cassette", leak.what)
+		}
+	}
+	// A cassette with everything stripped would pass the checks above while
+	// being useless, so confirm the interactions are still there and carry the
+	// placeholders the scrub promises.
+	for _, want := range []string{redacted, placeholderACMEDomain, "/cluster/acme/plugins"} {
+		if !bytes.Contains(data, []byte(want)) {
+			t.Errorf("cassette is missing %q — recorded nothing, or scrubbed too much", want)
+		}
 	}
 }

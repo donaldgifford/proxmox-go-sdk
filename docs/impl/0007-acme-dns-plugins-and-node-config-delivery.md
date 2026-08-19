@@ -721,6 +721,24 @@ the Phase-3 PR:
      The flow does not read certificates back, and the note now says a rule
      replacing the PEM wholesale is the prerequisite for adding one.
 
+**Leak-review rehearsal (2026-08-19).** Task 3's leak review is a human read of
+a YAML file, and everything guarding it so far checked hooks against hand-built
+`cassette.Interaction` values. That proves the rules transform structs
+correctly; it does not prove the bytes on disk are clean, and the unscrubbed
+`Response.Status` — which reached sixteen committed cassettes — is what the
+difference costs. `TestRecorderACMEFlowRedaction` now records the live run's
+flow (plugin create carrying a credential → read-back, where PVE returns it
+base64 → node config naming the domain) through the real recorder against
+mockpve, then greps the resulting file for the credential in both forms, the
+FQDN, the parent zone, and the node name, and confirms the interactions and
+placeholders survived. Verified by mutation twice: neutering
+`redactACMEPluginData` leaks the encoded credential, and dropping the domain
+pair publishes the zone even with the node pair still matching its first label —
+which demonstrates the ordering rationale in `withACMEDomain` instead of
+asserting it. Worth noting what the rehearsal cannot cover: the real run's
+provider error text, CA responses, and certificate DER are not in it, so the
+checklist read stays mandatory.
+
 **Certificate payload fidelity (2026-08-19).** The last of the review nits, and
 the reason it was worth taking rather than filing: the mock served a certificate
 that a real consumer would reject. Its fingerprint was the placeholder
