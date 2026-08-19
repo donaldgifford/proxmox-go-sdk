@@ -721,6 +721,22 @@ the Phase-3 PR:
      The flow does not read certificates back, and the note now says a rule
      replacing the PEM wholesale is the prerequisite for adding one.
 
+**Certificate payload fidelity (2026-08-19).** The last of the review nits, and
+the reason it was worth taking rather than filing: the mock served a certificate
+that a real consumer would reject. Its fingerprint was the placeholder
+`AA:BB:CC`, where PVE's schema declares 32 colon-separated hex octets — anyone
+validating the format would pass against a live node and fail against the mock,
+which is the wrong way round for a test double. And `notbefore`,
+`public-key-type`, and `public-key-bits` were never populated although the SDK
+models all three and real PVE returns them, so those decode paths, and any
+consumer branching on them, were exercised by nothing. The mock now emits a
+SHA-256 fingerprint derived from the certificate's own identity (stable across
+runs, so no fixture churns) and fills the three fields for all three install
+paths — seeded, uploaded, ACME-issued. `TestCertificateFieldsMatchAPIDoc` pins
+it, verified by reverting the change and watching it fail. Note that
+`certPayload` is converted from `nodeCertRecord` directly, so the two structs
+must keep identical layouts; the comment on `certPayload` says so.
+
 #### Tasks
 
 - [ ] 1. Environment prep: the shared domain's zone on Cloudflare DNS with a

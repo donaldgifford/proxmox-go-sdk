@@ -2,6 +2,7 @@ package nodes_test
 
 import (
 	"context"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -361,6 +362,65 @@ func TestACMECertTasksAreDistinct(t *testing.T) {
 		seen[ref.UPID] = true
 		if _, err := ts.Wait(ctx, ref); err != nil {
 			t.Errorf("Wait(%s): %v", ref.UPID, err)
+		}
+	}
+}
+
+// apidocFingerprint is the pattern PVE's schema declares for a certificate
+// fingerprint: 32 colon-separated hex octets (a SHA-256 digest).
+var apidocFingerprint = regexp.MustCompile(`^([A-Fa-f0-9]{2}:){31}[A-Fa-f0-9]{2}$`)
+
+// TestCertificateFieldsMatchAPIDoc checks the mock serves certificates shaped
+// like the ones a real node serves, for all three ways one is installed. The
+// SDK models notbefore/public-key-type/public-key-bits, so a mock that omitted
+// them left those decode paths — and any consumer branching on them — untested,
+// and a placeholder fingerprint would fail a consumer that validates the format.
+func TestCertificateFieldsMatchAPIDoc(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	mock.AddNodeCertificate(testNode, "pve-ssl.pem") // seeded
+	mock.SetNodeConfigKey(testNode, "acmedomain0", "pve.acme.example,plugin=cf")
+	svc, ts := newServiceAndTasks(t, mock)
+	ctx := context.Background()
+
+	if _, err := svc.UploadCustomCertificate(ctx, testNode, &nodes.CustomCertificateSpec{
+		Certificates: "-----BEGIN CERTIFICATE-----\nmock\n-----END CERTIFICATE-----\n",
+	}); err != nil {
+		t.Fatalf("UploadCustomCertificate: %v", err)
+	}
+	assertCertificateFields(ctx, t, svc, "uploaded")
+
+	ref, err := svc.OrderNodeCertificate(ctx, testNode)
+	if err != nil {
+		t.Fatalf("OrderNodeCertificate: %v", err)
+	}
+	if _, err := ts.Wait(ctx, ref); err != nil {
+		t.Fatalf("Wait(order): %v", err)
+	}
+	assertCertificateFields(ctx, t, svc, "ACME-issued")
+}
+
+func assertCertificateFields(ctx context.Context, t *testing.T, svc *nodes.Service, stage string) {
+	t.Helper()
+	certs, err := svc.GetNodeCertificates(ctx, testNode)
+	if err != nil {
+		t.Fatalf("GetNodeCertificates(%s): %v", stage, err)
+	}
+	if len(certs) == 0 {
+		t.Fatalf("GetNodeCertificates(%s) returned nothing", stage)
+	}
+	for i := range certs {
+		c := &certs[i]
+		if !apidocFingerprint.MatchString(c.Fingerprint) {
+			t.Errorf("%s %s: fingerprint %q does not match PVE's declared pattern",
+				stage, c.Filename, c.Fingerprint)
+		}
+		if c.NotBefore == 0 || c.NotAfter <= c.NotBefore {
+			t.Errorf("%s %s: validity %d..%d, want a real window", stage, c.Filename, c.NotBefore, c.NotAfter)
+		}
+		if c.PublicKeyType == "" || c.PublicKeyBits == 0 {
+			t.Errorf("%s %s: public key %q/%d, want both populated",
+				stage, c.Filename, c.PublicKeyType, c.PublicKeyBits)
 		}
 	}
 }

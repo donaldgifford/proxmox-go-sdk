@@ -1,6 +1,8 @@
 package mockpve
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -48,13 +50,16 @@ type nodeDiskRecord struct {
 
 // nodeCertRecord is one node certificate in the mock.
 type nodeCertRecord struct {
-	Filename    string
-	Fingerprint string
-	Subject     string
-	Issuer      string
-	NotAfter    int64
-	SAN         []string
-	PEM         string
+	Filename      string
+	Fingerprint   string
+	Subject       string
+	Issuer        string
+	NotBefore     int64
+	NotAfter      int64
+	SAN           []string
+	PEM           string
+	PublicKeyType string
+	PublicKeyBits int
 }
 
 // acmeAccountRecord is one registered ACME account (cluster-scoped).
@@ -119,14 +124,19 @@ type smartPayload struct {
 	Attributes []smartAttrPayload `json:"attributes,omitempty"`
 }
 
+// certPayload mirrors nodeCertRecord field for field — certRecordsToPayload
+// converts between them directly, so the two must stay in the same order.
 type certPayload struct {
-	Filename    string   `json:"filename"`
-	Fingerprint string   `json:"fingerprint,omitempty"`
-	Subject     string   `json:"subject,omitempty"`
-	Issuer      string   `json:"issuer,omitempty"`
-	NotAfter    int64    `json:"notafter,omitempty"`
-	SAN         []string `json:"san,omitempty"`
-	PEM         string   `json:"pem,omitempty"`
+	Filename      string   `json:"filename"`
+	Fingerprint   string   `json:"fingerprint,omitempty"`
+	Subject       string   `json:"subject,omitempty"`
+	Issuer        string   `json:"issuer,omitempty"`
+	NotBefore     int64    `json:"notbefore,omitempty"`
+	NotAfter      int64    `json:"notafter,omitempty"`
+	SAN           []string `json:"san,omitempty"`
+	PEM           string   `json:"pem,omitempty"`
+	PublicKeyType string   `json:"public-key-type,omitempty"`
+	PublicKeyBits int      `json:"public-key-bits,omitempty"`
 }
 
 type acmeAccountPayload struct {
@@ -213,8 +223,10 @@ func (s *Server) AddNodeCertificate(node, filename string) {
 	defer s.st.mu.Unlock()
 	n := s.ensureNodeLocked(node)
 	n.certs = append(n.certs, nodeCertRecord{
-		Filename: filename, Fingerprint: "AA:BB:CC", Subject: "CN=" + node,
-		Issuer: "CN=" + node, NotAfter: 4102444800, SAN: []string{node},
+		Filename: filename, Fingerprint: mockFingerprint(node + "/" + filename),
+		Subject: "CN=" + node, Issuer: "CN=" + node,
+		NotBefore: mockCertNotBefore, NotAfter: mockCertNotAfter, SAN: []string{node},
+		PublicKeyType: "rsa", PublicKeyBits: 2048,
 	})
 }
 
@@ -432,8 +444,10 @@ func (s *Server) handleCertUpload(w http.ResponseWriter, r *http.Request) {
 	// upload overwrites the first rather than adding a row to the certificate
 	// listing. Appending let the mock report a state the node cannot be in.
 	n.certs = append(withoutFrontendCert(n.certs), nodeCertRecord{
-		Filename: acmeCertFilename, Subject: "CN=custom", Issuer: "CN=custom",
-		NotAfter: 4102444800, PEM: r.PostForm.Get("certificates"),
+		Filename: acmeCertFilename, Fingerprint: mockFingerprint("custom/" + node),
+		Subject: "CN=custom", Issuer: "CN=custom",
+		NotBefore: mockCertNotBefore, NotAfter: mockCertNotAfter,
+		PEM: r.PostForm.Get("certificates"), PublicKeyType: "rsa", PublicKeyBits: 2048,
 	})
 	out := certRecordsToPayload(n.certs)
 	s.st.mu.Unlock()
@@ -484,9 +498,10 @@ func (s *Server) handleCertACME(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		if san := acmeSANsLocked(n); len(san) > 0 {
 			n.certs = append(n.certs, nodeCertRecord{
-				Filename: acmeCertFilename, Fingerprint: "AC:AC:AC",
+				Filename: acmeCertFilename, Fingerprint: mockFingerprint(strings.Join(san, ",")),
 				Subject: "CN=" + san[0], Issuer: mockACMEIssuer,
-				NotAfter: 4102444800, SAN: san,
+				NotBefore: mockCertNotBefore, NotAfter: mockCertNotAfter, SAN: san,
+				PublicKeyType: "ecdsa", PublicKeyBits: 256,
 			})
 		}
 	}
@@ -497,6 +512,27 @@ func (s *Server) handleCertACME(w http.ResponseWriter, r *http.Request) {
 	// would otherwise share a UPID and overwrite each other's task record —
 	// leaving a caller polling the order to read the revoke's result.
 	s.writeData(w, s.finishedTask(node, "acmecert", acmeCertVerb(r.Method)))
+}
+
+// Certificate validity for every mock-issued certificate: fixed, because a
+// cassette or an Example that printed a moving date would churn.
+const (
+	mockCertNotBefore = 1735689600 // 2025-01-01T00:00:00Z
+	mockCertNotAfter  = 4102444800 // 2100-01-01T00:00:00Z
+)
+
+// mockFingerprint renders a SHA-256 fingerprint in PVE's shape — 32 colon-
+// separated uppercase hex octets, which is what the apidoc's pattern requires.
+// The old "AA:BB:CC" placeholder would fail a consumer that validates the
+// format, and deriving it from the certificate's own identity keeps it stable
+// across runs so a recorded fixture does not churn.
+func mockFingerprint(seed string) string {
+	sum := sha256.Sum256([]byte(seed))
+	octets := make([]string, 0, len(sum))
+	for _, b := range sum {
+		octets = append(octets, fmt.Sprintf("%02X", b))
+	}
+	return strings.Join(octets, ":")
 }
 
 // acmeCertVerb names the operation an HTTP method performs on the ACME
@@ -533,11 +569,11 @@ const (
 // cluster CA's own pve-ssl.pem is a different file and is left alone.
 func withoutFrontendCert(recs []nodeCertRecord) []nodeCertRecord {
 	out := recs[:0:0]
-	for _, rec := range recs {
-		if rec.Filename == acmeCertFilename {
+	for i := range recs {
+		if recs[i].Filename == acmeCertFilename {
 			continue
 		}
-		out = append(out, rec)
+		out = append(out, recs[i])
 	}
 	return out
 }
@@ -711,8 +747,8 @@ func (s *Server) certsForNodeLocked(node string) []nodeCertRecord {
 
 func certRecordsToPayload(recs []nodeCertRecord) []certPayload {
 	out := make([]certPayload, 0, len(recs))
-	for _, rec := range recs {
-		out = append(out, certPayload(rec))
+	for i := range recs {
+		out = append(out, certPayload(recs[i]))
 	}
 	return out
 }
