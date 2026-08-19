@@ -32,6 +32,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(mockpve)* Give each ACME certificate verb its own task record
 - *(mockpve)* Serve certificates shaped like real PVE
 - *(integration)* Scrub every parent zone, not just the immediate one
+- *(pvelab)* Reject node VMIDs inside the template sub-range
 
 ### Refactor
 
