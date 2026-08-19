@@ -18,6 +18,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(integration)* Scrub the ACME contact and provider source IP
 - *(mockpve)* An ACME order installs a certificate, a revoke removes it
 - *(pvelab)* Optional ACME block, providers as config not code
+- *(pvelab)* Derive handoff file paths from the config
 
 ### Bug Fixes
 
