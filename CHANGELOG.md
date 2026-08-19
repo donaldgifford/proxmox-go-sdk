@@ -52,6 +52,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(claude)* ACME is mock-verified, and the YAML formatter/linter gotcha
 - *(mockpve)* Say what the ACME cert handler does NOT model
 - *(impl-0007)* Record the colliding-UPID fix
+- *(impl-0007)* Record the r740a destructive-test follow-up
 
 ### Testing
 
