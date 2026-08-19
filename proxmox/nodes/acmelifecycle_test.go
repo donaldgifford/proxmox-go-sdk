@@ -175,3 +175,36 @@ func certCoversDomain(certs []nodes.Certificate, domain string) bool {
 	}
 	return false
 }
+
+// TestACMEOrderUsesLegacyDomainList covers the other half of the mock's SAN
+// derivation: PVE's older acme=domains=a;b form, which predates the per-slot
+// acmedomain keys and is still what a node configured through an older UI
+// carries. A consumer inheriting such a node should see the same behaviour from
+// mockpve as from PVE — the order certifies what the config names, whichever
+// form names it.
+func TestACMEOrderUsesLegacyDomainList(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	// Seeded raw, the way a hand-edited or UI-written node config arrives: the
+	// SDK's own writer prefers the slots.
+	mock.SetNodeConfigKey(testNode, "acme", "account=default,domains=first.example;second.example")
+	svc, ts := newServiceAndTasks(t, mock)
+	ctx := context.Background()
+
+	ref, err := svc.OrderNodeCertificate(ctx, testNode)
+	if err != nil {
+		t.Fatalf("OrderNodeCertificate: %v", err)
+	}
+	if _, err := ts.Wait(ctx, ref); err != nil {
+		t.Fatalf("Wait(order): %v", err)
+	}
+	certs, err := svc.GetNodeCertificates(ctx, testNode)
+	if err != nil {
+		t.Fatalf("GetNodeCertificates: %v", err)
+	}
+	for _, domain := range []string{"first.example", "second.example"} {
+		if !certCoversDomain(certs, domain) {
+			t.Errorf("certificate does not cover %s: %+v", domain, certs)
+		}
+	}
+}

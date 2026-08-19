@@ -459,6 +459,13 @@ func (s *Server) handleCertDelete(w http.ResponseWriter, r *http.Request) {
 // revoke takes it away. A mock that answered with a task and changed nothing
 // would let a consumer's ACME automation pass its tests while never checking the
 // thing it exists to check.
+//
+// The failure side is NOT modelled: ordering on a node with no ACME config, or
+// one naming a plugin that does not exist, installs nothing here and still
+// reports OK. Real PVE fails that — but whether it fails the API call or the
+// worker task is unverified (IMPL-0007 Phase 4 exercises the happy path), and
+// guessing would hand consumers an error shape to code against that may not be
+// the real one.
 func (s *Server) handleCertACME(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
