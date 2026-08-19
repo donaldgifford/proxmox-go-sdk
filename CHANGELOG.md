@@ -17,6 +17,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(integration)* Scrub the ACME domain out of recordings automatically
 - *(integration)* Scrub the ACME contact and provider source IP
 - *(mockpve)* An ACME order installs a certificate, a revoke removes it
+- *(pvelab)* Optional ACME block, providers as config not code
 
 ### Bug Fixes
 
