@@ -668,8 +668,17 @@ the Phase-3 PR:
      under `PVE_REPLAY=1`, the same live-only carve-out `TestConsoleRFB` has.
      Replay covers the REST conversation and stops there; without the skip,
      wiring these cassettes into `just test-replay` would fail on a DNS lookup
-     for `pve.acme.example`.)_ wire the cassettes into `just test-replay`;
-     replay green in CI.
+     for `pve.acme.example`. And two identity values now scrub automatically
+     too: the account contact — which the CA account object carries verbatim —
+     and the Namecheap source IP, Donald's own egress address, which a provider
+     error can echo into an order task log. Neither is a credential, so the
+     entropy-based value scrub skips them, and neither derives from the
+     endpoint, so the topology pairs missed them. `apply` now sorts pairs
+     longest-live-value-first, which makes the overlap hazard structural rather
+     than a rule each caller has to follow: a contact ending in the certified
+     domain would otherwise have its tail rewritten by the domain pair and its
+     local part stranded.)_ wire the cassettes into `just test-replay`; replay
+     green in CI.
 - [ ] 4. Namecheap run: switch the domain's nameservers to Namecheap DNS, wait
      out propagation, run `TestACMEDNSNamecheap` with `PVE_RECORD=1` (Namecheap
      API allowlist needs the node's egress IP); confirm the `Namecheap` field

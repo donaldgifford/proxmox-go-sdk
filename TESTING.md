@@ -176,6 +176,8 @@ Every variable:
 | `PVE_TEST_ACME_DISPOSABLE`    | gate     | `1` to allow ordering — DISPOSABLE nodes only (pvelab!)                      |
 | `PVE_SCRUB_EXTRA`             | no       | extra `live=placeholder` recording-scrub pairs (CSV)                         |
 | `PVE_TEST_ACME_DOMAIN`        | —        | also scrubbed automatically when recording (FQDN + parent zone)              |
+| `PVE_TEST_ACME_ACCOUNT_EMAIL` | —        | also scrubbed automatically when recording (CA account object)               |
+| `PVE_TEST_ACME_NC_SOURCE_IP`  | —        | also scrubbed automatically when recording (provider error text)             |
 
 \* one credential pair is required: `PVE_TOKEN_ID`+`PVE_TOKEN_SECRET` (wins when
 both pairs are set) or `PVE_USERNAME`+`PVE_PASSWORD`.
@@ -556,12 +558,15 @@ cassette, open the `.yaml` and confirm:
   blob: `data: Q0ZfVG9rZW49…` is a live provider credential, and base64 is
   precisely the shape that survives a human leak review. Decode anything that
   looks like one (`base64 -d`) if you are unsure,
-- the certified FQDN and its zone read `pve.acme.example` / `acme.example`. The
-  recorder derives those pairs from `PVE_TEST_ACME_DOMAIN` automatically, so
-  this is a check that the scrub fired, not a step you perform — but do run it,
-  because the domain reaches a cassette through more than the obvious node
-  config: the order task's log, the DNS-01 challenge record
-  (`_acme-challenge.<zone>`), and the issued certificate's SAN list,
+- the certified FQDN and its zone read `pve.acme.example` / `acme.example`, the
+  account contact reads `acme@pve.acme.example`, and the Namecheap source IP
+  reads `192.0.2.10`. The recorder derives all four pairs from
+  `PVE_TEST_ACME_DOMAIN`, `PVE_TEST_ACME_ACCOUNT_EMAIL` and
+  `PVE_TEST_ACME_NC_SOURCE_IP` automatically, so this is a check that the scrub
+  fired, not a step you perform — but do run it, because these reach a cassette
+  through more than the obvious node config: the order task's log, the DNS-01
+  challenge record (`_acme-challenge.<zone>`), the issued certificate's SAN
+  list, and the CA account object that an account read returns verbatim,
 - you are comfortable committing the infrastructure details that _are_ captured:
   node names, IP addresses, MAC addresses, storage names, VM configs.
 

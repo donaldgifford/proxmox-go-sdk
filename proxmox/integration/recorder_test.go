@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -196,6 +197,12 @@ const (
 	// not optional cleanup after the fact.
 	placeholderACMEDomain = "pve.acme.example"
 	placeholderACMEZone   = "acme.example"
+	// The account contact and the caller address a DNS provider allowlists are
+	// not credentials — they are identifying data about Donald, low-entropy
+	// enough that the credential scrub skips them by design, and not derived
+	// from the endpoint, so the topology pairs miss them too.
+	placeholderACMEContact  = "acme@pve.acme.example"
+	placeholderACMESourceIP = "192.0.2.10"
 )
 
 // topologyScrub rewrites live topology values to fixed placeholders across a
@@ -251,6 +258,27 @@ func (s topologyScrub) withACMEDomain(domain string) topologyScrub {
 	return s
 }
 
+// withACMEIdentity returns the scrub extended with the ACME account contact
+// address and the source IP a DNS provider allowlists (Namecheap requires one).
+// Both reach a cassette on their own: the contact rides the CA account object
+// that GET /cluster/acme/account/{name} returns verbatim, and the source IP is
+// an ISP-assigned address that can surface in a provider's error text inside an
+// order task log.
+//
+// Neither is caught by the other two mechanisms — they are not high-entropy
+// secrets, so scrubACMECredentialValues skips them, and they are not derived
+// from the endpoint. Call order does not matter: apply sorts longest-first, so
+// a contact ending in the certified domain is rewritten whole.
+func (s topologyScrub) withACMEIdentity(contact, sourceIP string) topologyScrub {
+	if contact = strings.TrimSpace(contact); contact != "" {
+		s.pairs = append(s.pairs, [2]string{contact, placeholderACMEContact})
+	}
+	if sourceIP = strings.TrimSpace(sourceIP); sourceIP != "" {
+		s.pairs = append(s.pairs, [2]string{sourceIP, placeholderACMESourceIP})
+	}
+	return s
+}
+
 // withExtraPairs returns the scrub extended with live=placeholder pairs from a
 // CSV (the PVE_SCRUB_EXTRA shape pvelab writes into .pvelab.env), e.g.
 // "10.0.0.12=192.0.2.11,lab.internal=lab.example". Empty entries are skipped;
@@ -274,11 +302,19 @@ func (s topologyScrub) apply(i *cassette.Interaction) {
 	if len(s.pairs) == 0 {
 		return
 	}
+	// Longest live value first, always. Pairs overlap by nature here — a node
+	// name is a label of the FQDN it certifies, a bare host sits inside
+	// host:port, a contact address ends in the domain — and if the shorter pair
+	// runs first it rewrites part of the longer one, which then matches nothing
+	// and the remainder ships. Sorting makes that structural rather than
+	// something each caller has to arrange by construction.
+	pairs := slices.Clone(s.pairs)
+	slices.SortStableFunc(pairs, func(a, b [2]string) int { return len(b[0]) - len(a[0]) })
 	rep := func(v string) string {
 		if v == "" {
 			return v
 		}
-		for _, p := range s.pairs {
+		for _, p := range pairs {
 			v = strings.ReplaceAll(v, p[0], p[1])
 		}
 		return v
@@ -576,6 +612,43 @@ func TestScrubACMEDomain(t *testing.T) {
 	// An unset env var is a no-op, not an empty-string replacement.
 	if got := (topologyScrub{}).withACMEDomain(""); len(got.pairs) != 0 {
 		t.Errorf("withACMEDomain(\"\") added %d pair(s), want 0", len(got.pairs))
+	}
+}
+
+// TestScrubACMEIdentity covers the two values that are neither credentials nor
+// endpoint-derived: the account contact (returned verbatim inside the CA
+// account object) and the provider's allowlisted source IP (Donald's egress
+// address, which a provider error can echo into an order task log). The contact
+// deliberately ends in the certified domain — the case that proves apply's
+// longest-first ordering, since the domain pair would otherwise rewrite the
+// tail and strand the local part.
+func TestScrubACMEIdentity(t *testing.T) {
+	scrub := newTopologyScrub("https://10.0.0.11:8006", "pve1-dogfood").
+		withACMEDomain("pve1-dogfood.lab.example.com").
+		withACMEIdentity("sdk-tests@lab.example.com", "203.0.113.45")
+
+	i := &cassette.Interaction{
+		Response: cassette.Response{
+			Body: `{"data":{"account":{"contact":["mailto:sdk-tests@lab.example.com"]},` +
+				`"log":"NAMECHEAP_SOURCE_IP 203.0.113.45 not allowlisted"}}`,
+		},
+	}
+	scrub.apply(i)
+
+	for _, leak := range []string{"sdk-tests@lab.example.com", "203.0.113.45", "lab.example.com"} {
+		if strings.Contains(i.Response.Body, leak) {
+			t.Errorf("%q survived scrub: %q", leak, i.Response.Body)
+		}
+	}
+	if !strings.Contains(i.Response.Body, "mailto:"+placeholderACMEContact) {
+		t.Errorf("scrubbed body = %q, want the contact placeholder intact", i.Response.Body)
+	}
+	if !strings.Contains(i.Response.Body, placeholderACMESourceIP) {
+		t.Errorf("scrubbed body = %q, want the source-IP placeholder", i.Response.Body)
+	}
+	// Unset env vars add nothing.
+	if got := (topologyScrub{}).withACMEIdentity("", ""); len(got.pairs) != 0 {
+		t.Errorf("withACMEIdentity(\"\", \"\") added %d pair(s), want 0", len(got.pairs))
 	}
 }
 
