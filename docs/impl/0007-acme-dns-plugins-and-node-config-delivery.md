@@ -672,6 +672,14 @@ the Phase-3 PR:
   they wrote config through `SetNodeConfig`, whose encoder always emits
   `domain=` first — so the happy branch was the only branch exercised.
 
+  A fourth followed from the same review: all three certificate verbs emitted
+  the same synthetic UPID. A mock UPID is (node, type, id, second), and the
+  three shared an id, so an order and the revoke after it collided whenever they
+  ran inside one second — which the lifecycle test does — and the later task
+  overwrote the earlier record, leaving a caller polling the order to read the
+  revoke's result. The verb now rides the id field, which claims nothing about
+  PVE's real worker-type names (the apidoc does not carry them).
+
 - **Redaction audit (2026-08-18), before any capture.** An adversarial pass over
   the whole scrub pipeline — go-vcr's serialized fields against what the hooks
   actually rewrite, plus a grep over the 17 committed cassettes — found one
