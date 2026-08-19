@@ -55,6 +55,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(integration)* Add an ACME preflight and gate ordering on an opt-in
 - *(integration)* The served-cert probe is live-only, so skip it on replay
 - *(nodes)* Mock-verify the ACME DNS call sequence end to end
+- *(integration)* Rehearse the ACME cassette leak review
 
 ## [0.10.0] - 2026-07-26
 
