@@ -217,6 +217,12 @@ func cmdUp(args []string) error {
 	if err := lab.EnsureVMIDsFree(ctx, client, cfg); err != nil {
 		return err
 	}
+	// Before creating anything: the installers can only be answered by the
+	// machine answer_url names, and getting that wrong costs a full readiness
+	// timeout to discover.
+	if err := cfg.CheckAnswerURLLocal(ctx); err != nil {
+		return err
+	}
 	rootPW := os.Getenv(cfg.Nested.RootPasswordEnv) // presence validated at load.
 
 	templateVMID, useClone, err := cloneSource(ctx, client, cfg)

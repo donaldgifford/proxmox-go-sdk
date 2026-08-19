@@ -523,6 +523,20 @@ design. Review cassettes as described below before committing. The composite
 `dogfood` tears the lab down even when the suite fails; run the steps
 individually to keep it alive for debugging.
 
+`up` refuses to start when `nested.answer_url` does not name the machine running
+it, printing both the address the URL resolves to and this machine's own. That
+check exists because the failure it replaces is silent: the answer fetch is the
+only connection the flow initiates _toward_ whoever runs `up`, so pointing it
+elsewhere means every installer POSTs into the void and the run ends fifteen
+minutes later with three identical readiness timeouts and nothing in the log —
+the server that would have logged the request never saw one.
+
+Two ways to satisfy it: run `up` on the host the URL names, or point the URL at
+the machine you run from (any address the lab segment can route to) and re-run
+`pvelab iso`, since the URL is baked into the ISO. Confirm reachability first
+with a throwaway listener — `python3 -m http.server 8442` on your machine,
+`curl -m3 http://<your-ip>:8442` from the outer host.
+
 ### Running pvelab on the outer host
 
 The answer fetch is the only connection the flow initiates _toward_ the machine
