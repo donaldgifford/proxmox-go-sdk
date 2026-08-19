@@ -26,6 +26,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(integration)* Restore the TestVersionRoundTrip cassette
 - *(nodes)* UpdateACMEAccount returns the task it was discarding
 - *(integration)* Scrub the HTTP reason phrase, and guard the field list
+- *(mockpve)* Read acmedomain the way PVE does, and keep one front-end cert
 
 ### Refactor
 
