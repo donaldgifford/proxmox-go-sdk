@@ -34,6 +34,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(mockpve)* Serve certificates shaped like real PVE
 - *(integration)* Scrub every parent zone, not just the immediate one
 - *(pvelab)* Reject node VMIDs inside the template sub-range
+- *(integration)* Treat PVE's 400 as a missing ACME account
 
 ### Refactor
 
