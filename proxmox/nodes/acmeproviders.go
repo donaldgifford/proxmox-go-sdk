@@ -85,9 +85,13 @@ func (ACMECloudflare) String() string { return "nodes.ACMECloudflare{<redacted>}
 // the caller by API key AND by source IP, which must be allowlisted in the
 // Namecheap account, so SourceIP is the address PVE will call out from.
 //
-// Field names follow acme.sh's documented dnsapi variables. This mapping is
-// unit-verified only — it has not yet been exercised against a live Namecheap
-// zone (IMPL-0007 Phase 4); [ACMECloudflare] is the live-verified provider.
+// Field names are read off acme.sh's dns_namecheap.sh, the script PVE actually
+// runs, so they are not guesses — but they have never been exercised against a
+// live Namecheap zone: that run was descoped from IMPL-0007 (it needs the shared
+// domain's nameservers moved to Namecheap and the node's egress IP allowlisted).
+// [ACMECloudflare] is the live-verified provider. If a Namecheap challenge
+// fails, check the field names against the node's own answer first —
+// [Service.GetACMEChallengeSchema] publishes what the installed acme.sh expects.
 type ACMENamecheap struct {
 	Username string // NAMECHEAP_USERNAME — API username.
 	APIKey   string // NAMECHEAP_API_KEY — API key.

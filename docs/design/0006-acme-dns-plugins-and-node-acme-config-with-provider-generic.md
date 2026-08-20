@@ -401,6 +401,14 @@ here is 9.0 baseline).
    that run lands, Namecheap is unit-verified only and its doc comment says so
    (the honesty rule).
 
+   **Amended 2026-08-20: step 3 was descoped** (IMPL-0007 Phase 4 task 4). The
+   nameserver switch would take the now-verified Cloudflare path offline for
+   hours to prove a second provider, and what it was evidence for — that
+   `ACMEPluginData` is provider-generic — is carried by the interface shape and
+   by `RawPluginData` reaching all ~160 providers with no Go code. Namecheap
+   stays unit-verified with its caveat in place, which is exactly where step 3
+   said it would sit until a run lands. No run is scheduled.
+
 ## Open Questions
 
 1. **Where does the ACME surface live?** **Decision (2026-08-17): a.**

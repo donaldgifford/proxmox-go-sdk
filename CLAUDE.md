@@ -736,16 +736,22 @@ environment.** This shapes how we test and what "done" means:
   (both 2026-07-12, IMPL-0002 Phase 3), and the INV-0004 remediation wave
   (2026-07-23, IMPL-0004/0005 Phase 3): the HA arm/disarm cycle, blocked migrate
   with cause `resource-affinity`, HA/SDN status reads, and the OpenFabric fabric
-  lifecycle with FRR convergence. **Everything that shipped through IMPL-0006 is
-  live-verified.** The one exception is the newest surface: the **IMPL-0007 ACME
-  plugin/node-config ops are mock-verified only** until that ledger's Phase 4
-  runs (it needs a domain, DNS-provider credentials, and a disposable node — an
-  ACME order replaces the node's pveproxy certificate, so it never targets
-  r740a). Its task-vs-sync shapes are settled from the 9.2 apidoc, not guessed;
-  what is unobserved is live issuance. Volume-chain snapshots are **not** a gap
-  — confirmed via `r740a`'s own `apidoc.js` that PVE has no storage-level
-  snapshot endpoint, so they were honestly reclassified to
-  `pverr.ErrUnsupported`.
+  lifecycle with FRR convergence. **Everything the SDK ships is live-verified**,
+  IMPL-0007's ACME surface included: the DNS-01 flow ran end to end on a rebuilt
+  pvelab cluster (2026-08-19) — staging account → cf plugin → `acmedomain0` →
+  order → served-certificate check → revoke → teardown, cassette committed and
+  replaying in CI. Never point that run at r740a: an ACME order **replaces the
+  node's pveproxy certificate**, which is why the ordering tests carry a second
+  `PVE_TEST_ACME_DISPOSABLE=1` gate and the ACME env vars live in the lab's env
+  file, never the repo-root `.env`. Two ACME leftovers are stated where they
+  live rather than fixed: `RenewNodeCertificate`/`UpdateACMEAccount` are
+  schema-settled but unobserved (the run ordered and revoked, never renewed or
+  updated), and **Namecheap was descoped** from IMPL-0007 — its field names come
+  from upstream acme.sh, `TestACMEDNSNamecheap` has no cassette, and proving it
+  would mean moving the shared domain's nameservers off the working Cloudflare
+  path for hours. Volume-chain snapshots are **not** a gap — confirmed via
+  `r740a`'s own `apidoc.js` that PVE has no storage-level snapshot endpoint, so
+  they were honestly reclassified to `pverr.ErrUnsupported`.
 - **Task exit status `WARNINGS: N` is success, not failure.** PVE finishes some
   tasks (routinely an LXC create on a modern-systemd template — e.g. debian-13's
   "Systemd 257 detected. You may need to enable nesting.") with exit status

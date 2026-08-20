@@ -1,7 +1,7 @@
 ---
 id: IMPL-0007
 title: "ACME DNS plugins and node config delivery"
-status: In Progress
+status: Completed
 author: Donald Gifford
 created: 2026-08-17
 ---
@@ -10,8 +10,9 @@ created: 2026-08-17
 
 # IMPL 0007: ACME DNS plugins and node config delivery
 
-**Status:** In Progress **Author:** Donald Gifford **Date:** 2026-08-17 (OQs
-decided 2026-08-17: all a)
+**Status:** Completed **Author:** Donald Gifford **Date:** 2026-08-17 (OQs
+decided 2026-08-17: all a; closed 2026-08-20 — Phase 4 verified live on the
+pvelab nested cluster, Namecheap descoped)
 
 <!--toc:start-->
 
@@ -36,6 +37,7 @@ decided 2026-08-17: all a)
 - [File Changes](#file-changes)
 - [Testing Plan](#testing-plan)
 - [Dependencies](#dependencies)
+- [Follow-up: move the destructive integration tests off r740a](#follow-up-move-the-destructive-integration-tests-off-r740a)
 - [Open Questions](#open-questions)
 - [References](#references)
 <!--toc:end-->
@@ -80,7 +82,12 @@ shared domain for both providers, sequential nameserver switch).
 - Any non-ACME typed fields on node config (`wakeonlan` etc. ride in `Extra`).
 - The deprecated `/cluster/acme/tos` endpoint (no SDK surface, per the design;
   its coverage-report handling is OQ-2 here).
-- ACME account op changes (Phase 6 surface, untouched).
+- ACME account op changes (Phase 6 surface, untouched — except the
+  `UpdateACMEAccount` return-shape fix the Phase-4 schema audit forced).
+- **A live Namecheap issuance** (descoped 2026-08-20, Phase 4 task 4). The typed
+  struct, its unit tests and its env-gated harness all ship; what does not ship
+  is evidence from a node. Reopening it costs a nameserver switch on the shared
+  domain plus a propagation wait.
 
 ## Ground facts
 
@@ -875,28 +882,62 @@ must keep identical layouts; the comment on `certPayload` says so.
      it; a `proxmox.WithTaskWaitPolicy` mirroring `WithRetry` would cut that to
      seconds, and belongs in its own PR rather than as an unrelated addition to
      a labelled one.
-- [ ] 4. Namecheap run: switch the domain's nameservers to Namecheap DNS, wait
-     out propagation, run `TestACMEDNSNamecheap` with `PVE_RECORD=1` (Namecheap
-     API allowlist needs the node's egress IP); confirm the `Namecheap` field
-     names live; leak-review + commit + replay as above. Drop the "unit-verified
-     only" caveat from the Namecheap doc comment.
-- [ ] 5. Caveat closure: update the Phase-6 order/renew/revoke REST-with-caveat
+- [x] ~~4. Namecheap run: switch the domain's nameservers to Namecheap DNS, wait
+      out propagation, run `TestACMEDNSNamecheap` with `PVE_RECORD=1`.~~
+      **Descoped from IMPL-0007 on 2026-08-20** (Donald: "defer namecheap we
+      wont do it as part of this impl"). The cost is a nameserver switch on the
+      shared domain plus a propagation wait, and the domain is currently pointed
+      at Cloudflare and working — moving it to prove a second provider would
+      take the verified path offline for hours. What the run was for was never
+      the provider: it was evidence that `ACMEPluginData` is provider-generic
+      rather than Cloudflare-shaped. That claim rests instead on the shape of
+      the interface — `API()` + `Data()`, no Cloudflare-specific branch anywhere
+      in `encodePluginData` — and on `ACMERawPluginData`, which reaches all ~160
+      acme.sh providers with no Go code at all. `pvelab`'s `acme.credentials`
+      map is the same argument from the other side: adding a provider there is
+      config only. What is genuinely NOT proven is that the `ACMENamecheap`
+      field names match what the installed acme.sh reads; they are taken from
+      upstream's `dns_namecheap.sh` rather than from a node, and the doc comment
+      now says so and points at `GetACMEChallengeSchema`. `TestACMEDNSNamecheap`
+      stays in the tree as a prepared harness with no cassette.
+- [x] 5. Caveat closure: update the Phase-6 order/renew/revoke REST-with-caveat
      comments with the observed task-vs-sync behaviour; record the run in
      `certification.yaml`; tick this ledger; flip IMPL-0007 status → Completed
      (docs ride a `dont-release` PR or the next release PR). _(The schema half
-     is done — see the third phase note above: all three cert ops are tasks, the
-     caveat comments now say so from the schema, and the audit found
-     `UpdateACMEAccount` discarding a UPID. The tick still waits on the observed
-     behaviour from a live run.)_
+     was done earlier — see the third phase note above: all three cert ops are
+     tasks, and the audit found `UpdateACMEAccount` discarding a UPID.)_ **Done
+     2026-08-20.** The comments now carry what the node did, not what the schema
+     promised: `RegisterACMEAccount` → `acmeregister`, `OrderNodeCertificate` →
+     `acmenewcert`, `RevokeNodeCertificate` → `acmerevoke`, all exit status
+     `OK`, and plugin CRUD + the node config PUT answered `null` synchronously
+     as declared. The useful finding is timing, not shape: the order took ~80s
+     across thirteen status polls (acme.sh writes the challenge record, then
+     waits for the CA to resolve it) while the revoke finished in seconds — so
+     `OrderNodeCertificate` is documented as needing a deadline sized for DNS
+     propagation, since a ctx budgeted for a config write will cancel it. Two
+     verbs stay schema-only and say so in place: `RenewNodeCertificate` (a
+     renewal wants a certificate old enough to be worth renewing) and
+     `UpdateACMEAccount` (the run registered but never updated) — the latter
+     keeps its "if a node answers null, make the read tolerant" note, which is
+     the hedge the phase deliberately did not add without evidence.
 
 #### Success Criteria
 
-- Both provider runs issue (staging), verify, and revoke live; cassettes
-  committed, leak-reviewed, and replaying green in CI.
-- The typed provider field names are live-confirmed against
-  `GetChallengeSchema`; no REST-with-caveat remains anywhere on the ACME surface
-  (including the Phase-6 order/renew/revoke task-vs-sync note).
-- Zero credential or topology leaks in the committed cassettes.
+- ~~Both provider runs~~ **The Cloudflare run** issues (staging), verifies, and
+  revokes live; its cassette is committed, leak-reviewed, and replaying green in
+  CI. **Met 2026-08-19.** Amended 2026-08-20 when Namecheap was descoped
+  (task 4) — a criterion the ledger will not execute is not a criterion, and
+  leaving it worded for two providers would have made a closed phase read as
+  failed.
+- The typed provider field names are live-confirmed for **Cloudflare** (by
+  issuance, which is stronger evidence than a schema comparison — DNS-01 only
+  validates if acme.sh recognised the names PVE handed it). The Namecheap names
+  remain upstream-sourced and unobserved, stated as such on the type. No
+  REST-with-caveat remains anywhere on the ACME surface: order/revoke/register
+  are live-observed, renew and account-update are documented as schema-settled
+  with the specific symptom to watch for.
+- Zero credential or topology leaks in the committed cassettes. **Met
+  2026-08-19** — see task 3.
 
 ---
 

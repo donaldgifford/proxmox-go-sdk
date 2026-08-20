@@ -67,11 +67,16 @@ func TestACMEDNSCloudflare(t *testing.T) {
 }
 
 // TestACMEDNSNamecheap is the same flow through the second provider, which is
-// what proves the ACMEPluginData model is genuinely provider-generic rather than
-// Cloudflare-shaped. It runs against the SAME domain as the Cloudflare test, so
-// the two are sequential by nature: the domain's nameservers must point at the
-// provider under test (IMPL-0007 Phase 4 task 4 covers the switch and the
-// propagation wait).
+// what would prove the ACMEPluginData model is genuinely provider-generic rather
+// than Cloudflare-shaped. It runs against the SAME domain as the Cloudflare
+// test, so the two are sequential by nature: the domain's nameservers must point
+// at the provider under test.
+//
+// It has never been run. IMPL-0007 descoped the Namecheap run rather than hold
+// the ledger open for a nameserver switch and a propagation wait, so this test
+// is a prepared harness, not a verified one — there is no cassette and CI cannot
+// replay it. Whoever runs it first should expect to find something, and should
+// leak-review and commit the cassette the way TestACMEDNSCloudflare's was.
 func TestACMEDNSNamecheap(t *testing.T) {
 	username, apiKey := os.Getenv(envACMENCUsername), os.Getenv(envACMENCAPIKey)
 	if username == "" || apiKey == "" {

@@ -359,7 +359,10 @@ What you need before the first run:
 3. **For the Namecheap run**: API access enabled on the account, plus the
    caller's public address allowlisted — Namecheap authenticates by API key AND
    source IP, so `PVE_TEST_ACME_NC_SOURCE_IP` is the address _PVE_ calls out
-   from, not your workstation's.
+   from, not your workstation's. **Nobody has run this one yet** (IMPL-0007
+   descoped it), so treat it as a harness rather than a regression test: there
+   is no cassette, CI does not replay it, and the `ACMENamecheap` field names
+   come from upstream acme.sh rather than from a node.
 
 ```sh
 # Cloudflare — needs: PVE_TEST_ACME_DOMAIN, PVE_TEST_ACME_CF_TOKEN
@@ -371,7 +374,8 @@ domain: a zone has exactly one set of authoritative nameservers, so proving
 DNS-01 through Namecheap means pointing the domain's nameservers at Namecheap
 first and waiting for that delegation to propagate (registrar NS changes are
 slow — allow hours, and confirm with `dig +trace NS your.domain` before
-starting). Then:
+starting). That switch takes the verified Cloudflare path offline while it
+lasts, which is why IMPL-0007 stopped after the first provider. Then:
 
 ```sh
 # Namecheap — after the nameserver switch has propagated
