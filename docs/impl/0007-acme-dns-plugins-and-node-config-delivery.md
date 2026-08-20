@@ -745,6 +745,31 @@ sharing the TLD is left alone. `TestScrubACMEDomainDeepZone` pins both halves,
 verified by reverting to the single-parent form and watching the registrable
 domain survive.
 
+**pvelab re-verified on a rebuilt outer host (2026-08-19).** The outer host was
+reinstalled between IMPL-0002's acceptance and this ledger's Phase 4, so the lab
+was rebuilt from nothing: token, ISO, prepared installer ISO, no template. `up`
+reached quorate(3) in **4m42s** (answers served 43s after VM start, all three
+nodes ready at ~4m, cluster formed 34s later) — comparable to the 2026-07-12
+acceptance. That run also exercised two things landed the same day: the
+per-config handoff naming (it wrote `.pvelab-acme.env` /
+`.pvelab-acme-state.json`, leaving the plain lab's files alone) and the
+`PVE_SCRUB_EXTRA` derivation, which matched a hand-derivation done from the code
+beforehand.
+
+The failure that preceded it is the useful part. `nested.answer_url` named the
+OUTER host while `up` ran on a workstation, so all three installers POSTed into
+the void; the symptom was fifteen minutes of silence followed by three identical
+readiness timeouts, with nothing in the log, because the server that would have
+logged the requests never saw one. The answer fetch is the only connection the
+flow initiates _toward_ whoever runs `up`, and the URL is baked into the ISO —
+so `up` now resolves it at startup and refuses when it is not an address of the
+running machine, naming both sides and both fixes. Loopback gets its own
+message. What is NOT explained: the same config values are reported to have
+worked from the workstation before, and the workstation has never held that
+address — either the posture was on-host (what IMPL-0002 recorded) or the URL
+held a different value then. No evidence survives either way, and the guard
+makes the question moot.
+
 **Leak-review rehearsal (2026-08-19).** Task 3's leak review is a human read of
 a YAML file, and everything guarding it so far checked hooks against hand-built
 `cassette.Interaction` values. That proves the rules transform structs
