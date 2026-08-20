@@ -18,6 +18,8 @@ const StateSchemaVersion = 1
 // The two git-ignored files `up` writes in the working directory
 // (DESIGN-0002): what was created, and the inner suite's environment.
 const (
+	// Defaults only — Config.StatePath/EnvPath are what the commands use, so
+	// a second config gets its own pair rather than overwriting these.
 	DefaultStatePath = ".pvelab-state.json"
 	DefaultEnvPath   = ".pvelab.env"
 )

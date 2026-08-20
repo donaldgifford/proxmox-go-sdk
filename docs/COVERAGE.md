@@ -2,7 +2,7 @@
 
 # Proxmox VE API coverage
 
-The SDK reaches **248 of 675 endpoints (36.7%)** in the Proxmox VE 9.2 REST API.
+The SDK reaches **258 of 675 endpoints (38.2%)** in the Proxmox VE 9.2 REST API.
 
 The percentage is **not a target**. It is measured against the *entire* REST
 API, including surfaces no SDK consumer has asked for; driving it up for its own
@@ -13,7 +13,7 @@ use the per-service tables to find whether a specific endpoint is reachable.
 |---|---|
 | Measured against | Proxmox VE 9.2 (`apidoc.js from r740a (INV-0004)`, captured 2026-07-19) |
 | Denominator | 675 endpoints in `cmd/pve-schemadiff/testdata/baseline.json` |
-| Numerator | 248 distinct `mockpve` routes (248 matched a real endpoint) |
+| Numerator | 258 distinct `mockpve` routes (258 matched a real endpoint) |
 | Regenerate | `just coverage` |
 
 A **covered** endpoint has a `mockpve` route, which by this repo's discipline of
@@ -34,7 +34,7 @@ nobody has triaged yet.
 | ha | 21 | 0 | 0 | 12 | 33 | 63.6% |
 | lxc | 35 | 0 | 0 | 27 | 62 | 56.5% |
 | metrics | 7 | 0 | 0 | 5 | 12 | 58.3% |
-| nodes | 21 | 0 | 0 | 59 | 80 | 26.2% |
+| nodes | 31 | 0 | 1 | 48 | 80 | 38.8% |
 | pbs | 6 | 0 | 0 | 5 | 11 | 54.5% |
 | qemu | 42 | 0 | 0 | 62 | 104 | 40.4% |
 | sdn | 34 | 0 | 0 | 56 | 90 | 37.8% |
@@ -42,7 +42,7 @@ nobody has triaged yet.
 | tasks | 2 | 0 | 0 | 4 | 6 | 33.3% |
 | version | 1 | 0 | 0 | 0 | 1 | 100.0% |
 | unassigned | 0 | 0 | 0 | 67 | 67 | 0.0% |
-| **total** | **248** | **0** | **0** | **427** | **675** | **36.7%** |
+| **total** | **258** | **0** | **1** | **416** | **675** | **38.2%** |
 
 ## Covered outside REST
 
@@ -376,7 +376,7 @@ side channel, so they appear in no table below.
 
 ### nodes
 
-21 of 80 covered (26.2%)
+31 of 80 covered (38.8%)
 
 | Method | Path | State | Note |
 |---|---|---|---|
@@ -386,15 +386,15 @@ side channel, so they appear in no table below.
 | DELETE | `/cluster/acme/account/{}` | covered |  |
 | GET | `/cluster/acme/account/{}` | covered |  |
 | PUT | `/cluster/acme/account/{}` | covered |  |
-| GET | `/cluster/acme/challenge-schema` | gap |  |
-| GET | `/cluster/acme/directories` | gap |  |
-| GET | `/cluster/acme/meta` | gap |  |
-| GET | `/cluster/acme/plugins` | gap |  |
-| POST | `/cluster/acme/plugins` | gap |  |
-| DELETE | `/cluster/acme/plugins/{}` | gap |  |
-| GET | `/cluster/acme/plugins/{}` | gap |  |
-| PUT | `/cluster/acme/plugins/{}` | gap |  |
-| GET | `/cluster/acme/tos` | gap |  |
+| GET | `/cluster/acme/challenge-schema` | covered |  |
+| GET | `/cluster/acme/directories` | covered |  |
+| GET | `/cluster/acme/meta` | covered |  |
+| GET | `/cluster/acme/plugins` | covered |  |
+| POST | `/cluster/acme/plugins` | covered |  |
+| DELETE | `/cluster/acme/plugins/{}` | covered |  |
+| GET | `/cluster/acme/plugins/{}` | covered |  |
+| PUT | `/cluster/acme/plugins/{}` | covered |  |
+| GET | `/cluster/acme/tos` | out of scope | Deprecated upstream in favour of /cluster/acme/meta, which the SDK wraps as GetACMEMeta. (DESIGN-0006) |
 | GET | `/nodes` | gap |  |
 | GET | `/nodes/{}` | gap |  |
 | GET | `/nodes/{}/apt` | gap |  |
@@ -419,8 +419,8 @@ side channel, so they appear in no table below.
 | DELETE | `/nodes/{}/certificates/custom` | covered |  |
 | POST | `/nodes/{}/certificates/custom` | covered |  |
 | GET | `/nodes/{}/certificates/info` | covered |  |
-| GET | `/nodes/{}/config` | gap |  |
-| PUT | `/nodes/{}/config` | gap |  |
+| GET | `/nodes/{}/config` | covered |  |
+| PUT | `/nodes/{}/config` | covered |  |
 | GET | `/nodes/{}/dns` | gap |  |
 | PUT | `/nodes/{}/dns` | gap |  |
 | POST | `/nodes/{}/execute` | gap |  |

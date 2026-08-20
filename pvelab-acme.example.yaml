@@ -1,19 +1,29 @@
 ---
-# pvelab example config (IMPL-0002 / DESIGN-0002). Copy to pvelab.yaml
-# (git-ignored) and fill in your site's values.
+# pvelab-acme.example.yaml — the ACME-DNS variant of pvelab.example.yaml.
+#
+# Copy to pvelab-acme.yaml (git-ignored) and fill in your site. This is the
+# SAME lab as pvelab.example.yaml plus the nested.acme block, deliberately kept
+# as a second file rather than a flag: a failed run tells you which half broke
+# only if the two halves are configured separately. Provision the plain config
+# first — if that cluster forms and this one does not, the certificate path is
+# the difference.
+#
+# DNS is a prerequisite this file cannot check. Every node needs an A record at
+# <name>.<domain> before `up` runs, and the configured credentials must be able
+# to edit that zone: PVE proves control by writing a TXT record under
+# _acme-challenge.<fqdn>.
 #
 # SECRETS ARE NEVER VALUES IN THIS FILE: every *_env key names an environment
 # variable pvelab resolves at runtime, and config load fails fast if any named
-# variable is unset. Site topology (real domain, IPs) belongs only in your
-# local copy.
+# variable is unset. Keep them in .pvelab.env (0600, git-ignored).
 
 # Handoff files `up` writes and `down` removes. Both default to this config's
 # own basename — pvelab.yaml gives .pvelab.env and .pvelab-state.json,
 # pvelab-acme.yaml gives .pvelab-acme.env and .pvelab-acme-state.json — so two
 # labs never overwrite each other's answer to "what is currently up?". Set
 # either explicitly to override.
-# env_path: .pvelab.env
-# state_path: .pvelab-state.json
+# env_path: .pvelab-acme.env
+# state_path: .pvelab-acme-state.json
 
 outer:
   # The physical PVE host the lab runs on.
@@ -56,6 +66,34 @@ nested:
   # template:
   #   vmid: 9210
   #   cidr: 192.0.2.210/24
+  # ACME certificates for every node, after the cluster forms. Omit this whole
+  # block to get pvelab.example.yaml's behaviour (self-signed, no CA contact).
+  acme:
+    # staging (default) or production. Staging certificates are untrusted —
+    # fine for exercising the flow, and it keeps a re-provisioning loop away
+    # from production's 50-certificates-per-week-per-domain limit. Use
+    # production only for a lab you intend to keep.
+    directory: staging
+    # PVE account name; defaults to pvelab-<directory>. An account is
+    # registered against ONE CA, so staging and production must not share one.
+    # account: pvelab-staging
+    contact: sdk-tests@lab.example
+    # dns-01 is the only kind that works here: standalone (http-01) needs the
+    # CA to reach the node on port 80, and these nodes are on private addresses.
+    challenge: dns-01
+    # provider is acme.sh's plugin name — whatever PVE's api parameter accepts
+    # ("cf", "namecheap", "route53", ... 160 of them on 9.2). credentials maps
+    # that plugin's acme.sh variable names to the env vars holding their values,
+    # so a different provider is a config change and no Go code at all. Ask the
+    # node for a plugin's field names rather than guessing:
+    #   pvelab env    # then: GetACMEChallengeSchema
+    provider: cf
+    credentials:
+      CF_Token: PVELAB_ACME_CF_TOKEN
+      CF_Account_ID: PVELAB_ACME_CF_ACCOUNT_ID
+      # PVE plugin id created on the nested cluster; defaults to
+      # pvelab-<provider>.
+      # plugin_id: pvelab-cf
   nodes:  # >=3 for quorum; VMIDs must sit in the reserved 9200-9399 block
     - {name: pve1-dogfood, vmid: 9201, cidr: 192.0.2.201/24}
     - {name: pve2-dogfood, vmid: 9202, cidr: 192.0.2.202/24}

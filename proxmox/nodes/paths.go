@@ -36,3 +36,22 @@ func acmeAccountsPath() string { return "/cluster/acme/account" }
 func acmeAccountPath(name string) string {
 	return acmeAccountsPath() + "/" + url.PathEscape(name)
 }
+
+// Node configuration. It carries the node's ACME wiring (the acme and
+// acmedomain[n] property strings) alongside unrelated node settings.
+
+func nodeConfigPath(node string) string { return "/nodes/" + node + "/config" }
+
+// Cluster-scoped ACME challenge plugins and the discovery reads. PVE also
+// serves /cluster/acme/tos, deprecated upstream in favour of .../meta — the SDK
+// offers no surface for it (DESIGN-0006).
+
+func acmePluginsPath() string { return "/cluster/acme/plugins" }
+
+func acmePluginPath(id string) string {
+	return acmePluginsPath() + "/" + url.PathEscape(id)
+}
+
+func acmeChallengeSchemaPath() string { return "/cluster/acme/challenge-schema" }
+func acmeDirectoriesPath() string     { return "/cluster/acme/directories" }
+func acmeMetaPath() string            { return "/cluster/acme/meta" }

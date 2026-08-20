@@ -1,0 +1,1411 @@
+---
+version: 2
+interactions:
+    - id: 0
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 41
+        host: pve.example:8006
+        body: password=REDACTED&username=root%40pam
+        form:
+            password:
+                - REDACTED
+            username:
+                - root@pam
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/access/ticket
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: -1
+        uncompressed: true
+        body: '{"data":{"username":"root@pam","ticket":"REDACTED","cap":{"sdn":{"SDN.Audit":1,"SDN.Allocate":1,"SDN.Use":1,"Permissions.Modify":1},"mapping":{"Permissions.Modify":1,"Mapping.Use":1,"Mapping.Audit":1,"Mapping.Modify":1},"storage":{"Datastore.Allocate":1,"Datastore.AllocateSpace":1,"Datastore.AllocateTemplate":1,"Datastore.Audit":1,"Permissions.Modify":1},"vms":{"VM.Config.Network":1,"VM.Migrate":1,"VM.Audit":1,"VM.GuestAgent.FileRead":1,"VM.GuestAgent.FileWrite":1,"Permissions.Modify":1,"VM.Config.Cloudinit":1,"VM.Config.HWType":1,"VM.GuestAgent.Unrestricted":1,"VM.Config.Disk":1,"VM.Console":1,"VM.Config.Options":1,"VM.Config.Memory":1,"VM.Allocate":1,"VM.Clone":1,"VM.GuestAgent.FileSystemMgmt":1,"VM.Snapshot.Rollback":1,"VM.Snapshot":1,"VM.Replicate":1,"VM.Config.CPU":1,"VM.Config.CDROM":1,"VM.Backup":1,"VM.PowerMgmt":1,"VM.GuestAgent.Audit":1},"dc":{"SDN.Use":1,"SDN.Allocate":1,"Sys.Modify":1,"Sys.Audit":1,"SDN.Audit":1},"nodes":{"Permissions.Modify":1,"Sys.Console":1,"Sys.Syslog":1,"Sys.Incoming":1,"Sys.Audit":1,"Sys.Modify":1,"Sys.PowerMgmt":1,"Sys.AccessNetwork":1},"access":{"User.Modify":1,"Group.Allocate":1,"Permissions.Modify":1}},"clustername":"dogfood","CSRFPreventionToken":"REDACTED"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:53 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:53 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 199.546167ms
+    - id: 1
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/version
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 72
+        body: '{"data":{"version":"9.2.2","repoid":"b9984c6d90a4bd80","release":"9.2"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "72"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:53 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:53 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 93.791416ms
+    - id: 2
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/acme/directories
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 192
+        body: '{"data":[{"name":"Let''s Encrypt V2","url":"https://acme-v02.api.letsencrypt.org/directory"},{"url":"https://acme-staging-v02.api.letsencrypt.org/directory","name":"Let''s Encrypt V2 Staging"}]}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "192"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:53 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:53 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 8.339417ms
+    - id: 3
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/acme/account/sdk-staging
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 133
+        body: '{"errors":{"name":"ACME account config file ''sdk-staging'' does not exist."},"data":null,"message":"Parameter verification failed.\n"}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "133"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:53 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:53 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 400 Parameter verification failed.
+        code: 400
+        duration: 14.645375ms
+    - id: 4
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        form:
+            directory:
+                - https://acme-staging-v02.api.letsencrypt.org/directory
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/acme/meta?directory=https%3A%2F%2Facme-staging-v02.api.letsencrypt.org%2Fdirectory
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 386
+        body: '{"data":{"website":"https://letsencrypt.org/docs/staging-environment/","profiles":{"shortlived":"https://letsencrypt.org/docs/profiles#shortlived","classic":"https://letsencrypt.org/docs/profiles#classic","tlsserver":"https://letsencrypt.org/docs/profiles#tlsserver"},"caaIdentities":["letsencrypt.org"],"termsOfService":"https://letsencrypt.org/documents/LE-SA-v1.8-July-06-2026.pdf"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "386"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:53 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:53 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 253.187041ms
+    - id: 5
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 203
+        host: pve.example:8006
+        body: contact=REDACTED&directory=https%3A%2F%2Facme-staging-v02.api.letsencrypt.org%2Fdirectory&name=sdk-staging&tos_url=https%3A%2F%2Fletsencrypt.org%2Fdocuments%2FLE-SA-v1.8-July-06-2026.pdf
+        form:
+            contact:
+                - REDACTED
+            directory:
+                - https://acme-staging-v02.api.letsencrypt.org/directory
+            name:
+                - sdk-staging
+            tos_url:
+                - https://letsencrypt.org/documents/LE-SA-v1.8-July-06-2026.pdf
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/acme/account
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 71
+        body: '{"data":"UPID:pve:0000CB00:001CF71E:6A864D51:acmeregister::root@pam:"}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "71"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:53 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:53 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 33.473292ms
+    - id: 6
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB00:001CF71E:6A864D51:acmeregister::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 213
+        body: '{"data":{"id":"","type":"acmeregister","pid":51968,"user":"root@pam","starttime":1787186513,"pstart":1898270,"upid":"UPID:pve:0000CB00:001CF71E:6A864D51:acmeregister::root@pam:","status":"running","node":"pve"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "213"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:53 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:53 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 37.269541ms
+    - id: 7
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB00:001CF71E:6A864D51:acmeregister::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 213
+        body: '{"data":{"id":"","pid":51968,"type":"acmeregister","user":"root@pam","starttime":1787186513,"pstart":1898270,"node":"pve","upid":"UPID:pve:0000CB00:001CF71E:6A864D51:acmeregister::root@pam:","status":"running"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "213"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:54 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:54 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 29.638291ms
+    - id: 8
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB00:001CF71E:6A864D51:acmeregister::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 213
+        body: '{"data":{"type":"acmeregister","pid":51968,"id":"","upid":"UPID:pve:0000CB00:001CF71E:6A864D51:acmeregister::root@pam:","status":"running","node":"pve","user":"root@pam","pstart":1898270,"starttime":1787186513}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "213"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:56 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:56 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 33.904541ms
+    - id: 9
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB00:001CF71E:6A864D51:acmeregister::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 231
+        body: '{"data":{"type":"acmeregister","pid":51968,"id":"","upid":"UPID:pve:0000CB00:001CF71E:6A864D51:acmeregister::root@pam:","status":"stopped","node":"pve","exitstatus":"OK","starttime":1787186513,"pstart":1898270,"user":"root@pam"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "231"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:58 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:58 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 104.9085ms
+    - id: 10
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 203
+        host: pve.example:8006
+        body: api=cf&data=REDACTED&id=sdk-cf&type=dns&validation-delay=60
+        form:
+            api:
+                - cf
+            data:
+                - REDACTED
+            id:
+                - sdk-cf
+            type:
+                - dns
+            validation-delay:
+                - "60"
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/acme/plugins
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 13
+        body: '{"data":null}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "13"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:58 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:58 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 43.691125ms
+    - id: 11
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/acme/plugins/sdk-cf
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 246
+        body: '{"data":{"type":"dns","data":"REDACTED","api":"cf","validation-delay":60,"digest":"7de7999c07e73c607305ce4b3664c5f953873372","plugin":"sdk-cf"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "246"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:58 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:58 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 28.038291ms
+    - id: 12
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/config
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 11
+        body: '{"data":{}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "11"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:58 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:58 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 20.900875ms
+    - id: 13
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 92
+        host: pve.example:8006
+        body: acme=account%3Dsdk-staging&acmedomain0=domain%3Dpve.acme.example%2Cplugin%3Dsdk-cf
+        form:
+            acme:
+                - account=sdk-staging
+            acmedomain0:
+                - domain=pve.acme.example,plugin=sdk-cf
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/config
+        method: PUT
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 13
+        body: '{"data":null}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "13"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:58 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:58 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 18.867083ms
+    - id: 14
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/config
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 172
+        body: '{"data":{"description":"","digest":"997cf0f68348280cd447d4ea05ff83af6a821658","acmedomain0":"domain=pve.acme.example,plugin=sdk-cf","acme":"account=sdk-staging"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Connection:
+                - Keep-Alive
+            Content-Length:
+                - "172"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:59 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:59 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 23.297916ms
+    - id: 15
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/certificates/acme/certificate
+        method: POST
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 70
+        body: '{"data":"UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:"}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "70"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:59 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:59 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 35.599ms
+    - id: 16
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 211
+        body: '{"data":{"type":"acmenewcert","pid":51976,"id":"","upid":"UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:","status":"running","node":"pve","pstart":1898784,"starttime":1787186519,"user":"root@pam"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "211"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:41:59 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:41:59 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 28.406292ms
+    - id: 17
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 211
+        body: '{"data":{"status":"running","upid":"UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:","node":"pve","user":"root@pam","pstart":1898784,"starttime":1787186519,"type":"acmenewcert","pid":51976,"id":""}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "211"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:42:00 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:42:00 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 31.944083ms
+    - id: 18
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 211
+        body: '{"data":{"id":"","type":"acmenewcert","pid":51976,"user":"root@pam","pstart":1898784,"starttime":1787186519,"upid":"UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:","status":"running","node":"pve"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "211"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:42:01 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:42:01 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 34.91775ms
+    - id: 19
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 211
+        body: '{"data":{"pid":51976,"type":"acmenewcert","id":"","node":"pve","upid":"UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:","status":"running","user":"root@pam","pstart":1898784,"starttime":1787186519}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "211"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:42:03 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:42:03 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 30.322ms
+    - id: 20
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 211
+        body: '{"data":{"node":"pve","upid":"UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:","status":"running","pstart":1898784,"starttime":1787186519,"user":"root@pam","pid":51976,"type":"acmenewcert","id":""}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "211"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:42:07 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:42:07 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 31.081417ms
+    - id: 21
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 211
+        body: '{"data":{"id":"","pid":51976,"type":"acmenewcert","pstart":1898784,"starttime":1787186519,"user":"root@pam","node":"pve","upid":"UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:","status":"running"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "211"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:42:12 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:42:12 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 102.053709ms
+    - id: 22
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 211
+        body: '{"data":{"type":"acmenewcert","pid":51976,"id":"","upid":"UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:","status":"running","node":"pve","user":"root@pam","pstart":1898784,"starttime":1787186519}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "211"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:42:20 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:42:20 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 38.163291ms
+    - id: 23
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 211
+        body: '{"data":{"type":"acmenewcert","pid":51976,"id":"","status":"running","upid":"UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:","node":"pve","starttime":1787186519,"pstart":1898784,"user":"root@pam"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "211"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:42:30 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:42:30 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 36.479958ms
+    - id: 24
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 211
+        body: '{"data":{"id":"","type":"acmenewcert","pid":51976,"starttime":1787186519,"pstart":1898784,"user":"root@pam","status":"running","upid":"UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:","node":"pve"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "211"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:42:40 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:42:40 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 108.263ms
+    - id: 25
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 211
+        body: '{"data":{"id":"","type":"acmenewcert","pid":51976,"pstart":1898784,"starttime":1787186519,"user":"root@pam","status":"running","upid":"UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:","node":"pve"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "211"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:42:50 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:42:50 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 32.024833ms
+    - id: 26
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 211
+        body: '{"data":{"id":"","pid":51976,"type":"acmenewcert","user":"root@pam","pstart":1898784,"starttime":1787186519,"node":"pve","upid":"UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:","status":"running"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "211"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:43:00 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:43:00 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 30.459209ms
+    - id: 27
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 211
+        body: '{"data":{"id":"","pid":51976,"type":"acmenewcert","user":"root@pam","starttime":1787186519,"pstart":1898784,"node":"pve","upid":"UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:","status":"running"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "211"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:43:10 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:43:10 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 33.096666ms
+    - id: 28
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 229
+        body: '{"data":{"exitstatus":"OK","node":"pve","upid":"UPID:pve:0000CB08:001CF920:6A864D57:acmenewcert::root@pam:","status":"stopped","user":"root@pam","starttime":1787186519,"pstart":1898784,"pid":51976,"type":"acmenewcert","id":""}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "229"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:43:20 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:43:20 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 33.97275ms
+    - id: 29
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/certificates/acme/certificate
+        method: DELETE
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 69
+        body: '{"data":"UPID:pve:0000CCFB:001D1906:6A864DA8:acmerevoke::root@pam:"}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "69"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:43:20 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:43:20 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 75.261625ms
+    - id: 30
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CCFB:001D1906:6A864DA8:acmerevoke::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 209
+        body: '{"data":{"node":"pve","status":"running","upid":"UPID:pve:0000CCFB:001D1906:6A864DA8:acmerevoke::root@pam:","user":"root@pam","pstart":1906950,"starttime":1787186600,"pid":52475,"type":"acmerevoke","id":""}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "209"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:43:20 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:43:20 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 53.47575ms
+    - id: 31
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CCFB:001D1906:6A864DA8:acmerevoke::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 209
+        body: '{"data":{"id":"","type":"acmerevoke","pid":52475,"user":"root@pam","pstart":1906950,"starttime":1787186600,"status":"running","upid":"UPID:pve:0000CCFB:001D1906:6A864DA8:acmerevoke::root@pam:","node":"pve"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "209"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:43:21 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:43:21 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 27.030542ms
+    - id: 32
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Cookie:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/tasks/UPID:pve:0000CCFB:001D1906:6A864DA8:acmerevoke::root@pam:/status
+        method: GET
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 227
+        body: '{"data":{"type":"acmerevoke","pid":52475,"id":"","status":"stopped","upid":"UPID:pve:0000CCFB:001D1906:6A864DA8:acmerevoke::root@pam:","node":"pve","exitstatus":"OK","starttime":1787186600,"pstart":1906950,"user":"root@pam"}}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "227"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:43:23 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:43:23 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 53.069209ms
+    - id: 33
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 25
+        host: pve.example:8006
+        body: delete=acme%2Cacmedomain0
+        form:
+            delete:
+                - acme,acmedomain0
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/nodes/pve/config
+        method: PUT
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 13
+        body: '{"data":null}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "13"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:43:23 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:43:23 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 41.739084ms
+    - id: 34
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        host: pve.example:8006
+        headers:
+            Content-Type:
+                - application/x-www-form-urlencoded
+            Cookie:
+                - REDACTED
+            Csrfpreventiontoken:
+                - REDACTED
+            User-Agent:
+                - proxmox-go-sdk
+        url: https://pve.example:8006/api2/json/cluster/acme/plugins/sdk-cf
+        method: DELETE
+      response:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 13
+        body: '{"data":null}'
+        headers:
+            Cache-Control:
+                - max-age=0
+            Content-Length:
+                - "13"
+            Content-Type:
+                - application/json;charset=UTF-8
+            Date:
+                - Thu, 20 Aug 2026 00:43:23 GMT
+            Expires:
+                - Thu, 20 Aug 2026 00:43:23 GMT
+            Pragma:
+                - no-cache
+            Server:
+                - pve-api-daemon/3.0
+        status: 200 OK
+        code: 200
+        duration: 41.648292ms

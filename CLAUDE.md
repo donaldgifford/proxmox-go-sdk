@@ -90,6 +90,21 @@ when the repos split (DESIGN-0001). New public packages are admitted under
   **stable-pinned** pvelab (`justfile` var `pvelab_pin`, IMPL-0002 Phase 4:
   released code provisions, branch code is what gets tested); set `PVELAB_DEV=1`
   to run the branch's `./cmd/pvelab` when developing the harness itself.
+- **One config per lab shape**: `-config` defaults to `pvelab.yaml`;
+  `pvelab-acme.example.yaml` is the same cluster plus a `nested.acme` block,
+  kept separate so a failure is attributable (cluster vs certificate path).
+  Handoff files derive from the config's basename
+  (`.pvelab.env`/`.pvelab-state.json` vs
+  `.pvelab-acme.env`/`.pvelab-acme-state.json`), overridable via
+  `env_path`/`state_path`; pass the same `-config` to every subcommand.
+  `just dogfood-test` picks its env file from `PVELAB_ENV`. ACME providers are
+  **data, not code** — `provider` is acme.sh's plugin name and `credentials`
+  maps that plugin's variable names to env var NAMES, resolved into
+  `nodes.ACMERawPluginData`, so a new provider is a config change only. The
+  block is **inert at provision time so far** (config surface only; the `up`
+  wiring that registers the account, creates the plugin and orders per node is
+  not written). Node VMIDs must avoid the 9210-9219 template sub-range —
+  validation rejects them.
 - Config is `pvelab.yaml` (git-ignored; copy `pvelab.example.yaml`). Secrets are
   env-var NAMES in the config, resolved+validated at load; site topology stays
   out of the repo. `TestExampleConfigValid` pins the example to the schema.
@@ -721,10 +736,22 @@ environment.** This shapes how we test and what "done" means:
   (both 2026-07-12, IMPL-0002 Phase 3), and the INV-0004 remediation wave
   (2026-07-23, IMPL-0004/0005 Phase 3): the HA arm/disarm cycle, blocked migrate
   with cause `resource-affinity`, HA/SDN status reads, and the OpenFabric fabric
-  lifecycle with FRR convergence. **Nothing on the SDK surface remains
-  written-but-unverified.** Volume-chain snapshots are **not** a gap — confirmed
-  via `r740a`'s own `apidoc.js` that PVE has no storage-level snapshot endpoint,
-  so they were honestly reclassified to `pverr.ErrUnsupported`.
+  lifecycle with FRR convergence. **Everything the SDK ships is live-verified**,
+  IMPL-0007's ACME surface included: the DNS-01 flow ran end to end on a rebuilt
+  pvelab cluster (2026-08-19) — staging account → cf plugin → `acmedomain0` →
+  order → served-certificate check → revoke → teardown, cassette committed and
+  replaying in CI. Never point that run at r740a: an ACME order **replaces the
+  node's pveproxy certificate**, which is why the ordering tests carry a second
+  `PVE_TEST_ACME_DISPOSABLE=1` gate and the ACME env vars live in the lab's env
+  file, never the repo-root `.env`. Two ACME leftovers are stated where they
+  live rather than fixed: `RenewNodeCertificate`/`UpdateACMEAccount` are
+  schema-settled but unobserved (the run ordered and revoked, never renewed or
+  updated), and **Namecheap was descoped** from IMPL-0007 — its field names come
+  from upstream acme.sh, `TestACMEDNSNamecheap` has no cassette, and proving it
+  would mean moving the shared domain's nameservers off the working Cloudflare
+  path for hours. Volume-chain snapshots are **not** a gap — confirmed via
+  `r740a`'s own `apidoc.js` that PVE has no storage-level snapshot endpoint, so
+  they were honestly reclassified to `pverr.ErrUnsupported`.
 - **Task exit status `WARNINGS: N` is success, not failure.** PVE finishes some
   tasks (routinely an LXC create on a modern-systemd template — e.g. debian-13's
   "Systemd 257 detected. You may need to enable nesting.") with exit status
@@ -820,6 +847,13 @@ environment.** This shapes how we test and what "done" means:
   unused method receivers and unused func params: drop the receiver name
   (`func (*T) m()`) and rename unused handler params to `_`
   (`func(w http.ResponseWriter, _ *http.Request)`).
+- **`just fmt` and `just lint` disagree about folded YAML by one column.**
+  yamlfmt refills a `>-` scalar to 121 columns where yamllint's `line-length`
+  warns above 120, so a multi-line folded string cannot be both formatted and
+  warning-free (lowering yamlfmt's `max_line_length` would rewrap every workflow
+  file). Keep a folded value short enough to sit on one line — in
+  `coverage-annotations.yaml` the long argument lives in a `#` comment above the
+  entry, since comments are left alone.
 
 ## Renovate
 

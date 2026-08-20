@@ -1,7 +1,7 @@
 ---
 id: DESIGN-0006
 title: "ACME DNS plugins and node ACME config with provider-generic credentials"
-status: Approved
+status: Implemented
 author: Donald Gifford
 created: 2026-08-16
 ---
@@ -10,7 +10,7 @@ created: 2026-08-16
 
 # DESIGN 0006: ACME DNS plugins and node ACME config with provider-generic credentials
 
-**Status:** Approved **Author:** Donald Gifford **Date:** 2026-08-16 (OQs
+**Status:** Implemented **Author:** Donald Gifford **Date:** 2026-08-16 (OQs
 decided 2026-08-17: all a; OQ-6 amended — one shared domain for both providers,
 sequential runs)
 
@@ -400,6 +400,14 @@ here is 9.0 baseline).
    to Namecheap DNS (OQ-6: one shared domain, sequential provider runs); until
    that run lands, Namecheap is unit-verified only and its doc comment says so
    (the honesty rule).
+
+   **Amended 2026-08-20: step 3 was descoped** (IMPL-0007 Phase 4 task 4). The
+   nameserver switch would take the now-verified Cloudflare path offline for
+   hours to prove a second provider, and what it was evidence for — that
+   `ACMEPluginData` is provider-generic — is carried by the interface shape and
+   by `RawPluginData` reaching all ~160 providers with no Go code. Namecheap
+   stays unit-verified with its caveat in place, which is exactly where step 3
+   said it would sit until a run lands. No run is scheduled.
 
 ## Open Questions
 

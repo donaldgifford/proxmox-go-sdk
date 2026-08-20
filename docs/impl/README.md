@@ -39,6 +39,6 @@ docz create impl "Your Implementation Title"
 | IMPL-0004 | SDN fabrics remediation delivery                                 | In Progress | 2026-07-21 | Donald Gifford | [0004-sdn-fabrics-remediation-delivery.md](0004-sdn-fabrics-remediation-delivery.md)                                                         |
 | IMPL-0005 | HA arm disarm status and migrate delivery                        | In Progress | 2026-07-21 | Donald Gifford | [0005-ha-arm-disarm-status-and-migrate-delivery.md](0005-ha-arm-disarm-status-and-migrate-delivery.md)                                       |
 | IMPL-0006 | API coverage tracker delivery                                    | Completed   | 2026-07-21 | Donald Gifford | [0006-api-coverage-tracker-delivery.md](0006-api-coverage-tracker-delivery.md)                                                               |
-| IMPL-0007 | ACME DNS plugins and node config delivery                        | Draft       | 2026-08-17 | Donald Gifford | [0007-acme-dns-plugins-and-node-config-delivery.md](0007-acme-dns-plugins-and-node-config-delivery.md)                                       |
+| IMPL-0007 | ACME DNS plugins and node config delivery                        | Completed   | 2026-08-17 | Donald Gifford | [0007-acme-dns-plugins-and-node-config-delivery.md](0007-acme-dns-plugins-and-node-config-delivery.md)                                       |
 
 <!-- END DOCZ AUTO-GENERATED -->

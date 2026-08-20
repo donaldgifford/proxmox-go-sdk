@@ -187,11 +187,16 @@ func newLiveClient(t *testing.T, record bool) *proxmox.Client {
 		if insecure {
 			rt = insecureTransport()
 		}
-		// Scrub the live endpoint host and node name — plus any extra
-		// live=placeholder pairs (the other cluster members' IPs and the site
-		// DNS domain, via PVE_SCRUB_EXTRA) — from the cassette so a committed
-		// fixture does not expose lab topology.
-		scrub, serr := newTopologyScrub(endpoint, testNode()).withExtraPairs(os.Getenv(envScrubExtra))
+		// Scrub the live endpoint host and node name, the ACME test domain
+		// (PVE_TEST_ACME_DOMAIN — a real zone, and it rides certificate SANs
+		// and order task logs), the ACME account contact and provider source
+		// IP, plus any extra live=placeholder pairs (the other cluster members'
+		// IPs and the site DNS domain, via PVE_SCRUB_EXTRA) — so a committed
+		// fixture does not expose topology or identity.
+		scrub, serr := newTopologyScrub(endpoint, testNode()).
+			withACMEDomain(os.Getenv(envACMEDomain)).
+			withACMEIdentity(os.Getenv(envACMEAccountMail), os.Getenv(envACMENCSourceIP)).
+			withExtraPairs(os.Getenv(envScrubExtra))
 		if serr != nil {
 			t.Fatalf("%s: %v", envScrubExtra, serr)
 		}
@@ -250,7 +255,10 @@ func cassetteName(t *testing.T) string {
 // self-signed node (PVE_INSECURE_TLS=1); it mirrors the SDK's own opt-in.
 func insecureTransport() http.RoundTripper {
 	return &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12}, //nolint:gosec // opt-in for self-signed PVE, matches the SDK
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			MinVersion:         tls.VersionTLS12,
+		}, //nolint:gosec // opt-in for self-signed PVE, matches the SDK
 	}
 }
 

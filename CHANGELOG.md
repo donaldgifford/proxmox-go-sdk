@@ -6,12 +6,71 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [unreleased]
 
+### Features
+
+- *(nodes)* Add the provider-generic ACME plugin data model
+- *(nodes)* Add the ACME plugin and discovery read types
+- *(mockpve)* Serve the ACME plugin and discovery endpoints
+- *(nodes)* Add ACME plugin CRUD
+- *(nodes)* Add ACME discovery reads
+- *(nodes)* Type the node ACME config both ways
+- *(integration)* Scrub the ACME domain out of recordings automatically
+- *(integration)* Scrub the ACME contact and provider source IP
+- *(mockpve)* An ACME order installs a certificate, a revoke removes it
+- *(pvelab)* Optional ACME block, providers as config not code
+- *(pvelab)* Derive handoff file paths from the config
+- *(pvelab)* Refuse to start when answer_url is not this machine
+
+### Bug Fixes
+
+- *(nodes)* Refuse an ACME plugin whose credentials render empty
+- *(integration)* Scrub the ACME plugin credential blob from cassettes
+- *(nodes)* Bound acmedomain slots to PVE's real range, and 9 review fixes
+- *(integration)* Restore the TestVersionRoundTrip cassette
+- *(nodes)* UpdateACMEAccount returns the task it was discarding
+- *(integration)* Scrub the HTTP reason phrase, and guard the field list
+- *(mockpve)* Read acmedomain the way PVE does, and keep one front-end cert
+- *(mockpve)* Give each ACME certificate verb its own task record
+- *(mockpve)* Serve certificates shaped like real PVE
+- *(integration)* Scrub every parent zone, not just the immediate one
+- *(pvelab)* Reject node VMIDs inside the template sub-range
+- *(integration)* Treat PVE's 400 as a missing ACME account
+
+### Refactor
+
+- *(mockpve)* Type the CA account object; cover the refresh path
+
 ### Documentation
 
 - *(design-0006)* ACME DNS plugins with provider-generic credentials
 - *(design-0006)* Record the OQ decisions — all a, doc Approved
 - *(impl-0007)* Phase the ACME DNS delivery
 - *(impl-0007)* Record the OQ decisions — all a
+- *(testing)* Add the ACME DNS-01 walkthrough
+- *(nodes)* Promote the package doc and add an ACME example
+- Mark DESIGN-0006 implemented and IMPL-0007 in progress
+- *(impl-0007)* Close phase 3 — CI green on PR #27
+- *(impl-0007)* Record the surface-wide return-shape audit
+- *(claude)* ACME is mock-verified, and the YAML formatter/linter gotcha
+- *(mockpve)* Say what the ACME cert handler does NOT model
+- *(impl-0007)* Record the colliding-UPID fix
+- *(impl-0007)* Record the r740a destructive-test follow-up
+- *(pvelab)* Document the two-config lab, handoff files and prereqs
+- *(impl-0007)* Record the pvelab rebuild verification
+- *(impl-0007)* Close the ledger — Namecheap descoped, caveats now observed
+
+### Testing
+
+- *(integration)* Add the ACME DNS-01 lifecycle tests
+- *(integration)* Add an ACME preflight and gate ordering on an opt-in
+- *(integration)* The served-cert probe is live-only, so skip it on replay
+- *(nodes)* Mock-verify the ACME DNS call sequence end to end
+- *(integration)* Rehearse the ACME cassette leak review
+- *(integration)* Commit the live ACME cassette and replay it in CI
+
+### Miscellaneous Tasks
+
+- *(pvelab)* Ignore .pvelab.secrets.env, say what .pvelab.env is
 
 ## [0.10.0] - 2026-07-26
 

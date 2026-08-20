@@ -3,16 +3,19 @@ package lab
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v4"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/api"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/nodes"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/ssh"
 )
 
@@ -47,11 +50,62 @@ const (
 	defaultAnswerListen = ":8442"
 )
 
+// ACME challenge kinds. Only dns-01 is implementable here: the nested nodes
+// sit on the lab's private addressing, and a standalone (http-01) challenge
+// requires the CA to reach the node on port 80 from the internet. The constant
+// exists so the config rejects it by name with that reason, rather than by
+// looking like a typo.
+const (
+	ChallengeDNS01      = "dns-01"
+	ChallengeStandalone = "standalone"
+)
+
+// ACME directories. Staging is the default and has to be: a lab that
+// re-provisions in a loop would burn Let's Encrypt's production rate limits
+// (50 certificates per registered domain per week) in an afternoon, and a
+// config typo must not be what discovers that.
+const (
+	DirectoryStaging    = "staging"
+	DirectoryProduction = "production"
+
+	stagingDirectoryURL    = "https://acme-staging-v02.api.letsencrypt.org/directory"
+	productionDirectoryURL = "https://acme-v02.api.letsencrypt.org/directory"
+)
+
 // Config is the pvelab YAML schema (settings only — anything secret is an
 // env-var NAME resolved at runtime, never a value in the file).
 type Config struct {
 	Outer  Outer  `yaml:"outer"`
 	Nested Nested `yaml:"nested"`
+	// EnvPath and StatePath are where `up` writes its handoff files and
+	// `down` removes them. Both default to the config's own basename
+	// (pvelab.yaml -> .pvelab.env and .pvelab-state.json; pvelab-acme.yaml ->
+	// .pvelab-acme.env and .pvelab-acme-state.json), which is what keeps two
+	// labs from overwriting each other's answer to "what is currently up?".
+	//
+	// They were fixed names until the ACME variant arrived and made a second
+	// config normal. A shared state file is the worse half of that: it records
+	// what `up` created, so the wrong one silently describes the other lab.
+	EnvPath   string `yaml:"env_path"`
+	StatePath string `yaml:"state_path"`
+}
+
+// resolveHandoffPaths fills EnvPath/StatePath from the config's filename when
+// the operator has not set them. Deriving from the config rather than from a
+// flag means the pairing cannot be got wrong by forgetting an argument, and
+// the default config keeps the names it has always had.
+func (c *Config) resolveHandoffPaths(configPath string) {
+	base := filepath.Base(configPath)
+	base = strings.TrimSuffix(base, filepath.Ext(base))
+	if base == "" || base == "." {
+		base = "pvelab"
+	}
+	if c.EnvPath == "" {
+		c.EnvPath = "." + base + ".env"
+	}
+	if c.StatePath == "" {
+		c.StatePath = "." + base + "-state.json"
+	}
 }
 
 // Outer locates and authenticates the physical PVE host the lab runs on.
@@ -99,7 +153,93 @@ type Nested struct {
 	// version's template (IMPL-0002 Phase 5). Optional: without it `template
 	// build` refuses to run and `up` always takes the ISO-install path.
 	Template *TemplateSpec `yaml:"template,omitempty"`
-	Nodes    []Node        `yaml:"nodes"`
+	// ACME requests a real TLS certificate for every node after the cluster
+	// forms. Optional, and absent is the original behaviour: the lab installs
+	// with PVE's self-signed certificate and never talks to a CA. Keeping the
+	// two paths separately configurable is what makes a failed run
+	// attributable — a cluster that will not form is a different bug from a
+	// certificate that will not issue, and one config per shape says which was
+	// under test.
+	ACME  *ACMESpec `yaml:"acme,omitempty"`
+	Nodes []Node    `yaml:"nodes"`
+}
+
+// ACMESpec configures certificate issuance for the nested cluster. Every node
+// gets its own certificate for its own FQDN (<node name>.<nested domain>),
+// which is why no domain is configured here: the DNS records the lab needs
+// already have to match the FQDNs the answer files install, so a second place
+// to spell the domain could only ever disagree with the first.
+//
+// Providers are data, not code. Provider is acme.sh's plugin name — whatever
+// PVE's api parameter accepts, 160 of them on 9.2 — and Credentials maps that
+// provider's acme.sh variable names to the env vars holding their values. A
+// new provider is therefore a config change and nothing else; pvelab hands the
+// pair to the SDK's [nodes.ACMEPluginData] interface via [nodes.ACMERawPluginData]
+// and never learns what a Cloudflare token is. Ask the node itself for a
+// provider's field names with Service.GetACMEChallengeSchema rather than
+// guessing them.
+//
+// The values are live provider credentials: pvelab passes them straight to the
+// SDK, never logs them, and the committed example names variables that do not
+// exist.
+type ACMESpec struct {
+	// Directory selects the CA endpoint: "staging" (default) or "production".
+	Directory string `yaml:"directory"`
+	// Account is the PVE ACME account name. It defaults per directory
+	// ("pvelab-staging" / "pvelab-production") because an account is
+	// registered against one CA: reusing a staging account's name against
+	// production would hand PVE a key the production CA has never seen.
+	Account string `yaml:"account"`
+	// Contact is the registration email. Not a secret, and it lives in the
+	// git-ignored config beside the domain and the addresses, but the recorder
+	// scrubs it out of any cassette.
+	Contact string `yaml:"contact"`
+	// Challenge is the challenge kind — "dns-01" (default).
+	Challenge string `yaml:"challenge"`
+	// Provider is the acme.sh plugin name PVE stores in the plugin's api
+	// field, e.g. "cf".
+	Provider string `yaml:"provider"`
+	// PluginID is the PVE ACME plugin id to create and reference. It defaults
+	// to "pvelab-<provider>". Cluster-scoped on the nested cluster, so it is
+	// created once and every node's config points at it.
+	PluginID string `yaml:"plugin_id"`
+	// Credentials maps acme.sh variable name -> env var NAME holding its
+	// value, e.g. {CF_Token: PVELAB_ACME_CF_TOKEN}.
+	Credentials map[string]string `yaml:"credentials"`
+}
+
+// PluginData resolves the configured env vars and returns the SDK plugin data
+// for this provider. It reads the environment on every call and retains
+// nothing, so a caller decides how long the credentials live.
+//
+// A named-but-unset variable is an error rather than an omitted field: config
+// load already refuses that case, and silently registering a plugin with a
+// missing credential would fail minutes later inside a CA exchange, where the
+// cause is much harder to see.
+func (a *ACMESpec) PluginData() (nodes.ACMEPluginData, error) {
+	values := make(map[string]string, len(a.Credentials))
+	var missing []string
+	for _, key := range slices.Sorted(maps.Keys(a.Credentials)) {
+		env := a.Credentials[key]
+		v := os.Getenv(env)
+		if v == "" {
+			missing = append(missing, fmt.Sprintf("%s (env %s)", key, env))
+			continue
+		}
+		values[key] = v
+	}
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("acme credentials unset: %s", strings.Join(missing, ", "))
+	}
+	return nodes.ACMERawPluginData{Provider: a.Provider, Values: values}, nil
+}
+
+// DirectoryURL resolves the configured directory keyword to its CA URL.
+func (a *ACMESpec) DirectoryURL() string {
+	if a.Directory == DirectoryProduction {
+		return productionDirectoryURL
+	}
+	return stagingDirectoryURL
 }
 
 // TemplateSpec reserves the outer-host VMID (in the 9210–9219 template
@@ -146,6 +286,7 @@ func LoadConfig(path string) (*Config, error) {
 	if err := dec.Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("parse config %s: %w", path, err)
 	}
+	cfg.resolveHandoffPaths(path)
 	cfg.applyDefaults()
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("validate config %s: %w", path, err)
@@ -165,6 +306,27 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Nested.AnswerListen == "" {
 		c.Nested.AnswerListen = defaultAnswerListen
+	}
+	c.Nested.ACME.applyDefaults()
+}
+
+// applyDefaults fills the ACME block's optional fields. The nil check lives
+// here rather than at the call site because the block itself is optional.
+func (a *ACMESpec) applyDefaults() {
+	if a == nil {
+		return
+	}
+	if a.Directory == "" {
+		a.Directory = DirectoryStaging
+	}
+	if a.Challenge == "" {
+		a.Challenge = ChallengeDNS01
+	}
+	if a.Account == "" {
+		a.Account = "pvelab-" + a.Directory
+	}
+	if a.PluginID == "" && a.Provider != "" {
+		a.PluginID = "pvelab-" + a.Provider
 	}
 }
 
@@ -220,6 +382,7 @@ func (c *Config) Validate() error {
 
 	errs = append(errs, c.validateNodes()...)
 	errs = append(errs, c.validateTemplate()...)
+	errs = append(errs, c.validateACME()...)
 	errs = append(errs, c.validateEnvRefs()...)
 	return errors.Join(errs...)
 }
@@ -251,6 +414,56 @@ func (c *Config) validateTemplate() []error {
 	return errs
 }
 
+// validateACME checks the optional nested.acme block. It deliberately knows
+// nothing about individual providers — the credential keys are acme.sh's
+// vocabulary, and the node's own challenge schema is the only authority on
+// them — so it checks the two things that fail late and expensively: a
+// challenge kind that cannot work here, and a credential the environment does
+// not actually hold.
+func (c *Config) validateACME() []error {
+	a := c.Nested.ACME
+	if a == nil {
+		return nil
+	}
+	var errs []error
+	if a.Contact == "" {
+		errs = append(errs, errors.New("nested.acme.contact is required"))
+	}
+	if a.Provider == "" {
+		errs = append(errs, errors.New("nested.acme.provider is required (an acme.sh plugin name, e.g. cf)"))
+	}
+	if len(a.Credentials) == 0 {
+		errs = append(errs, errors.New("nested.acme.credentials is required (acme.sh variable name -> env var name)"))
+	}
+	for key, env := range a.Credentials {
+		if env == "" {
+			errs = append(errs, fmt.Errorf("nested.acme.credentials[%s] names no env var", key))
+		}
+	}
+	switch a.Directory {
+	case DirectoryStaging, DirectoryProduction:
+	default:
+		errs = append(errs, fmt.Errorf("nested.acme.directory %q: want %q or %q",
+			a.Directory, DirectoryStaging, DirectoryProduction))
+	}
+	if a.Challenge == ChallengeStandalone {
+		errs = append(errs, fmt.Errorf(
+			"nested.acme.challenge %q needs the CA to reach the node on port 80; pvelab's nodes sit on the lab's private addressing, so only %q can work here",
+			ChallengeStandalone,
+			ChallengeDNS01,
+		))
+	} else if a.Challenge != ChallengeDNS01 {
+		errs = append(errs, fmt.Errorf("nested.acme.challenge %q: want %q", a.Challenge, ChallengeDNS01))
+	}
+	return errs
+}
+
+// acmeEnvRefs lists the env vars the configured credentials read, so
+// validateEnvRefs fails at load rather than mid-provision.
+func (a *ACMESpec) acmeEnvRefs() []string {
+	return slices.Sorted(maps.Values(a.Credentials))
+}
+
 func (c *Config) validateNodes() []error {
 	var errs []error
 	if len(c.Nested.Nodes) < 3 {
@@ -258,6 +471,12 @@ func (c *Config) validateNodes() []error {
 	}
 	names := make(map[string]bool, len(c.Nested.Nodes))
 	vmids := make(map[int]bool, len(c.Nested.Nodes))
+	// The template sub-range is reserved whether or not THIS config declares a
+	// template: it holds one template per PVE minor, so a node parked there
+	// collides with a version this config has never heard of. Checking only
+	// against the configured template VMID (validateTemplate) misses that —
+	// the collision arrives later, from another config, as a template build
+	// that cannot have its VMID.
 	cidrs := make(map[string]bool, len(c.Nested.Nodes))
 	for _, n := range c.Nested.Nodes {
 		if n.Name == "" {
@@ -272,6 +491,9 @@ func (c *Config) validateNodes() []error {
 		if n.VMID < vmidRangeLo || n.VMID > vmidRangeHi {
 			errs = append(errs, fmt.Errorf("node %s: vmid %d outside the reserved pvelab block %d-%d",
 				n.Name, n.VMID, vmidRangeLo, vmidRangeHi))
+		} else if n.VMID >= templateVMIDLo && n.VMID <= templateVMIDHi {
+			errs = append(errs, fmt.Errorf("node %s: vmid %d is inside the template sub-range %d-%d; pick one outside it",
+				n.Name, n.VMID, templateVMIDLo, templateVMIDHi))
 		}
 		if vmids[n.VMID] {
 			errs = append(errs, fmt.Errorf("duplicate vmid %d", n.VMID))
@@ -353,6 +575,9 @@ func (c *Config) validateEnvRefs() []error {
 	refs := []string{c.Outer.TokenIDEnv, c.Outer.TokenSecretEnv, c.Nested.RootPasswordEnv}
 	if c.Outer.SSH.PasswordEnv != "" {
 		refs = append(refs, c.Outer.SSH.PasswordEnv)
+	}
+	if c.Nested.ACME != nil {
+		refs = append(refs, c.Nested.ACME.acmeEnvRefs()...)
 	}
 	var errs []error
 	for _, name := range refs {

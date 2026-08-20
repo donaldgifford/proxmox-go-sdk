@@ -399,10 +399,15 @@ The 9.x-reworked area — model rules, never the deprecated groups.
       cluster-scoped ACME accounts
       (`ListACMEAccounts`/`GetACMEAccount`/`RegisterACMEAccount`→`tasks.Ref`/
       `UpdateACMEAccount`/`DeactivateACMEAccount`→`tasks.Ref`) + node ACME cert
-      `Order`/`Renew`/`RevokeNodeCertificate`→`tasks.Ref` (**REST-with-caveat**:
-      real endpoint, task-vs-sync unconfirmed). **Custom node scripts have no
-      PVE REST endpoint** — the SDK offers no method; run them over the SSH
-      side-channel (`c.SSH().Exec`). Mock-verified.
+      `Order`/`Renew`/`RevokeNodeCertificate`→`tasks.Ref`
+      (~~**REST-with-caveat**: real endpoint, task-vs-sync unconfirmed~~ —
+      **task-vs-sync resolved from the schema 2026-08-18**, IMPL-0007 Phase 4:
+      all three declare a bare string return, PVE's house style for a UPID, so
+      the `tasks.Ref` signatures were right; only live timing/log behaviour is
+      unobserved. The same audit found `UpdateACMEAccount` **discarding** its
+      UPID and fixed it to return a `tasks.Ref` — a pre-v1 break). **Custom node
+      scripts have no PVE REST endpoint** — the SDK offers no method; run them
+      over the SSH side-channel (`c.SSH().Exec`). Mock-verified.
 - [x] Ceph: pools, OSDs, RBD mirroring (Squid) — new `ceph` package (`c.Ceph()`,
       **no** node arg; each op takes the MON node per-call, flat cluster-wide
       state). Pools (`ListPools`/`GetPool`/`CreatePool`→`tasks.Ref`/

@@ -173,6 +173,23 @@ func (s *Service) ListACMEAccounts(ctx context.Context) ([]string, error) {
 }
 
 // GetACMEAccount returns one registered ACME account by its local handle.
+//
+// An account that does not exist is reported by PVE as HTTP 400 "Parameter
+// verification failed" with the detail under the name parameter — "ACME
+// account config file '<name>' does not exist." — NOT as a 404. So
+// errors.Is(err, pverr.ErrNotFound) does not fire for a missing account, and
+// code that branches on absence should test the parameter detail instead:
+//
+//	var perr *pverr.Error
+//	if errors.As(err, &perr) && perr.Status == http.StatusBadRequest &&
+//		strings.Contains(perr.Params["name"], "does not exist") {
+//		// not registered yet
+//	}
+//
+// Observed live 2026-08-19 against PVE 9.2. The SDK does not reclassify it:
+// deciding from the message text which 400s are really 404s would bake a guess
+// about PVE's prose into the transport, where every op would inherit it.
+// [ListACMEAccounts] is the allocation-free way to test for existence.
 func (s *Service) GetACMEAccount(ctx context.Context, name string) (*ACMEAccount, error) {
 	if name == "" {
 		return nil, fmt.Errorf("nodes.GetACMEAccount: name: %w", svcutil.ErrMissingField)
@@ -185,7 +202,9 @@ func (s *Service) GetACMEAccount(ctx context.Context, name string) (*ACMEAccount
 }
 
 // RegisterACMEAccount registers a new ACME account with the CA. It runs as a
-// worker; the returned tasks.Ref is awaited for completion.
+// worker; the returned tasks.Ref is awaited for completion. Live-observed
+// against Let's Encrypt staging on 9.2: UPID:…:acmeregister::root@pam:, exit
+// status OK in a few seconds (IMPL-0007 Phase 4, 2026-08-19).
 func (s *Service) RegisterACMEAccount(ctx context.Context, spec *ACMEAccountSpec) (tasks.Ref, error) {
 	if spec == nil {
 		return tasks.Ref{}, fmt.Errorf("nodes.RegisterACMEAccount: %w", svcutil.ErrNilSpec)
@@ -208,26 +227,39 @@ func (s *Service) RegisterACMEAccount(ctx context.Context, spec *ACMEAccountSpec
 	return svcutil.TaskRef("nodes.RegisterACMEAccount", upid)
 }
 
-// UpdateACMEAccount changes an account's contact addresses. The write is
-// synchronous (no task).
-func (s *Service) UpdateACMEAccount(ctx context.Context, name string, update *ACMEAccountUpdate) error {
+// UpdateACMEAccount changes an account's contact addresses. It runs as a worker;
+// the returned tasks.Ref is awaited.
+//
+// Applying the change means talking to the CA, which is why this is a task and
+// not a config write — and why an update with no new information is PVE's way of
+// refreshing the account from the CA. To ask for that refresh, pass an empty
+// update (&ACMEAccountUpdate{}); a nil update is an error, since discarding a
+// caller's nil by silently refreshing would hide the mistake.
+//
+// The task shape here comes from the schema, not from a node: the live run
+// registered, ordered and revoked but never updated an account. If a node ever
+// answers this one with null, the UPID read turns a write that succeeded into an
+// error, and the fix is to make the read tolerant the way
+// [Service.ApplyNetworkConfig] is.
+func (s *Service) UpdateACMEAccount(ctx context.Context, name string, update *ACMEAccountUpdate) (tasks.Ref, error) {
 	if update == nil {
-		return fmt.Errorf("nodes.UpdateACMEAccount: %w", svcutil.ErrNilSpec)
+		return tasks.Ref{}, fmt.Errorf("nodes.UpdateACMEAccount: %w", svcutil.ErrNilSpec)
 	}
 	if name == "" {
-		return fmt.Errorf("nodes.UpdateACMEAccount: name: %w", svcutil.ErrMissingField)
+		return tasks.Ref{}, fmt.Errorf("nodes.UpdateACMEAccount: name: %w", svcutil.ErrMissingField)
 	}
 	body, err := svcutil.EncodeWithExtra(update, update.Extra)
 	if err != nil {
-		return fmt.Errorf("nodes.UpdateACMEAccount: %w", err)
+		return tasks.Ref{}, fmt.Errorf("nodes.UpdateACMEAccount: %w", err)
 	}
 	if len(update.Contact) > 0 {
 		body.Set("contact", strings.Join(update.Contact, ","))
 	}
-	if err := s.c.DoRequest(ctx, http.MethodPut, acmeAccountPath(name), body, nil); err != nil {
-		return fmt.Errorf("nodes.UpdateACMEAccount: %w", err)
+	var upid string
+	if err := s.c.DoRequest(ctx, http.MethodPut, acmeAccountPath(name), body, &upid); err != nil {
+		return tasks.Ref{}, fmt.Errorf("nodes.UpdateACMEAccount: %w", err)
 	}
-	return nil
+	return svcutil.TaskRef("nodes.UpdateACMEAccount", upid)
 }
 
 // DeactivateACMEAccount deactivates an account with the CA and removes it
@@ -247,8 +279,15 @@ func (s *Service) DeactivateACMEAccount(ctx context.Context, name string) (tasks
 // via POST /nodes/{node}/certificates/acme/certificate. It runs as a worker; the
 // returned tasks.Ref is awaited.
 //
-// This is REST-with-caveat: the endpoint is real, but whether order vs renew is
-// task-vs-sync was not confirmed against a live node.
+// Task-vs-sync was settled from the schema and is now live-observed: a dns-01
+// staging order on 9.2 returned UPID:…:acmenewcert::root@pam: and finished with
+// exit status OK (IMPL-0007 Phase 4, 2026-08-19; replayable as
+// TestACMEDNSCloudflare).
+//
+// Budget for a slow task. That order took roughly 80 seconds — thirteen status
+// polls — because acme.sh writes the challenge record and then waits for the CA
+// to resolve it, so the wall clock is the provider's DNS propagation, not PVE's.
+// A ctx whose deadline suits a normal config write will cancel this one.
 func (s *Service) OrderNodeCertificate(ctx context.Context, node string) (tasks.Ref, error) {
 	var upid string
 	if err := s.c.DoRequest(ctx, http.MethodPost, nodeCertACMEPath(node), nil, &upid); err != nil {
@@ -259,8 +298,12 @@ func (s *Service) OrderNodeCertificate(ctx context.Context, node string) (tasks.
 
 // RenewNodeCertificate renews node's existing ACME certificate
 // (PUT /nodes/{node}/certificates/acme/certificate). It runs as a worker; the
-// returned tasks.Ref is awaited. Same REST-with-caveat status as
-// OrderNodeCertificate.
+// returned tasks.Ref is awaited.
+//
+// This is the one certificate verb the live run did not exercise — the phase
+// ordered and revoked, and a renewal wants a certificate old enough to be worth
+// renewing. Its schema is identical to order's, and PVE renews through the same
+// challenge machinery, so expect order's timing rather than a config write's.
 func (s *Service) RenewNodeCertificate(ctx context.Context, node string) (tasks.Ref, error) {
 	var upid string
 	if err := s.c.DoRequest(ctx, http.MethodPut, nodeCertACMEPath(node), nil, &upid); err != nil {
@@ -271,8 +314,14 @@ func (s *Service) RenewNodeCertificate(ctx context.Context, node string) (tasks.
 
 // RevokeNodeCertificate revokes node's ACME certificate with the CA
 // (DELETE /nodes/{node}/certificates/acme/certificate). It runs as a worker; the
-// returned tasks.Ref is awaited. Same REST-with-caveat status as
-// OrderNodeCertificate.
+// returned tasks.Ref is awaited. Live-observed alongside the order:
+// UPID:…:acmerevoke::root@pam:, exit status OK, and unlike the order it finished
+// in a few seconds — nothing waits on DNS to revoke.
+//
+// Revoking is not the whole undo: the node config still carries the acme
+// property that named the domains, and PVE will order again on its renewal
+// cycle. A caller rolling an order back clears that property too — see
+// [Service.SetNodeConfig].
 func (s *Service) RevokeNodeCertificate(ctx context.Context, node string) (tasks.Ref, error) {
 	var upid string
 	if err := s.c.DoRequest(ctx, http.MethodDelete, nodeCertACMEPath(node), nil, &upid); err != nil {

@@ -66,11 +66,34 @@ type API interface {
 	ListACMEAccounts(ctx context.Context) ([]string, error)
 	GetACMEAccount(ctx context.Context, name string) (*ACMEAccount, error)
 	RegisterACMEAccount(ctx context.Context, spec *ACMEAccountSpec) (tasks.Ref, error)
-	UpdateACMEAccount(ctx context.Context, name string, update *ACMEAccountUpdate) error
+	UpdateACMEAccount(ctx context.Context, name string, update *ACMEAccountUpdate) (tasks.Ref, error)
 	DeactivateACMEAccount(ctx context.Context, name string) (tasks.Ref, error)
 	OrderNodeCertificate(ctx context.Context, node string) (tasks.Ref, error)
 	RenewNodeCertificate(ctx context.Context, node string) (tasks.Ref, error)
 	RevokeNodeCertificate(ctx context.Context, node string) (tasks.Ref, error)
+
+	// ACME challenge plugins (IMPL-0007). Cluster-scoped like the accounts, and
+	// every write is synchronous — a plugin is cluster config, not a worker.
+	// CreateACMEPlugin and UpdateACMEPlugin carry provider credentials; see
+	// ACMEPluginData.
+	ListACMEPlugins(ctx context.Context) ([]ACMEPlugin, error)
+	GetACMEPlugin(ctx context.Context, id string) (*ACMEPlugin, error)
+	CreateACMEPlugin(ctx context.Context, spec *ACMEPluginSpec) error
+	UpdateACMEPlugin(ctx context.Context, id string, update *ACMEPluginUpdate) error
+	DeleteACMEPlugin(ctx context.Context, id string) error
+
+	// Node configuration (IMPL-0007). The ACME property strings are typed both
+	// ways; SetNodeConfig is synchronous and clears nothing implicitly — name a
+	// key in NodeConfigUpdate.Delete to unset it.
+	GetNodeConfig(ctx context.Context, node string) (*NodeConfig, error)
+	SetNodeConfig(ctx context.Context, node string, update *NodeConfigUpdate) error
+
+	// ACME discovery (IMPL-0007). GetACMEChallengeSchema publishes each
+	// provider's credential fields — the runtime source of truth behind
+	// ACMEPluginData — and the other two describe the CAs a node can order from.
+	GetACMEChallengeSchema(ctx context.Context) ([]ACMEChallengeSchemaEntry, error)
+	ListACMEDirectories(ctx context.Context) ([]ACMEDirectory, error)
+	GetACMEMeta(ctx context.Context, opts ...ACMEMetaOption) (*ACMEMeta, error)
 }
 
 // Compile-time assertion that *Service implements the published contract.

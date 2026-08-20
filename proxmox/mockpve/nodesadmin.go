@@ -1,6 +1,8 @@
 package mockpve
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -48,13 +50,16 @@ type nodeDiskRecord struct {
 
 // nodeCertRecord is one node certificate in the mock.
 type nodeCertRecord struct {
-	Filename    string
-	Fingerprint string
-	Subject     string
-	Issuer      string
-	NotAfter    int64
-	SAN         []string
-	PEM         string
+	Filename      string
+	Fingerprint   string
+	Subject       string
+	Issuer        string
+	NotBefore     int64
+	NotAfter      int64
+	SAN           []string
+	PEM           string
+	PublicKeyType string
+	PublicKeyBits int
 }
 
 // acmeAccountRecord is one registered ACME account (cluster-scoped).
@@ -119,20 +124,59 @@ type smartPayload struct {
 	Attributes []smartAttrPayload `json:"attributes,omitempty"`
 }
 
+// certPayload mirrors nodeCertRecord field for field — certRecordsToPayload
+// converts between them directly, so the two must stay in the same order.
 type certPayload struct {
-	Filename    string   `json:"filename"`
-	Fingerprint string   `json:"fingerprint,omitempty"`
-	Subject     string   `json:"subject,omitempty"`
-	Issuer      string   `json:"issuer,omitempty"`
-	NotAfter    int64    `json:"notafter,omitempty"`
-	SAN         []string `json:"san,omitempty"`
-	PEM         string   `json:"pem,omitempty"`
+	Filename      string   `json:"filename"`
+	Fingerprint   string   `json:"fingerprint,omitempty"`
+	Subject       string   `json:"subject,omitempty"`
+	Issuer        string   `json:"issuer,omitempty"`
+	NotBefore     int64    `json:"notbefore,omitempty"`
+	NotAfter      int64    `json:"notafter,omitempty"`
+	SAN           []string `json:"san,omitempty"`
+	PEM           string   `json:"pem,omitempty"`
+	PublicKeyType string   `json:"public-key-type,omitempty"`
+	PublicKeyBits int      `json:"public-key-bits,omitempty"`
 }
 
 type acmeAccountPayload struct {
 	Location  string `json:"location,omitempty"`
 	Directory string `json:"directory,omitempty"`
 	TOS       string `json:"tos,omitempty"`
+	// Account is the CA's own account object. Real PVE passes it through
+	// verbatim, and the contact addresses live inside it rather than in a
+	// top-level field — so a caller reading back a contact change has to look
+	// here, and the mock has to carry it for that to be testable.
+	Account *acmeCAAccount `json:"account,omitempty"`
+}
+
+// acmeCAAccount is the CA-side account object: what an ACME server returns for
+// a registration, which PVE passes through untouched.
+type acmeCAAccount struct {
+	Status  string   `json:"status"`
+	Contact []string `json:"contact"`
+}
+
+// acmeAccountObject renders the CA-side account object for a record, with each
+// contact as an RFC 8555 mailto URI. A nil record renders nothing, so the
+// payload's omitempty drops the field rather than the handler having to guard
+// the call (the record is passed by pointer because it is over gocritic's
+// hugeParam threshold, which makes nil reachable).
+func acmeAccountObject(rec *acmeAccountRecord) *acmeCAAccount {
+	if rec == nil {
+		return nil
+	}
+	out := &acmeCAAccount{Status: "valid", Contact: make([]string, 0, len(rec.Contact))}
+	for _, c := range rec.Contact {
+		if c = strings.TrimSpace(c); c == "" {
+			continue
+		}
+		if !strings.HasPrefix(c, "mailto:") {
+			c = "mailto:" + c
+		}
+		out.Contact = append(out.Contact, c)
+	}
+	return out
 }
 
 // --- seeders ---
@@ -179,8 +223,10 @@ func (s *Server) AddNodeCertificate(node, filename string) {
 	defer s.st.mu.Unlock()
 	n := s.ensureNodeLocked(node)
 	n.certs = append(n.certs, nodeCertRecord{
-		Filename: filename, Fingerprint: "AA:BB:CC", Subject: "CN=" + node,
-		Issuer: "CN=" + node, NotAfter: 4102444800, SAN: []string{node},
+		Filename: filename, Fingerprint: mockFingerprint(node + "/" + filename),
+		Subject: "CN=" + node, Issuer: "CN=" + node,
+		NotBefore: mockCertNotBefore, NotAfter: mockCertNotAfter, SAN: []string{node},
+		PublicKeyType: "rsa", PublicKeyBits: 2048,
 	})
 }
 
@@ -394,9 +440,14 @@ func (s *Server) handleCertUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	s.st.mu.Lock()
 	n := s.ensureNodeLocked(node)
-	n.certs = append(n.certs, nodeCertRecord{
-		Filename: "pveproxy-ssl.pem", Subject: "CN=custom", Issuer: "CN=custom",
-		NotAfter: 4102444800, PEM: r.PostForm.Get("certificates"),
+	// Replace, do not append: PVE serves one file at this path, so a second
+	// upload overwrites the first rather than adding a row to the certificate
+	// listing. Appending let the mock report a state the node cannot be in.
+	n.certs = append(withoutFrontendCert(n.certs), nodeCertRecord{
+		Filename: acmeCertFilename, Fingerprint: mockFingerprint("custom/" + node),
+		Subject: "CN=custom", Issuer: "CN=custom",
+		NotBefore: mockCertNotBefore, NotAfter: mockCertNotAfter,
+		PEM: r.PostForm.Get("certificates"), PublicKeyType: "rsa", PublicKeyBits: 2048,
 	})
 	out := certRecordsToPayload(n.certs)
 	s.st.mu.Unlock()
@@ -410,8 +461,10 @@ func (s *Server) handleCertDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	node := r.PathValue("node")
 	s.st.mu.Lock()
+	// Only the front-end file goes: the cluster CA's pve-ssl.pem is not the
+	// operator's to delete, and PVE keeps serving it.
 	if n := s.st.nodes[node]; n != nil {
-		n.certs = nil
+		n.certs = withoutFrontendCert(n.certs)
 	}
 	s.st.mu.Unlock()
 	s.writeData(w, nil)
@@ -419,12 +472,160 @@ func (s *Server) handleCertDelete(w http.ResponseWriter, r *http.Request) {
 
 // handleCertACME serves order (POST) / renew (PUT) / revoke (DELETE); all return
 // a worker task.
+//
+// It moves the node's certificate state, because on real PVE that is the whole
+// point of the call: an order installs a certificate the node then serves, and a
+// revoke takes it away. A mock that answered with a task and changed nothing
+// would let a consumer's ACME automation pass its tests while never checking the
+// thing it exists to check.
+//
+// The failure side is NOT modelled: ordering on a node with no ACME config, or
+// one naming a plugin that does not exist, installs nothing here and still
+// reports OK. Real PVE fails that — but whether it fails the API call or the
+// worker task is unverified (IMPL-0007 Phase 4 exercises the happy path), and
+// guessing would hand consumers an error shape to code against that may not be
+// the real one. That OK is therefore an absence of modelling, not a promise:
+// do not write a test asserting an unconfigured order succeeds.
 func (s *Server) handleCertACME(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
 	}
 	node := r.PathValue("node")
-	s.writeData(w, s.finishedTask(node, "acmecert", "acmecert"))
+
+	s.st.mu.Lock()
+	n := s.ensureNodeLocked(node)
+	n.certs = withoutFrontendCert(n.certs)
+	if r.Method != http.MethodDelete {
+		if san := acmeSANsLocked(n); len(san) > 0 {
+			n.certs = append(n.certs, nodeCertRecord{
+				Filename: acmeCertFilename, Fingerprint: mockFingerprint(strings.Join(san, ",")),
+				Subject: "CN=" + san[0], Issuer: mockACMEIssuer,
+				NotBefore: mockCertNotBefore, NotAfter: mockCertNotAfter, SAN: san,
+				PublicKeyType: "ecdsa", PublicKeyBits: 256,
+			})
+		}
+	}
+	s.st.mu.Unlock()
+
+	// The verb rides the UPID's id field: a synthetic UPID is (node, type, id,
+	// second), so an order and the revoke that follows it within the same second
+	// would otherwise share a UPID and overwrite each other's task record —
+	// leaving a caller polling the order to read the revoke's result.
+	s.writeData(w, s.finishedTask(node, "acmecert", acmeCertVerb(r.Method)))
+}
+
+// Certificate validity for every mock-issued certificate: fixed, because a
+// cassette or an Example that printed a moving date would churn.
+const (
+	mockCertNotBefore = 1735689600 // 2025-01-01T00:00:00Z
+	mockCertNotAfter  = 4102444800 // 2100-01-01T00:00:00Z
+)
+
+// mockFingerprint renders a SHA-256 fingerprint in PVE's shape — 32 colon-
+// separated uppercase hex octets, which is what the apidoc's pattern requires.
+// The old "AA:BB:CC" placeholder would fail a consumer that validates the
+// format, and deriving it from the certificate's own identity keeps it stable
+// across runs so a recorded fixture does not churn.
+func mockFingerprint(seed string) string {
+	sum := sha256.Sum256([]byte(seed))
+	octets := make([]string, 0, len(sum))
+	for _, b := range sum {
+		octets = append(octets, fmt.Sprintf("%02X", b))
+	}
+	return strings.Join(octets, ":")
+}
+
+// acmeCertVerb names the operation an HTTP method performs on the ACME
+// certificate, for the synthetic UPID. It is not a claim about PVE's worker
+// type names, which the apidoc does not carry.
+func acmeCertVerb(method string) string {
+	switch method {
+	case http.MethodPost:
+		return "order"
+	case http.MethodPut:
+		return "renew"
+	default:
+		return "revoke"
+	}
+}
+
+// The filename PVE installs an ACME certificate under, and the issuer this mock
+// stamps on it — deliberately not a real CA name, so a test asserting on a
+// trusted issuer cannot pass here and fail live.
+const (
+	acmeCertFilename = "pveproxy-ssl.pem"
+	mockACMEIssuer   = "CN=mockpve ACME CA"
+	// PVE declares acmedomain0..acmedomain5 (the GET's property enum, with
+	// additionalProperties:0 on the PUT), so six is the whole range.
+	acmeDomainSlots = 6
+)
+
+// withoutFrontendCert returns recs with the API/web front-end certificate
+// removed, whoever issued it. PVE keeps ONE file at that path
+// (pveproxy-ssl.pem) — an ACME order overwrites whatever is there, including a
+// certificate the operator uploaded, and a custom upload overwrites an ACME one
+// — so anything that distinguishes them (the issuer, say) would let the mock
+// hold two entries for a single file, a state the real node cannot reach. The
+// cluster CA's own pve-ssl.pem is a different file and is left alone.
+func withoutFrontendCert(recs []nodeCertRecord) []nodeCertRecord {
+	out := recs[:0:0]
+	for i := range recs {
+		if recs[i].Filename == acmeCertFilename {
+			continue
+		}
+		out = append(out, recs[i])
+	}
+	return out
+}
+
+// slotDomain extracts the domain from an "acmedomain[n]" property string.
+// The domain is PVE's default key, so it may be bare ("host,plugin=cf") or
+// keyed ("plugin=cf,domain=host") — and keyed does not imply first, which is
+// what a naive read of the leading token gets wrong. A slot naming no domain
+// yields "", and an order certifies nothing for it: the SDK's own parser treats
+// that string as unparseable and keeps it in Extra, so issuing a certificate for
+// "plugin=cf" would have the mock and the SDK reading one config two ways.
+func slotDomain(v string) string {
+	for i, part := range strings.Split(v, ",") {
+		part = strings.TrimSpace(part)
+		if rest, ok := strings.CutPrefix(part, "domain="); ok {
+			return rest
+		}
+		if i == 0 && !strings.Contains(part, "=") {
+			return part
+		}
+	}
+	return ""
+}
+
+// acmeSANsLocked collects the names an order would certify from the node's own
+// config: the acmedomain slots, then the legacy acme=domains list. Caller holds
+// mu. An empty result means the node was never wired for ACME, which is why an
+// order there installs nothing.
+func acmeSANsLocked(n *nodeState) []string {
+	var san []string
+	seen := make(map[string]bool)
+	add := func(domain string) {
+		if domain = strings.TrimSpace(domain); domain != "" && !seen[domain] {
+			seen[domain] = true
+			san = append(san, domain)
+		}
+	}
+	for i := range acmeDomainSlots {
+		v, ok := n.config["acmedomain"+strconv.Itoa(i)]
+		if !ok {
+			continue
+		}
+		add(slotDomain(v))
+	}
+	for _, part := range strings.Split(n.config["acme"], ",") {
+		if rest, ok := strings.CutPrefix(strings.TrimSpace(part), "domains="); ok {
+			for _, d := range strings.Split(rest, ";") {
+				add(d)
+			}
+		}
+	}
+	return san
 }
 
 func (s *Server) handleACMEAccountList(w http.ResponseWriter, r *http.Request) {
@@ -476,7 +677,10 @@ func (s *Server) handleACMEAccountGet(w http.ResponseWriter, r *http.Request) {
 	rec := s.st.acmeAccounts[name]
 	var payload acmeAccountPayload
 	if rec != nil {
-		payload = acmeAccountPayload{Location: rec.Location, Directory: rec.Directory, TOS: rec.TOS}
+		payload = acmeAccountPayload{
+			Location: rec.Location, Directory: rec.Directory, TOS: rec.TOS,
+			Account: acmeAccountObject(rec),
+		}
 	}
 	s.st.mu.Unlock()
 	if rec == nil {
@@ -486,7 +690,10 @@ func (s *Server) handleACMEAccountGet(w http.ResponseWriter, r *http.Request) {
 	s.writeData(w, payload)
 }
 
-// handleACMEAccountUpdate changes an account's contact. Synchronous.
+// handleACMEAccountUpdate changes an account's contact and returns a worker
+// task. PVE talks to the CA to apply the change (its own description notes that
+// sending no new information triggers a refresh), and the 9.2 schema declares a
+// bare string return — its house style for a UPID.
 func (s *Server) handleACMEAccountUpdate(w http.ResponseWriter, r *http.Request) {
 	if !s.checkAuth(w, r) {
 		return
@@ -499,7 +706,7 @@ func (s *Server) handleACMEAccountUpdate(w http.ResponseWriter, r *http.Request)
 	rec := s.st.acmeAccounts[name]
 	if rec != nil {
 		if v := r.PostForm.Get("contact"); v != "" {
-			rec.Contact = strings.Split(v, ",")
+			rec.Contact = splitCSV(v)
 		}
 	}
 	s.st.mu.Unlock()
@@ -507,7 +714,7 @@ func (s *Server) handleACMEAccountUpdate(w http.ResponseWriter, r *http.Request)
 		s.writeError(w, http.StatusNotFound, msgNoSuchACMEAccount)
 		return
 	}
-	s.writeData(w, nil)
+	s.writeData(w, s.finishedTask("pve", "acmeupdate", name))
 }
 
 // handleACMEAccountDelete deactivates an account and returns a worker task.
@@ -540,8 +747,8 @@ func (s *Server) certsForNodeLocked(node string) []nodeCertRecord {
 
 func certRecordsToPayload(recs []nodeCertRecord) []certPayload {
 	out := make([]certPayload, 0, len(recs))
-	for _, rec := range recs {
-		out = append(out, certPayload(rec))
+	for i := range recs {
+		out = append(out, certPayload(recs[i]))
 	}
 	return out
 }

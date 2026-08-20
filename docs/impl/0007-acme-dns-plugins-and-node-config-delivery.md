@@ -1,7 +1,7 @@
 ---
 id: IMPL-0007
 title: "ACME DNS plugins and node config delivery"
-status: Draft
+status: Completed
 author: Donald Gifford
 created: 2026-08-17
 ---
@@ -10,8 +10,9 @@ created: 2026-08-17
 
 # IMPL 0007: ACME DNS plugins and node config delivery
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-08-17 (OQs decided
-2026-08-17: all a)
+**Status:** Completed **Author:** Donald Gifford **Date:** 2026-08-17 (OQs
+decided 2026-08-17: all a; closed 2026-08-20 — Phase 4 verified live on the
+pvelab nested cluster, Namecheap descoped)
 
 <!--toc:start-->
 
@@ -36,6 +37,7 @@ created: 2026-08-17
 - [File Changes](#file-changes)
 - [Testing Plan](#testing-plan)
 - [Dependencies](#dependencies)
+- [Follow-up: move the destructive integration tests off r740a](#follow-up-move-the-destructive-integration-tests-off-r740a)
 - [Open Questions](#open-questions)
 - [References](#references)
 <!--toc:end-->
@@ -80,7 +82,12 @@ shared domain for both providers, sequential nameserver switch).
 - Any non-ACME typed fields on node config (`wakeonlan` etc. ride in `Extra`).
 - The deprecated `/cluster/acme/tos` endpoint (no SDK surface, per the design;
   its coverage-report handling is OQ-2 here).
-- ACME account op changes (Phase 6 surface, untouched).
+- ACME account op changes (Phase 6 surface, untouched — except the
+  `UpdateACMEAccount` return-shape fix the Phase-4 schema audit forced).
+- **A live Namecheap issuance** (descoped 2026-08-20, Phase 4 task 4). The typed
+  struct, its unit tests and its env-gated harness all ship; what does not ship
+  is evidence from a node. Reopening it costs a nameserver switch on the shared
+  domain plus a propagation wait.
 
 ## Ground facts
 
@@ -100,9 +107,17 @@ Checked against the tree and the committed 9.2 apidoc, 2026-08-17:
 - The per-provider credential field names (`CF_Token`, `NAMECHEAP_API_KEY`, …)
   are **runtime** challenge-schema facts, not in the apidoc — the typed structs
   are written from acme.sh's documented variables and confirmed live in Phase 4.
-- `acmedomain[n]`'s maximum index is **not stated in the apidoc** (the
-  properties key is the wildcard `acmedomain[n]`); the SDK models slots without
-  a hard cap and lets the server enforce its limit.
+- ~~`acmedomain[n]`'s maximum index is **not stated in the apidoc**~~ — **WRONG,
+  corrected 2026-08-18.** The PUT's wildcard `acmedomain[n]` is the apidoc
+  generator's COLLAPSED rendering of concrete keys, and reading only that key is
+  what produced the error. Two other facts in the same schema state the bound:
+  the PUT sets `additionalProperties: 0`, and the GET's `property` filter
+  enumerates `acmedomain0`…`acmedomain5`. A grep for `acmedomain[0-9]*` across
+  the whole 4.3 MB apidoc returns exactly those six, once each. **Slots are
+  0–5**; `acmedomain6` is a parameter-verification 400. The SDK now exports
+  `ACMEDomainMaxIndex` and refuses a higher slot on write, while keeping the
+  READ permissive (PVE returns a hand-edited config verbatim, and a key the SDK
+  will not write is still one it must not lose).
 - The plugin `data` wire form is base64 of newline-joined `KEY=value` pairs;
   `GET …/plugins/{id}` returns the stored config, so response bodies carry the
   secret too — both directions need recorder redaction.
@@ -126,7 +141,7 @@ self-service.
 
 #### Tasks
 
-- [ ] 1. Provider data model in `proxmox/nodes/acmeproviders.go`: the two-method
+- [x] 1. Provider data model in `proxmox/nodes/acmeproviders.go`: the two-method
      `ACMEPluginData` interface, `Cloudflare` (Token/AccountID/ ZoneID/Key/Email
      → `CF_*`), `Namecheap` (Username/APIKey/SourceIP → `NAMECHEAP_*`),
      `RawPluginData{Provider, Values}`, and the unexported render helper (sorted
@@ -134,41 +149,221 @@ self-service.
      values as credentials (never log), Namecheap as unit-verified-only until
      Phase 4, and the field names as confirmed-live-via-challenge-schema. Unit
      tests: exact base64 output for both typed providers and raw;
-     empty-omission; sort stability.
-- [ ] 2. Plugin types + paths in `proxmox/nodes/acmeplugins.go`: lossless
+     empty-omission; sort stability. _(Done 2026-08-17: `ACMEPluginData` +
+     `Cloudflare`/`Namecheap`/`RawPluginData` + `encodePluginData` (sorted,
+     empty-omitting, base64). All three providers satisfy the interface **by
+     value** — uniform construction, and a typed-nil receiver is impossible;
+     `Cloudflare` sits exactly at gocritic's 80-byte hugeParam threshold so it
+     carries a documented `nolint` rather than becoming the one provider needing
+     `&`. Note for future edits: gofumpt moves a `//nolint` directive to the END
+     of its doc-comment group, so the reason must be self-contained on that one
+     line (the first attempt was silently reordered into nonsense). 8 tests
+     including exact-base64 for each provider, the standalone empty case, a
+     64-iteration determinism loop that fails without the sort, and a
+     no-plaintext-leak guard.)_
+- [x] 2. Plugin types + paths in `proxmox/nodes/acmeplugins.go`: lossless
      `ACMEPlugin` read (`Plugin`, `Type`, `API`, `Data` verbatim base64,
      `ValidationDelay`, `Nodes` CSV, `Disable`, `Digest`, `Extra` via
      `svcutil.DecodeExtra`), `ACMEPluginSpec` (ID required;
      `Data ACMEPluginData` required when Type is dns; `Nodes []string`
      `json:"-"` CSV-joined post-encode), `ACMEPluginUpdate` (+
      `Delete []string`, `Digest`), path helpers, and `TestACMEPathsReal` pinning
-     the plugin paths (the `TestCephPathsReal` pattern).
-- [ ] 3. mockpve plugin state in `mockpve/nodesadmin.go`: `acmePlugins` map (id
+     the plugin paths (the `TestCephPathsReal` pattern). _(Done 2026-08-17:
+     `acmeplugins.go` carries `ACMEPlugin` (lossless), `ACMEPluginSpec`,
+     `ACMEPluginUpdate`, plus the task-5 read types written up front since they
+     share the file: `ChallengeSchemaEntry`, `ACMEDirectory`, and lossless
+     `ACMEMeta`. Two additions beyond the ledger line: exported
+     `ChallengeTypeDNS`/`ChallengeTypeStandalone` constants (the wire enum has
+     exactly two values, and goconst would flag the repeated literal anyway),
+     and `ACMEPluginUpdate.Data` so credentials can be ROTATED — an update that
+     could not replace the payload would force delete-and-recreate for a token
+     rotation. Paths pinned by `TestACMEPathsReal`, including a comment on why
+     there is no `tos` helper. Toolchain note: `just fmt` runs `go fmt`, which
+     does NOT enforce gofumpt's blank-line rule between a single-line and a
+     multi-line func — `golangci-lint fmt <file>` is what fixes a `gofumpt`
+     finding.)_
+- [x] 3. mockpve plugin state in `mockpve/nodesadmin.go`: `acmePlugins` map (id
      → record with digest), routes for the five verbs through `handle`,
      `AddACMEPlugin` seeder, digest-mismatch conflict on update (mirror real
      PVE's refusal), `delete` param honored. The mock stores `data` verbatim and
-     returns it on get/list, same as real PVE.
-- [ ] 4. The five CRUD ops (`ListACMEPlugins`/`GetACMEPlugin`/
+     returns it on get/list, same as real PVE. _(Done 2026-08-17, with one
+     placement deviation: the plugin + discovery routes live in a NEW
+     `mockpve/acme.go` rather than growing `nodesadmin.go` — that file is
+     already the apt/disks/certs/accounts grab-bag, and a per-surface file is
+     the mock's own convention. `acmePlugins` keyed by ID; `AddACMEPlugin`
+     seeder; digest guard (a non-matching `digest` is a 400, an absent one is
+     unguarded, as on real PVE); `delete` honored, applied AFTER the sets so a
+     set+unset request is unambiguous. The list handler **sorts** — the rest of
+     mockpve returns raw map order, but a random order makes an `// Output:`
+     Example impossible, and real PVE's order is stable too. Numeric fields are
+     stored as the form's strings (that is what makes partial update trivial)
+     and converted by `atoiOrZero`, since errcheck's check-blank forbids the `v,
+     _ := strconv.Atoi` shorthand.)\_
+- [x] 4. The five CRUD ops (`ListACMEPlugins`/`GetACMEPlugin`/
      `CreateACMEPlugin`/`UpdateACMEPlugin`/`DeleteACMEPlugin`), all synchronous
      (`error`, never `tasks.Ref`). Unit round-trips against mockpve: create with
      typed `Cloudflare` data → get returns the exact base64; create with
      `RawPluginData`; update with `Delete` + digest-mismatch rejection;
-     standalone type with no data; nil-spec and missing-ID guards.
-- [ ] 5. Discovery reads: `GetChallengeSchema` (`ChallengeSchemaEntry`, `Schema`
+     standalone type with no data; nil-spec and missing-ID guards. _(Done
+     2026-08-17: all five synchronous, added to the `API` interface (the
+     mockability seam). Two contract decisions worth recording: (a) a `dns`
+     plugin with no `Data` is refused **client-side** — PVE would accept the
+     config and then fail every order, which is far harder to diagnose than an
+     error at the call; (b) `Type` defaults to `dns` so the common case needs no
+     enum. 12 tests: the flagship verbatim-base64 round-trip, the raw-provider
+     path, standalone, sorted list, rotate-vs-keep credentials on update,
+     `Delete`, stale-digest refusal WITH a fresh-digest control (a refusal test
+     alone would pass if the mock refused everything), not-found for all three
+     addressed verbs, and the client-side guards.)_
+- [x] 5. Discovery reads: `GetChallengeSchema` (`ChallengeSchemaEntry`, `Schema`
      as `json.RawMessage`), `ListACMEDirectories` (`ACMEDirectory{Name, URL}`),
      and `GetACMEMeta` per OQ-1 (lossless `ACMEMeta`, optional
      `WithACMEDirectory` query option). mockpve serves static payloads: two
      schema entries (`cf`, `namecheap` with plausible field schemas), the two
      Let's Encrypt directories, a static meta. Unit tests decode all three.
+     _(Done 2026-08-17: all three landed and added to the `API` interface.
+     `GetACMEMeta`'s `directory` rides in the GET path as a query parameter
+     (`WithACMEDirectory`) — the storage `WithContentType` precedent, since GET
+     bodies are not form-encoded. The mock's meta payload carries an unmodelled
+     `externalAccountBinding` key so the lossless path is exercised rather than
+     assumed, and it derives `termsOfService` from the requested directory so
+     `TestGetACMEMetaWithDirectory` proves the option reached the wire instead
+     of merely compiling. `TestGetChallengeSchema` asserts each typed provider's
+     `API()` appears as a schema id and that `cf`'s schema mentions `CF_Token` —
+     the in-repo half of the Phase 4 field-name check, which is the only part
+     verifiable without a node. 4 tests, all green.)_
 
 #### Success Criteria
 
-- `go build ./...`, `just lint`, `just test` (race) green.
+- `go build ./...`, `just lint`, `just test` (race) green. **Met 2026-08-17.**
 - Plugin CRUD round-trips against mockpve, including the digest guard and the
   verbatim-base64 property (what was rendered at create is what get returns).
+  **Met 2026-08-17** — `TestCreateAndGetACMEPluginCloudflare` asserts the get
+  returns byte-for-byte what `encodePluginData` rendered, and the digest guard
+  is covered in both directions (stale refused, fresh accepted).
 - `just coverage-check` green with the eight cluster-ACME rows flipped to
   covered and zero unmatched routes — the fabrication guard is the proof the
-  paths are real.
+  paths are real. **Met 2026-08-17** — 248/675 → **256/675 (37.9%)**, exactly
+  the eight cluster-ACME rows, 0 unmatched. The two node-config rows land in
+  Phase 2 for the planned 258.
+
+**Phase-review remediation (2026-08-18).** A style/API pass and a
+credential-leak pass over the phase diff produced six changes, all landed before
+Phase 2 started:
+
+1. **A real bug — a non-nil-but-empty provider wrote a credential-less plugin.**
+   `applyPluginData` set `data` only when the render was non-empty, so
+   `Data: ACMECloudflare{Token: os.Getenv("CF_TOKEN")}` with the variable unset
+   sailed past the `Data == nil` guard and PVE stored a plugin it could never
+   drive. On an update it was worse: the call returned nil having changed
+   nothing, so a caller rotating a token believed it had rotated while the old
+   one stayed live. `applyPluginData` now returns an error for both an empty
+   render and an empty provider name. `TestACMEPluginRejectsEmptyCredentials`
+   covers create, the silent-rotation case (asserting the stored payload is
+   untouched), and the unnamed raw provider.
+2. **Renamed the un-prefixed exports** — `Cloudflare`→`ACMECloudflare`,
+   `Namecheap`→`ACMENamecheap`, `RawPluginData`→`ACMERawPluginData`,
+   `ChallengeSchemaEntry`→`ACMEChallengeSchemaEntry`,
+   `GetChallengeSchema`→`GetACMEChallengeSchema`. DESIGN-0006 named them
+   unprefixed; `nodes` is the SDK's grab-bag package (interfaces, apt, disks,
+   SMART, certs) and all nine pre-existing ACME identifiers carry the prefix, so
+   `nodes.RawPluginData` read like a _storage_ plugin. Pre-v1 this costs a
+   rename; post-tag it would be a consumer break.
+3. **`ACMEChallengeType` is now a defined type** (the `ha.RuleType` /
+   `sdn.FabricProtocol` convention) **and unknown values are refused**. A
+   capital-D `"DNS"` previously missed the dns comparison, so the
+   credentials-required guard never fired and the typo reached the cluster
+   config. Added `svcutil.ErrInvalidValue` for this class of refusal, beside the
+   existing `ErrNilSpec`/`ErrMissingField`.
+4. **Redaction under `fmt`.** The write path had only a doc comment protecting
+   it: `%+v` of a spec printed a live token, and the first consumer is a service
+   whose logs go to a pipeline. The three providers and `ACMEPlugin` now have
+   `String` methods; the provider receivers must be **values**, since fmt will
+   not call a pointer method on the non-addressable value inside an interface.
+   The tests format through an `any` — that is how a value reaches slog, and it
+   is the only form that exercises fmt's dispatch rather than calling `String`
+   directly (it also sidesteps gocritic's `redundantSprint`).
+5. **Corrected a dishonest doc line.** `ACMEPlugin` claimed that offering no
+   decode helper meant "printing an ACMEPlugin cannot spill plaintext
+   credentials" — true and misleading, since base64 is one `base64 -d` from
+   plaintext. It now says so.
+6. Smaller: `ACMEPluginUpdate.Nodes` documented as REPLACE-with-empty-means-keep
+   (it inverts `ACMEPluginSpec.Nodes`, where empty means every node — an
+   operator widening a restriction would silently no-op); `GetACMEMeta` builds
+   its query with `url.Values`; the mock's form helper takes `url.Values` like
+   its six siblings.
+
+**Carried into Phase 3 task 1** (recorder redaction), confirmed by both reviews
+against the real payload shapes: `redactInteraction` currently scrubs none of
+the three places `data` appears (request body, go-vcr's parsed `Request.Form`,
+response body — the GET returns the stored credential). Critically, **the scrub
+must be URL-scoped to `/cluster/acme/plugins`**: a blanket `"data"` JSON rule
+also matches the envelope's `{"data":"UPID:…"}` and would destroy the UPID in
+every existing task-returning cassette.
+
+**Not actioned, for Donald:** `govulncheck` reports 6 reachable stdlib
+vulnerabilities on go 1.26.4 (two `crypto/tls`, three `net/http`), fixed in
+1.26.6. That is a `go.mod`+`mise.toml` bump Renovate owns, and folding a
+toolchain change into a feature PR would muddy both.
+
+**Phase 2/3 review remediation (2026-08-18, after PR #27 went green).** A second
+review pass — this one told to verify my apidoc claims rather than trust them —
+found one wrong ground fact and nine defects. All fixed on the branch:
+
+1. **The slot bound above.** This is the INV-0004 failure class at PARAMETER
+   level rather than path level, which is exactly the gap the coverage
+   fabrication guard cannot see: the path is real, the parameter is not.
+   `TestAcmeDomainSlot` had actively blessed `acmedomain42`.
+2. **`parseACMEDomain` only honoured the bare default key in first position.**
+   PVE's `parse_property_string` takes a bare token wherever it appears, and a
+   hand-edited `plugin=cf,host.example` is stored verbatim. The slot silently
+   vanished from the typed field into `Extra`, so a read-modify-write would drop
+   the domain — including the integration test's own config restore.
+3. **The mock applied `delete` AFTER the sets**; real PVE (and this repo's own
+   shared `applyConfigForm`) does the opposite. A request that both sets and
+   deletes one key would have behaved differently here than on a node, so a test
+   written against the mock would have encoded the wrong expectation.
+4. **The lossless read was not lossless for a non-string `acme`/`digest`.** The
+   `known` map was pre-seeded, so a key that failed to decode was neither typed
+   nor preserved — the one thing the type promises. It now starts empty and
+   grows only as a key is successfully claimed, matching what the acmedomain
+   branch already did. A JSON `null` acme also no longer yields a non-nil empty
+   `ACME`.
+5. **`acmeDomainSlot` accepted non-canonical suffixes** (`acmedomain00`,
+   `acmedomain+1`), so two config keys could parse to one slot and produce a
+   read the SDK's own writer refuses.
+6. **`ACME: &NodeACME{}` sent `acme=`**, which on a real node CLEARS the account
+   and the legacy domain list — a silent destructive write from what reads like
+   a no-op, and reachable from the integration test's own cleanup. Now refused,
+   naming `Delete` as the way to clear it.
+7. **Recorder hardening (the highest-stakes item).** The URL-scoped rule covers
+   every request the SDK makes with a credential, but says nothing about a
+   response that echoes one back from elsewhere. The realistic case: a FAILED
+   order — the run most likely to be re-recorded while debugging — makes
+   `tasks.Wait` fetch `/nodes/{node}/tasks/{upid}/log`, a URL the rule ignores.
+   Added `scrubACMECredentialValues`, which scrubs the credential VALUES
+   (plaintext and base64) from every interaction regardless of URL, taking them
+   from the same env vars the tests read. Values under 12 characters are skipped
+   so a short one cannot rewrite unrelated text.
+8. **The integration test built a SECOND client inside
+   `registerStagingAccount`.** Under `PVE_RECORD` that starts a second recorder
+   on the same cassette path, and go-vcr's record-only mode rewrites the whole
+   file on stop — the two would have clobbered each other and quietly dropped
+   the registration interactions from the very cassette Phase 4 exists to
+   produce.
+9. **The revoke was not in a cleanup.** Any failure after the order landed —
+   most plausibly the SAN probe, which dials the public FQDN that may not
+   resolve to the node — would abort with the node already serving an untrusted
+   staging certificate, and the config-restore cleanup does not undo that.
+   Registered as a cleanup immediately after the order, so it runs first.
+10. `leaf.Issuer.Organization[0]` was indexed on the failure path, where an
+    issuer DN without an `O` would panic and replace the diagnosis with a stack
+    trace.
+
+The review also confirmed, by running them against real payload shapes, that the
+redaction regexes themselves are correct (`data` first/last/middle/alone,
+repeated keys, `metadata=` correctly untouched, both read shapes,
+`{"data":null}` spared) and that the sparse-slot handling is right end to end.
 
 ---
 
@@ -179,35 +374,82 @@ typed both ways.
 
 #### Tasks
 
-- [ ] 1. Property-string parse/render in `proxmox/nodes/nodeconfig.go`:
+- [x] 1. Property-string parse/render in `proxmox/nodes/nodeconfig.go`:
      `NodeACME` ↔ `acme` (`account=…[,domains=…;…]`) and `ACMEDomain` ↔
      `acmedomain[n]` (`[domain=]<domain>[,plugin=…][,alias=…]`), following the
      CRS-settings precedent (typed both ways, no Extra inside a compound
      property). Table-driven tests: default-key domain form, all-options form,
-     round-trip stability, malformed-string rejection.
-- [ ] 2. `NodeConfig` lossless read (`ACME`, `ACMEDomains` index-ordered,
+     round-trip stability, malformed-string rejection. _(Done 2026-08-18:
+     `parseNodeACME`/ `encodeNodeACME` and `parseACMEDomain`/`encodeACMEDomain`,
+     plus `acmeDomainSlot`/`acmeDomainKey` for the indexed config key. Two facts
+     re-confirmed against the committed 9.2 apidoc before writing: `acme` has NO
+     default key (both `account` and `domains` are keyed) while `acmedomain[n]`
+     makes `domain` its default key, so the bare form PVE's own UI writes must
+     parse. One asymmetry is deliberate — `parseNodeACME` ignores what it cannot
+     understand (the CRS precedent), but `parseACMEDomain` returns an ERROR when
+     no domain is present, because `domain` is required and a domain-less slot
+     is not something the SDK can write back. The bare default key is honoured
+     only in FIRST position, so `plugin=cf,host.example` is an error rather than
+     silently adopting the trailing token. 5 table-driven tests, 33 cases,
+     including a round-trip that asserts re-encoding is a fixed point.)_
+- [x] 2. `NodeConfig` lossless read (`ACME`, `ACMEDomains` index-ordered,
      `Digest`, `Extra`) + `GetNodeConfig`; `NodeConfigUpdate` + `SetNodeConfig`
      with the explicit-delete contract (writes only the slots given; clearing is
      `Delete: ["acmedomain1"]`, never implicit diffing) and the `Digest`
      concurrent-write guard. Extend `TestACMEPathsReal` with the node-config
-     path.
-- [ ] 3. mockpve node-config state: per-node config map + digest,
+     path. _(Done 2026-08-18. **Deviation from DESIGN-0006, worth recording:**
+     `ACMEDomain` gained an `Index` field the design did not have. The design's
+     contract was positional — `ACMEDomains[i]` ↔ `acmedomain<i>` — which is
+     wrong for a SPARSE config: a node with slots 0 and 3 would read back as a
+     two-element slice and write back as slots 0 and 1, silently moving a
+     domain. Carrying the true slot makes the round-trip honest, and
+     `SetNodeConfig` refuses a duplicate index rather than dropping one of two
+     writes to the same slot. A malformed slot does not fail the read — the raw
+     string stays in `Extra` under its own key, since one hand-edited line
+     should not render a node unreadable. `SetNodeConfig` encodes through
+     `EncodeWithExtra` with an empty struct: every typed field here is a
+     property string or a control parameter, so there is nothing for the flat
+     JSON encoder to render.)_
+- [x] 3. mockpve node-config state: per-node config map + digest,
      `GET`/`PUT /nodes/{node}/config` routes through `handle`, digest-mismatch
      conflict, `delete` param honored, seeder. Unit round-trips: set two
      acmedomain slots + account → get parses both; delete one slot; digest
-     rejection; non-ACME keys survive via `Extra` untouched.
-- [ ] 4. Regenerate `docs/COVERAGE.md` (`just coverage`) — the two node-config
+     rejection; non-ACME keys survive via `Extra` untouched. _(Done 2026-08-18:
+     `nodeState.config` (raw key → property string, exactly as the wire carries
+     it), `SetNodeConfigKey` seeder, and the two routes in `mockpve/acme.go`
+     beside the plugin routes. The GET honours PVE's optional `property` filter.
+     An unknown node reads as an empty config rather than a 404, matching how
+     the neighbouring node-scoped handlers tolerate one (`handleNetworkList`);
+     the PUT uses `ensureNodeLocked`. The mock stores only what the request
+     names and applies `delete` afterwards — it has to be as literal as real PVE
+     for the SDK's "clears nothing implicitly" contract to be worth testing. 7
+     service-level tests: the two-domain round-trip, sparse slots, the
+     explicit-delete contract in both halves (a write naming slot 0 leaves slot
+     1 alone), losslessness of description/wakeonlan/startall-onboot-delay, the
+     malformed slot, the digest guard in both directions, and the client-side
+     guards.)_
+- [x] 4. Regenerate `docs/COVERAGE.md` (`just coverage`) — the two node-config
      rows flip; total lands at 258 (OQ-1a) — and add the `/cluster/acme/tos`
      `out_of_scope` annotation with its deprecation reason (OQ-2a, the section's
-     first non-empty entry).
+     first non-empty entry). _(Done 2026-08-18: **258/675 (38.2%)**, the figure
+     the ground-facts section predicted. `/cluster/acme/tos` is the
+     `out_of_scope` section's first entry, reason citing DESIGN-0006 and
+     pointing at `GetACMEMeta`; its row now reads "out of scope" with the reason
+     inline instead of an unexplained gap. The section's header comment was
+     rewritten so "empty on purpose" did not survive as a lie next to a
+     non-empty list — the untriaged families are still deliberately absent, and
+     the comment now says why an entry earns its place.)_
 
 #### Success Criteria
 
 - Property-string round-trips pass, including multi-slot `acmedomain[n]` and the
-  explicit-delete contract.
+  explicit-delete contract. **Met 2026-08-18** — and the sparse-slot case that
+  the positional design would have got wrong is covered too
+  (`TestNodeConfigSparseSlots`).
 - `just coverage-check` green; the committed report is current with all intended
-  flips and no annotation drift.
-- `just lint` + `just test` (race) green.
+  flips and no annotation drift. **Met 2026-08-18** — 256 → **258/675 (38.2%)**,
+  0 unmatched routes, one new annotation.
+- `just lint` + `just test` (race) green. **Met 2026-08-18.**
 
 ---
 
@@ -218,13 +460,26 @@ will execute, and the release PR.
 
 #### Tasks
 
-- [ ] 1. Recorder redaction FIRST: the integration harness's `BeforeSaveHook`
+- [x] 1. Recorder redaction FIRST: the integration harness's `BeforeSaveHook`
      scrubs the `data` form field (request side) and the base64 `data` values in
      plugin response bodies to `REDACTED`, plus the go-vcr parsed-`Form` map
      (the 2026-07-23 leak-review precedent). Extend `TestRedactInteraction` with
      a plugin-create interaction so the scrub is pinned before any live capture
-     exists.
-- [ ] 2. Env-gated integration tests in `proxmox/integration/`
+     exists. _(Done 2026-08-18, and the phase-1 review pass independently
+     confirmed the gap by running the two existing regexes against real ACME
+     payloads: **none** of the three places `data` appears was scrubbed. The new
+     `redactACMEPluginData` covers all three — request body, go-vcr's separately
+     stored parsed `Form` map (the 2026-07-23 node-name precedent), and the
+     response body of a plugin read, since PVE does not treat `data` as
+     write-only. **The scrub is URL-scoped to `/cluster/acme/plugins` and must
+     stay that way:** `data` is also the name of PVE's response envelope, so a
+     blanket rule rewrites `{"data":"UPID:…"}` and breaks `tasks.Wait` on replay
+     for every existing task-returning cassette. `TestRedactACMEDataSpareUPID`
+     pins exactly that, beside `TestRedactACMEPluginData` (request body, Form
+     map, and both the single and list read shapes, while asserting the
+     non-secret `id`/`type`/`api` parameters survive so the cassette still
+     documents the request shape).)_
+- [x] 2. Env-gated integration tests in `proxmox/integration/`
      (`//go:build integration`): `TestACMEDNSCloudflare` and
      `TestACMEDNSNamecheap`, gated per OQ-3's env set, both skipping cleanly
      without a node/domain. Flow per the design: staging directory via
@@ -232,29 +487,86 @@ will execute, and the release PR.
      account on the target node → order → await task → verify the served
      certificate's SAN → revoke → restore node config + delete plugin/account.
      Teardown uses `cleanupCtx`, never `context.Background()`. Compile-verified
-     via `go vet -tags=integration ./proxmox/integration/`.
-- [ ] 3. TESTING.md: an ACME DNS section — domain + scoped-token prep, the env
+     via `go vet -tags=integration ./proxmox/integration/`. _(Done 2026-08-18:
+     `integration/acme_test.go`. Both tests are one shared `runACMEDNSLifecycle`
+     with different credentials — running the SAME sequence through two
+     providers is what actually demonstrates the model is provider-generic
+     rather than Cloudflare-shaped. Three decisions worth recording. (a) The
+     staging directory is **resolved from the node's own
+     `ListACMEDirectories`**, and the helper `t.Fatal`s if no staging entry
+     exists rather than falling through to production — a misconfigured run must
+     not burn LE rate limits. (b) The final assertion **dials the node's :8006
+     and inspects the presented certificate** rather than reading the API back:
+     PVE reporting a finished task only proves it stored something. The probe
+     skips TLS verification on purpose (a staging cert chains to an untrusted
+     root by design) and checks the SAN plus that the issuer really is a staging
+     CA. (c) The ACME **account is reused, not recreated** — it holds the CA
+     registration key, and re-registering every run is what burns rate limits —
+     while the plugin and the node config ARE restored, the latter slot-by-slot
+     from the pre-run read. Both skip with an actionable message when their env
+     is absent, and under `PVE_REPLAY` too, since no cassette can stand in for a
+     TLS dial. `go vet -tags=integration` clean.)_
+- [x] 3. TESTING.md: an ACME DNS section — domain + scoped-token prep, the env
      set, Let's Encrypt staging, the sequential provider dance (Cloudflare run →
      nameserver switch + propagation wait → Namecheap run), and the cassette
-     leak-review checklist addition (`data` must read REDACTED).
-- [ ] 4. Docs promotion: `nodes/doc.go` gains the ACME story (accounts → plugins
+     leak-review checklist addition (`data` must read REDACTED). _(Done
+     2026-08-18: a "ACME DNS-01" section under the lifecycle tests, plus six new
+     env rows and two edits to the recording chapter. The section leads with the
+     constraint that actually matters — **run it on pvelab, never r740a**,
+     because an order replaces the node's pveproxy certificate and the staging
+     cert it installs is untrusted by design — and explains WHY the two provider
+     runs are sequential rather than just asserting it: a zone has one set of
+     authoritative nameservers, so the Namecheap run needs a registrar NS switch
+     and its propagation wait first (`dig +trace NS` to confirm). The
+     leak-review checklist gained an explicit "do not skim past a base64 blob"
+     line — that is the exact failure mode the redaction exists to prevent, and
+     a reviewer who does not know `data:` is a credential will nod straight past
+     it.)_
+- [x] 4. Docs promotion: `nodes/doc.go` gains the ACME story (accounts → plugins
      → node config → order, with the provider-generic model); a runnable
      `Example` (named, e.g. `Example_acmeDNS`) wiring plugin-create → node
      config → order against mockpve with an `// Output:` block; `go doc ./...`
-     renders cleanly.
-- [ ] 5. PR: exactly one `minor` label (new public API on `proxmox/nodes`);
+     renders cleanly. _(Done 2026-08-18. The old `doc.go` was stale in a way
+     worth noting: it still described networking as "the first surface (Phase
+     5)" and promised node status/packages/disks/certificates in "later phases"
+     — all of which landed in Phase 6. The rewrite covers the whole surface
+     under headings, and states the ACME flow as the four ordered pieces it
+     actually is (account → plugin → node wiring → order), since the ordering is
+     the part a consumer gets wrong. It also records two things the API cannot
+     express: that some surfaces here are cluster-scoped despite the package
+     being node-scoped, and that credentials are credentials — the shipped
+     provider types redact under `fmt`, an implementation of your own does not
+     inherit that. `Example_acmeDNS` runs plugin-create → node config →
+     read-back → order against mockpve with a deterministic `// Output:`. Doc
+     render verified per-package across `go list ./...` — note `go doc ./...` is
+     not a valid invocation ("too many periods in symbol specification"), so the
+     phrase in this ledger line means the per-package loop.)_
+- [x] 5. PR: exactly one `minor` label (new public API on `proxmox/nodes`);
      changelog as the branch's final commit; DESIGN-0006 status → Implemented in
-     the same PR; merge → auto-release.
+     the same PR; merge → auto-release. _(Done 2026-08-18: **PR #27**, all 12
+     checks green — test, Test Go, Test Replay (cassettes), Lint, check
+     (schema-drift + coverage), Security Scan, CodeQL, Analyze Go, license
+     check, both required-label checks, goreleaser snapshot. Labels `minor` +
+     `documentation` (the labeler's own, not a semver label — the required-label
+     check passes). DESIGN-0006 → Implemented; this ledger → In Progress, NOT
+     Completed, because Phase 4 is real work that has not happened. **Awaiting
+     Donald's merge**, which mints the tag.)_
 
 #### Success Criteria
 
 - All CI jobs green on the PR: `just test` (race), `just test-replay`,
-  `just lint`, schema-drift, `just coverage-check`, goreleaser snapshot.
+  `just lint`, schema-drift, `just coverage-check`, goreleaser snapshot. **Met
+  2026-08-18** on PR #27.
 - `TestRedactInteraction` proves a plugin-create interaction is scrubbed before
-  any cassette exists.
+  any cassette exists. **Met 2026-08-18** — landed as its own
+  `TestRedactACMEPluginData` (request body, parsed `Form` map, and both read
+  shapes) rather than growing the existing test, plus
+  `TestRedactACMEDataSpareUPID` proving the scrub does not clobber the task
+  envelope. No ACME cassette exists yet, which is the point: the guard precedes
+  the capture.
 - The integration tests compile under the tag and skip without env; the Example
-  runs deterministically under `go test`.
-- PR merged and the tag minted (Donald fires the merge).
+  runs deterministically under `go test`. **Met 2026-08-18.**
+- PR merged and the tag minted (Donald fires the merge). **Pending Donald.**
 
 ---
 
@@ -264,41 +576,368 @@ Executes on real PVE with the shared domain (DESIGN-0006 OQ-6). Everything here
 is Donald-run; SDK-side findings fold back as fixes + cassette commits. Until
 this phase completes, the ACME surface is mock-verified and says so.
 
+**Prepared 2026-08-18 (the parts that did not need a node).** Two additions ride
+the Phase-3 PR:
+
+- **`TestACMEPreflight`** — read-only, safe anywhere, and it front-loads the two
+  checks that would otherwise fail an expensive order. It proves the **node**
+  can reach Let's Encrypt staging (`GetACMEMeta` makes the node fetch the
+  directory, so reachability is measured from where it matters rather than from
+  the workstation), and it compares each typed provider's credential keys
+  against what the node's challenge schema publishes — DESIGN-0006's
+  confirm-live item, task 2's second half, performed without ordering anything.
+  The asymmetry is deliberate: an SDK key the provider does not publish FAILS
+  (acme.sh ignores it and the challenge fails with a message that names nothing
+  useful), while a published field the SDK does not model only logs. The schema
+  envelope is not in the apidoc, so `schemaFieldNames` tries both plausible
+  shapes and, failing both, hands over the raw JSON rather than guessing — which
+  is how the real shape gets recorded on the first run. `TestSchemaFieldNames`
+  covers the parser without a node, so a parser bug cannot surface as a
+  confusing failure mid-phase.
+- **`PVE_TEST_ACME_DISPOSABLE=1`, a second gate on the ordering tests.** Found
+  empirically while running the tagged suite here: the harness autoloads a
+  repo-root `.env` via godotenv, and **that file points at r740a** — so
+  credentials alone were enough to fire an order, and ACME variables added to
+  the wrong env file would have replaced the real node's pveproxy certificate
+  with an untrusted staging one. Prose in TESTING.md was the only thing
+  preventing it. The flag mirrors `PVE_TEST_HA_ARM`, the repo's existing answer
+  to exactly this hazard: the operator asserting "this node is disposable",
+  which no environment can imply on its own. The preflight is NOT gated on it —
+  it writes nothing.
+- **The task-vs-sync half of task 5 is closed from the schema, and it found a
+  bug.** Auditing every ACME endpoint's declared `returns` against the committed
+  9.2 apidoc settled order/renew/revoke as tasks (all three declare
+  `{"type": "string"}` with no format, which is PVE's house style for a UPID —
+  cross-checked against `POST /nodes/{node}/qemu/{vmid}/status/start`, a known
+  task) and turned up a fourth: **`PUT /cluster/acme/account/{name}` is also a
+  task**, and `nodes.UpdateACMEAccount` was returning only `error`, throwing the
+  UPID away. A caller could not wait for the contact change to land. The mock
+  returned null too, so mock and SDK agreed with each other and both disagreed
+  with real PVE — the exact failure mode mockpve exists to prevent, and one the
+  coverage guard cannot see, since the path and verb are right and only the
+  return shape is wrong. Fixed on the branch in all three layers
+  (`UpdateACMEAccount` → `(tasks.Ref, error)`; the mock emits a real UPID; the
+  `API` interface follows). **Pre-v1 signature break**, and the reason this
+  bullet is a phase note rather than a tick: what remains for task 5 is the
+  observed behaviour on a node, which is still Donald's.
+
+  The audit covered the surface, not just the ops under suspicion — all 20
+  ACME-adjacent (method, path) pairs plus `/nodes/{node}/config`. Everything
+  else agrees with what shipped: plugin `POST`/`PUT`/`DELETE` and
+  `PUT /nodes/{node}/config` all declare `{"type": "null"}`, so their `error`
+  returns are right; `POST`/`DELETE /cluster/acme/account` declare strings, and
+  those two were already tasks. Two shape details also re-checked against the
+  schema rather than trusted: the account GET returns `account` as an **object**
+  (hence `json.RawMessage`, and the contact addresses live inside it — nothing
+  to model), and the `acme` property string's `domains` sub-key is
+  **semicolon**-separated (`domain[;domain;...]`), which is what the codec
+  emits.
+
+  **One thing to watch on the live run:** the UPID read is strict, so a node
+  that answers `null` here would turn a write that SUCCEEDED into an error.
+  Elsewhere the SDK hedges (`ApplyNetworkConfig` reads `*string` and returns a
+  zero `Ref`, `ConvertToTemplate` likewise) — but those hedge against PVE
+  behaviour that was actually observed to vary, and the schema here is
+  unambiguous. Adding a branch every caller must handle to guard a hypothesis is
+  the wrong trade before there is evidence, and the live run is the evidence. If
+  `UpdateACMEAccount` returns a malformed-UPID error on a node whose contact
+  change went through, that is the finding: make the read tolerant.
+
+- **The call sequence is mock-verified** (`TestACMEDNSLifecycleEndToEnd`, added
+  2026-08-18). It walks the same steps as the live test — register account,
+  create plugin, wire the node config, order, then revoke → restore config →
+  delete plugin — and asserts each read-back and the teardown. It cannot prove
+  issuance (no CA, no DNS, no certificate), which is the whole point of Phase 4;
+  what it removes is the class of failure a live run should not be spending an
+  order attempt on: a step that does not see what the previous one wrote, or a
+  teardown that does not reverse the setup. The latter is the expensive one — a
+  botched teardown leaves the node on an untrusted certificate or leaves a live
+  provider credential in the cluster config. To make the order observable at
+  all, mockpve's ACME certificate handler now MOVES state rather than just
+  answering with a task: an order installs a certificate whose SANs come from
+  the node's own acmedomain slots, a revoke removes it. That is what PVE does,
+  and it is what makes step 3 → step 4 a real dependency in the test instead of
+  two calls in sequence — the config has to be right for the certificate to
+  cover the domain. The issuer is stamped `CN=mockpve ACME CA`, deliberately not
+  a real CA name, so a test asserting on a trusted issuer cannot pass against
+  the mock and fail live.
+
+  **A review of that handler found three defects in it, all fixed.** (1) The SAN
+  derivation read only the leading comma token, so `plugin=cf,domain=host` —
+  which PVE accepts, because `domain` is the default key and property strings
+  are order-independent — certified the literal string `plugin=cf`. The SDK's
+  own parser gets this right, so the mock and the SDK were reading one config
+  two ways, which is worse than either being wrong alone. (2) A slot naming no
+  domain at all still produced a certificate, where the SDK correctly treats the
+  string as unparseable and keeps it in `Extra`. (3) The order preserved an
+  operator-uploaded certificate alongside the new one, giving two entries for a
+  single file: PVE serves ONE front-end certificate, so an order overwrites
+  whatever is there — including the operator's. The same invariant was already
+  broken next door (the upload handler appended, so two uploads produced two
+  rows) and the delete handler dropped the cluster CA's `pve-ssl.pem` along with
+  the front-end file; both fixed with it. The tests missed all of this because
+  they wrote config through `SetNodeConfig`, whose encoder always emits
+  `domain=` first — so the happy branch was the only branch exercised.
+
+  A fourth followed from the same review: all three certificate verbs emitted
+  the same synthetic UPID. A mock UPID is (node, type, id, second), and the
+  three shared an id, so an order and the revoke after it collided whenever they
+  ran inside one second — which the lifecycle test does — and the later task
+  overwrote the earlier record, leaving a caller polling the order to read the
+  revoke's result. The verb now rides the id field, which claims nothing about
+  PVE's real worker-type names (the apidoc does not carry them).
+
+- **Redaction audit (2026-08-18), before any capture.** An adversarial pass over
+  the whole scrub pipeline — go-vcr's serialized fields against what the hooks
+  actually rewrite, plus a grep over the 17 committed cassettes — found one
+  confirmed hole and several weaker claims. All fixed on the branch:
+  1. **`Response.Status` was never scrubbed or redacted.** PVE puts its own
+     error text in the HTTP reason phrase, and a committed cassette proves it
+     (`TestResourceAffinityPlacement.yaml`:
+     `status: '500 create ha rule failed: 400 Rule ... is invalid.'`). A failing
+     ACME write — the run most likely to be re-recorded while debugging — would
+     have shipped hostnames or node names there while the body beside it was
+     clean. Now covered by both the redaction and the topology scrub.
+  2. **The real fix is structural**: `TestScrubCoversEveryStringField` walks the
+     cassette structs by reflection and fails on any string field that is
+     neither scrubbed nor listed in `scrubExemptFields` with a stated reason.
+     The gap was not a bug in a rule, it was a field nobody had enumerated — and
+     an allowlist with no completeness check is one dependency upgrade from the
+     next one. Verified by removing the new rule and watching the guard fail.
+  3. **The account contact is now scrubbed structurally**, under
+     `/cluster/acme/account`, not via `PVE_TEST_ACME_ACCOUNT_EMAIL`. The account
+     is registered once and REUSED, so a re-record takes the reuse path and
+     never sets that variable — exactly the run where an address chosen months
+     earlier ships inside the CA account object PVE returns verbatim.
+  4. `key=` joined the form-secret pattern (`UploadCustomCertificate` sends a
+     PEM private key under that name; nothing records it today, and it is one
+     `t.Run` away on the surface this ledger extends).
+  5. A set-but-too-short credential value now WARNS instead of being silently
+     skipped — a Namecheap username is realistically under the 12-character
+     floor, and the operator is the only one who can judge whether it matters.
+  6. Two comments were claiming coverage that does not exist and are corrected:
+     the base64 half of the value scrub only works when the value happens to
+     land 3-aligned at the end of the blob (so the URL-scoped rule is what
+     actually covers an encoded credential), and `"value"` IS a legitimate PVE
+     data key (SMART tables, qemu pending) rather than write-only. Left
+     deliberately: sibling node names and cluster names stay in cassettes — the
+     TESTING.md checklist already asks the reviewer to accept them — but the
+     `topologyScrub` doc no longer promises otherwise. And a certificate PEM
+     carries its subject and SANs in DER where no string pair reaches; the
+     cassette from `TestConsoleMint` already contains the cluster UUID that way.
+     The flow does not read certificates back, and the note now says a rule
+     replacing the PEM wholesale is the prerequisite for adding one.
+
+**Lab domain settled + scrub depth fix (2026-08-19).** The Phase-4 domain is
+real now: a Cloudflare-hosted zone with `pve{1,2,3}.<lab>.<domain>` A records on
+the lab subnet, credentials in `.env` as 1Password references. Preflighted
+without a node by driving Cloudflare's API directly — the token carries
+`#dns_records:edit` on the zone, and a TXT create → read-back → delete at
+`_acme-challenge.pve1.…` round-tripped clean, which is precisely what acme.sh
+does for DNS-01. (`/user/tokens/verify` returns "Invalid API Token" for a
+zone-scoped token that cannot read itself; acme.sh never calls it, so it is
+noise.) The acme.sh variable names the SDK ships were confirmed against upstream
+`dnsapi/dns_cf.sh` and `dns_namecheap.sh`: all five `CF_*` and all three
+`NAMECHEAP_*` match. PVE vendors its own snapshot of those scripts, so
+`GetACMEChallengeSchema` on the node stays the runtime authority — worth one
+call during the run.
+
+That domain is three labels deep, which exposed a real gap: `withACMEDomain`
+scrubbed the FQDN and its immediate parent only, so the registrable domain — the
+half that names the operator — survived on its own. It appears wherever the
+provider discusses the zone rather than the record, including an ACME worker's
+task log, which `tasks.Wait` reads and the cassette keeps. The scrub now walks
+every parent suffix and stops before the public suffix, so an unrelated hostname
+sharing the TLD is left alone. `TestScrubACMEDomainDeepZone` pins both halves,
+verified by reverting to the single-parent form and watching the registrable
+domain survive.
+
+**pvelab re-verified on a rebuilt outer host (2026-08-19).** The outer host was
+reinstalled between IMPL-0002's acceptance and this ledger's Phase 4, so the lab
+was rebuilt from nothing: token, ISO, prepared installer ISO, no template. `up`
+reached quorate(3) in **4m42s** (answers served 43s after VM start, all three
+nodes ready at ~4m, cluster formed 34s later) — comparable to the 2026-07-12
+acceptance. That run also exercised two things landed the same day: the
+per-config handoff naming (it wrote `.pvelab-acme.env` /
+`.pvelab-acme-state.json`, leaving the plain lab's files alone) and the
+`PVE_SCRUB_EXTRA` derivation, which matched a hand-derivation done from the code
+beforehand.
+
+The failure that preceded it is the useful part. `nested.answer_url` named the
+OUTER host while `up` ran on a workstation, so all three installers POSTed into
+the void; the symptom was fifteen minutes of silence followed by three identical
+readiness timeouts, with nothing in the log, because the server that would have
+logged the requests never saw one. The answer fetch is the only connection the
+flow initiates _toward_ whoever runs `up`, and the URL is baked into the ISO —
+so `up` now resolves it at startup and refuses when it is not an address of the
+running machine, naming both sides and both fixes. Loopback gets its own
+message. What is NOT explained: the same config values are reported to have
+worked from the workstation before, and the workstation has never held that
+address — either the posture was on-host (what IMPL-0002 recorded) or the URL
+held a different value then. No evidence survives either way, and the guard
+makes the question moot.
+
+**Leak-review rehearsal (2026-08-19).** Task 3's leak review is a human read of
+a YAML file, and everything guarding it so far checked hooks against hand-built
+`cassette.Interaction` values. That proves the rules transform structs
+correctly; it does not prove the bytes on disk are clean, and the unscrubbed
+`Response.Status` — which reached sixteen committed cassettes — is what the
+difference costs. `TestRecorderACMEFlowRedaction` now records the live run's
+flow (plugin create carrying a credential → read-back, where PVE returns it
+base64 → node config naming the domain) through the real recorder against
+mockpve, then greps the resulting file for the credential in both forms, the
+FQDN, the parent zone, and the node name, and confirms the interactions and
+placeholders survived. Verified by mutation twice: neutering
+`redactACMEPluginData` leaks the encoded credential, and dropping the domain
+pair publishes the zone even with the node pair still matching its first label —
+which demonstrates the ordering rationale in `withACMEDomain` instead of
+asserting it. Worth noting what the rehearsal cannot cover: the real run's
+provider error text, CA responses, and certificate DER are not in it, so the
+checklist read stays mandatory.
+
+**Certificate payload fidelity (2026-08-19).** The last of the review nits, and
+the reason it was worth taking rather than filing: the mock served a certificate
+that a real consumer would reject. Its fingerprint was the placeholder
+`AA:BB:CC`, where PVE's schema declares 32 colon-separated hex octets — anyone
+validating the format would pass against a live node and fail against the mock,
+which is the wrong way round for a test double. And `notbefore`,
+`public-key-type`, and `public-key-bits` were never populated although the SDK
+models all three and real PVE returns them, so those decode paths, and any
+consumer branching on them, were exercised by nothing. The mock now emits a
+SHA-256 fingerprint derived from the certificate's own identity (stable across
+runs, so no fixture churns) and fills the three fields for all three install
+paths — seeded, uploaded, ACME-issued. `TestCertificateFieldsMatchAPIDoc` pins
+it, verified by reverting the change and watching it fail. Note that
+`certPayload` is converted from `nodeCertRecord` directly, so the two structs
+must keep identical layouts; the comment on `certPayload` says so.
+
 #### Tasks
 
-- [ ] 1. Environment prep: the shared domain's zone on Cloudflare DNS with a
+- [x] 1. Environment prep: the shared domain's zone on Cloudflare DNS with a
      scoped API token (Zone.DNS edit on that zone only); env per OQ-3 exported
      alongside the existing `PVE_*` set; target node per OQ-4 (pvelab nested
      node recommended — verify its outbound reachability to the Let's Encrypt
      staging directory and the Cloudflare API early, before burning an order
-     attempt).
-- [ ] 2. Cloudflare run: `TestACMEDNSCloudflare` with `PVE_RECORD=1` — staging
+     attempt). _(The reachability half is now mechanical: run
+     `TestACMEPreflight` first — see the phase note above. Also set
+     `PVE_TEST_ACME_DISPOSABLE=1`, and put the ACME variables in the LAB's env
+     file, never the repo-root `.env` that points at r740a.)_
+- [x] 2. Cloudflare run: `TestACMEDNSCloudflare` with `PVE_RECORD=1` — staging
      account, cf plugin, order, SAN verify, revoke, cleanup. Confirm the typed
-     `Cloudflare` field names against the node's live `GetChallengeSchema`
+     `Cloudflare` field names against the node's live `GetACMEChallengeSchema`
      output; fix the struct if drift is found (this is the design's confirm-live
-     item).
-- [ ] 3. Cassette leak review + commit: `data` REDACTED in both directions,
-     token absent, topology scrubbed (domain rewritten by the existing scrub;
-     add a `PVE_SCRUB_EXTRA` pair if the real domain leaks anywhere unexpected);
-     wire the cassettes into `just test-replay`; replay green in CI.
-- [ ] 4. Namecheap run: switch the domain's nameservers to Namecheap DNS, wait
-     out propagation, run `TestACMEDNSNamecheap` with `PVE_RECORD=1` (Namecheap
-     API allowlist needs the node's egress IP); confirm the `Namecheap` field
-     names live; leak-review + commit + replay as above. Drop the "unit-verified
-     only" caveat from the Namecheap doc comment.
-- [ ] 5. Caveat closure: update the Phase-6 order/renew/revoke REST-with-caveat
+     item). _(`TestACMEPreflight` performs this comparison and names any drift
+     precisely, so run it before the lifecycle test rather than discovering
+     drift after a failed DNS-01 exchange.)_ **Done 2026-08-19** — the order
+     succeeded end to end in 90s (~80s in the order itself) and the node served
+     a certificate covering the requested FQDN, issued by Let's Encrypt staging.
+     That success is itself the field-name confirmation, and a stronger one than
+     the schema comparison: DNS-01 only validates if PVE handed acme.sh
+     credentials under names it recognised. `TestACMEPreflight` also ran earlier
+     the same day and left a cassette, but against an unrecorded target (the
+     nested cluster did not exist at that hour), so its explicit
+     `GetACMEChallengeSchema` comparison is NOT claimed here — re-run it against
+     a live cluster if that specific evidence is wanted.
+- [x] 3. Cassette leak review + commit: `data` REDACTED in both directions,
+     token absent, topology scrubbed. _(Amended 2026-08-18: the domain is no
+     longer left to the reviewer's eye. `withACMEDomain` derives scrub pairs
+     from `PVE_TEST_ACME_DOMAIN` — the FQDN and its parent zone — and prepends
+     them, because the node is usually the FQDN's first label and the node pair
+     would otherwise rewrite that label and leave the zone published. The zone
+     needs its own pair regardless: a DNS-01 challenge names
+     `_acme-challenge.<zone>`. `TestScrubACMEDomain` pins both, and
+     `PVE_SCRUB_EXTRA` stays available for anything unforeseen. Also: the
+     served-certificate probe does not go through the SDK client, so no cassette
+     can carry it and the placeholder domain resolves nowhere — it now skips
+     under `PVE_REPLAY=1`, the same live-only carve-out `TestConsoleRFB` has.
+     Replay covers the REST conversation and stops there; without the skip,
+     wiring these cassettes into `just test-replay` would fail on a DNS lookup
+     for `pve.acme.example`. And two identity values now scrub automatically
+     too: the account contact — which the CA account object carries verbatim —
+     and the Namecheap source IP, Donald's own egress address, which a provider
+     error can echo into an order task log. Neither is a credential, so the
+     entropy-based value scrub skips them, and neither derives from the
+     endpoint, so the topology pairs missed them. `apply` now sorts pairs
+     longest-live-value-first, which makes the overlap hazard structural rather
+     than a rule each caller has to follow: a contact ending in the certified
+     domain would otherwise have its tail rewritten by the domain pair and its
+     local part stranded.)_ wire the cassettes into `just test-replay`; replay
+     green in CI. **Done 2026-08-19** — `TestACMEDNSCloudflare.yaml` (35
+     interactions, 50 REDACTED markers) is committed and in the replay run. Leak
+     review found the capture clean on every check: zero occurrences of the
+     provider token raw or base64, the account id, the root password, the
+     account contact, the certified FQDN, its parent zone, the registrable
+     domain, any lab address, the workstation address, or the node name — with
+     the placeholders present, which is what proves the scrub ran rather than
+     the values simply being absent. The known DER gap does not apply: there is
+     no PEM or private key in the capture at all, because the flow never reads
+     the certificate back through the API (the SAN check dials TLS directly).
+     Wiring it in required removing the whole-test `PVE_REPLAY` skip — the
+     probe's own carve-out at the assertion is what this note describes, and the
+     outer skip made it unreachable and this task impossible. The disposable
+     gate is likewise bypassed under replay: nothing is ordered against a real
+     node, so requiring the operator opt-in would only skip the test in CI.
+     **Cost:** replay re-sleeps the recorded task-poll backoff, so the job grows
+     by ~88s. `tasks.WithWaitPolicy` exists but no root-client option exposes
+     it; a `proxmox.WithTaskWaitPolicy` mirroring `WithRetry` would cut that to
+     seconds, and belongs in its own PR rather than as an unrelated addition to
+     a labelled one.
+- [x] ~~4. Namecheap run: switch the domain's nameservers to Namecheap DNS, wait
+      out propagation, run `TestACMEDNSNamecheap` with `PVE_RECORD=1`.~~
+      **Descoped from IMPL-0007 on 2026-08-20** (Donald: "defer namecheap we
+      wont do it as part of this impl"). The cost is a nameserver switch on the
+      shared domain plus a propagation wait, and the domain is currently pointed
+      at Cloudflare and working — moving it to prove a second provider would
+      take the verified path offline for hours. What the run was for was never
+      the provider: it was evidence that `ACMEPluginData` is provider-generic
+      rather than Cloudflare-shaped. That claim rests instead on the shape of
+      the interface — `API()` + `Data()`, no Cloudflare-specific branch anywhere
+      in `encodePluginData` — and on `ACMERawPluginData`, which reaches all ~160
+      acme.sh providers with no Go code at all. `pvelab`'s `acme.credentials`
+      map is the same argument from the other side: adding a provider there is
+      config only. What is genuinely NOT proven is that the `ACMENamecheap`
+      field names match what the installed acme.sh reads; they are taken from
+      upstream's `dns_namecheap.sh` rather than from a node, and the doc comment
+      now says so and points at `GetACMEChallengeSchema`. `TestACMEDNSNamecheap`
+      stays in the tree as a prepared harness with no cassette.
+- [x] 5. Caveat closure: update the Phase-6 order/renew/revoke REST-with-caveat
      comments with the observed task-vs-sync behaviour; record the run in
      `certification.yaml`; tick this ledger; flip IMPL-0007 status → Completed
-     (docs ride a `dont-release` PR or the next release PR).
+     (docs ride a `dont-release` PR or the next release PR). _(The schema half
+     was done earlier — see the third phase note above: all three cert ops are
+     tasks, and the audit found `UpdateACMEAccount` discarding a UPID.)_ **Done
+     2026-08-20.** The comments now carry what the node did, not what the schema
+     promised: `RegisterACMEAccount` → `acmeregister`, `OrderNodeCertificate` →
+     `acmenewcert`, `RevokeNodeCertificate` → `acmerevoke`, all exit status
+     `OK`, and plugin CRUD + the node config PUT answered `null` synchronously
+     as declared. The useful finding is timing, not shape: the order took ~80s
+     across thirteen status polls (acme.sh writes the challenge record, then
+     waits for the CA to resolve it) while the revoke finished in seconds — so
+     `OrderNodeCertificate` is documented as needing a deadline sized for DNS
+     propagation, since a ctx budgeted for a config write will cancel it. Two
+     verbs stay schema-only and say so in place: `RenewNodeCertificate` (a
+     renewal wants a certificate old enough to be worth renewing) and
+     `UpdateACMEAccount` (the run registered but never updated) — the latter
+     keeps its "if a node answers null, make the read tolerant" note, which is
+     the hedge the phase deliberately did not add without evidence.
 
 #### Success Criteria
 
-- Both provider runs issue (staging), verify, and revoke live; cassettes
-  committed, leak-reviewed, and replaying green in CI.
-- The typed provider field names are live-confirmed against
-  `GetChallengeSchema`; no REST-with-caveat remains anywhere on the ACME surface
-  (including the Phase-6 order/renew/revoke task-vs-sync note).
-- Zero credential or topology leaks in the committed cassettes.
+- ~~Both provider runs~~ **The Cloudflare run** issues (staging), verifies, and
+  revokes live; its cassette is committed, leak-reviewed, and replaying green in
+  CI. **Met 2026-08-19.** Amended 2026-08-20 when Namecheap was descoped
+  (task 4) — a criterion the ledger will not execute is not a criterion, and
+  leaving it worded for two providers would have made a closed phase read as
+  failed.
+- The typed provider field names are live-confirmed for **Cloudflare** (by
+  issuance, which is stronger evidence than a schema comparison — DNS-01 only
+  validates if acme.sh recognised the names PVE handed it). The Namecheap names
+  remain upstream-sourced and unobserved, stated as such on the type. No
+  REST-with-caveat remains anywhere on the ACME surface: order/revoke/register
+  are live-observed, renew and account-update are documented as schema-settled
+  with the specific symptom to watch for.
+- Zero credential or topology leaks in the committed cassettes. **Met
+  2026-08-19** — see task 3.
 
 ---
 
@@ -311,6 +950,8 @@ this phase completes, the ACME surface is mock-verified and says so.
 | `proxmox/nodes/nodeconfig.go`                  | Create | `NodeConfig` + property-string codecs + get/set                  |
 | `proxmox/nodes/paths.go`                       | Modify | Plugin/schema/directories/meta/node-config path helpers          |
 | `proxmox/nodes/doc.go`                         | Modify | ACME story promotion                                             |
+| `proxmox/nodes/certificates.go`                | Modify | `UpdateACMEAccount` → `tasks.Ref`; cert-op caveats from schema   |
+| `proxmox/nodes/service.go`                     | Modify | `API` follows that signature                                     |
 | `proxmox/nodes/example_test.go`                | Modify | `Example_acmeDNS`                                                |
 | `proxmox/mockpve/nodesadmin.go`                | Modify | `acmePlugins` + node-config state, routes, seeders, digest guard |
 | `proxmox/integration/recorder_test.go`         | Modify | `data` redaction both directions + test                          |
@@ -337,6 +978,52 @@ this phase completes, the ACME surface is mock-verified and says so.
   credentials + egress-IP allowlist entry, and a reachable PVE node (per OQ-4).
   None of these block Phases 1–3.
 - No new Go module dependencies.
+
+## Follow-up: move the destructive integration tests off r740a
+
+**Raised 2026-08-19, not scheduled.** r740a is heading for production as part of
+a real cluster, and the integration suite currently creates and destroys guests
+on it: the QEMU and LXC lifecycles (scratch VMIDs 9101/9102), the ISO upload,
+the console-mint scratch VM, and — the reason this came up — an ACME order,
+which replaces the node's pveproxy certificate. Now that pvelab provisions a
+quorate 3-node nested cluster on demand, most of that has somewhere safer to
+run.
+
+**This is not a blanket move.** Split by what a test needs from the hardware:
+
+- **Move (mutating):** QEMU/LXC lifecycle, ISO upload, console mint, ACME. The
+  env gate names are identical between the two targets, so pointing them at the
+  nested cluster is an env-file change, not a code change — which is the clue
+  that the relocation is operational work, not new surface.
+- **Keep on r740a (read-only):** the hardware-shaped reads nested cannot fake —
+  `ListDisks`/`GetDiskSMART` return virtual disks with no SMART table, ZFS pool
+  ops want real vdevs, Ceph wants real OSDs. Reads against production are
+  defensible, and once r740a is clustered the cluster-scoped reads get _better_
+  coverage than a single node gives today.
+- **Already nested:** HA placement/migrate/arm-disarm, SDN fabrics, console RFB.
+
+**The real deliverable is the gate, not the relocation.** Today exactly two
+destructive tests can tell whether their target is disposable
+(`PVE_TEST_ACME_DISPOSABLE`, `PVE_TEST_HA_ARM`); every other mutating test fires
+wherever `PVE_ENDPOINT` happens to point. Moving tests makes an accident less
+likely; a single disposable-node assertion that every mutating test honours
+makes it structurally impossible, and it keeps working when someone runs one
+test by hand with the wrong env file. That assertion is the piece worth
+designing — whether it is an explicit env gate, a check against the configured
+lab node list, or something the node itself can answer.
+
+**Prerequisites before any of it lands:**
+
+1. Storage parity — `nestedTestStorage` is a pvelab constant; the nested
+   template's storage must actually support what the moved tests do.
+2. Re-record the affected cassettes from the nested cluster and re-review them
+   for leaks; `PVE_SCRUB_EXTRA` already covers the lab topology, and
+   `certification.yaml` records provenance (a mixed-origin corpus is already the
+   norm).
+3. Decide the circularity policy: the nested cluster is provisioned BY this SDK,
+   so a broken SDK cannot build its own test bed. The `pvelab_pin` stable-pin
+   rule exists for exactly this and should be reaffirmed rather than quietly
+   dropped when `PVELAB_DEV=1` becomes habitual.
 
 ## Open Questions
 

@@ -36,8 +36,10 @@ test-replay:
       PVE_TEST_HA_ARM=1 \
       PVE_TEST_FABRIC_NODES=pve,pve2-dogfood,pve3-dogfood \
       PVE_TEST_FABRIC_IFACE=vmbr0 \
+      PVE_TEST_ACME_DOMAIN=pve.acme.example \
+      PVE_TEST_ACME_CF_TOKEN=replay-placeholder \
       go test -tags=integration ./proxmox/integration/ \
-      -run 'TestVersionRoundTrip|TestComputeReads|TestStorageReads|TestClusterAndHAReads|TestNetworkReads|TestAccessReads|TestQEMULifecycle|TestLXCLifecycle|TestISOUpload|TestConsoleMint|TestResourceAffinityPlacement|TestHAStatusReads|TestHAArmDisarmCycle|TestHAResourceMigrate|TestSDNStatusReads|TestSDNFabricLifecycle'
+      -run 'TestVersionRoundTrip|TestComputeReads|TestStorageReads|TestClusterAndHAReads|TestNetworkReads|TestAccessReads|TestQEMULifecycle|TestLXCLifecycle|TestISOUpload|TestConsoleMint|TestResourceAffinityPlacement|TestHAStatusReads|TestHAArmDisarmCycle|TestHAResourceMigrate|TestSDNStatusReads|TestSDNFabricLifecycle|TestACMEDNSCloudflare'
 
 # Run the mockpve test-helper server locally
 run *args:
@@ -54,6 +56,10 @@ run *args:
 
 pvelab_pin := "v0.6.0"
 pvelab_pkg := if env("PVELAB_DEV", "") == "1" { "./cmd/pvelab" } else { "github.com/donaldgifford/proxmox-go-sdk/cmd/pvelab@" + pvelab_pin }
+# Handoff file the inner suite sources. `up` derives it from the config it ran
+# (pvelab.yaml -> .pvelab.env, pvelab-acme.yaml -> .pvelab-acme.env), so point
+# PVELAB_ENV at the matching one when running the ACME lab.
+pvelab_env := env("PVELAB_ENV", ".pvelab.env")
 
 # Prepare the auto-install ISO on the outer host (assistant over SSH)
 dogfood-iso *args:
@@ -67,14 +73,15 @@ dogfood-up *args:
 dogfood-down *args:
     go run {{pvelab_pkg}} down {{args}}
 
-# Run the inner suite against the nested lab: sources .pvelab.env (written by
-# dogfood-up) and records cassettes (PVE_RECORD=1). Default -run targets the
-# two IMPL-0001 live-only criteria; pass extra `go test` flags via args.
+# Run the inner suite against the nested lab: sources the handoff env (written
+# by dogfood-up) and records cassettes (PVE_RECORD=1). Default -run targets the
+# two IMPL-0001 live-only criteria; pass extra `go test` flags via args. Set
+# PVELAB_ENV for a non-default lab (e.g. PVELAB_ENV=.pvelab-acme.env).
 dogfood-test *args:
     #!/usr/bin/env bash
     set -euo pipefail
-    [ -f .pvelab.env ] || { echo "no .pvelab.env — run 'just dogfood-up' first" >&2; exit 1; }
-    source .pvelab.env
+    [ -f {{pvelab_env}} ] || { echo "no {{pvelab_env}} — run 'just dogfood-up' first" >&2; exit 1; }
+    source {{pvelab_env}}
     PVE_RECORD=1 go test -tags=integration ./proxmox/integration/ -v -timeout 30m \
       -run 'TestResourceAffinityPlacement|TestConsoleRFB' {{args}}
 

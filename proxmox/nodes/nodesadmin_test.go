@@ -3,6 +3,7 @@ package nodes_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/mockpve"
@@ -193,7 +194,10 @@ func TestInitializeDiskValidation(t *testing.T) {
 func TestNodeCertificates(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()
-	mock.AddNodeCertificate(testNode, "pveproxy-ssl.pem")
+	// pve-ssl.pem is the cluster CA's own certificate — a different file from
+	// the front-end pveproxy-ssl.pem an upload or an ACME order writes, and it
+	// is what proves the write touches only the file it owns.
+	mock.AddNodeCertificate(testNode, "pve-ssl.pem")
 	svc := newService(t, mock)
 	ctx := context.Background()
 
@@ -201,8 +205,8 @@ func TestNodeCertificates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetNodeCertificates: %v", err)
 	}
-	if len(certs) != 1 || certs[0].Filename != "pveproxy-ssl.pem" {
-		t.Fatalf("GetNodeCertificates = %+v, want one pveproxy-ssl.pem", certs)
+	if len(certs) != 1 || certs[0].Filename != "pve-ssl.pem" {
+		t.Fatalf("GetNodeCertificates = %+v, want one pve-ssl.pem", certs)
 	}
 
 	after, err := svc.UploadCustomCertificate(ctx, testNode, &nodes.CustomCertificateSpec{
@@ -212,7 +216,7 @@ func TestNodeCertificates(t *testing.T) {
 		t.Fatalf("UploadCustomCertificate: %v", err)
 	}
 	if len(after) != 2 {
-		t.Errorf("cert count after upload = %d, want 2", len(after))
+		t.Errorf("cert count after upload = %d, want the CA cert plus the uploaded one", len(after))
 	}
 
 	if err := svc.DeleteCustomCertificate(ctx, testNode); err != nil {
@@ -222,8 +226,8 @@ func TestNodeCertificates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetNodeCertificates after delete: %v", err)
 	}
-	if len(certs) != 0 {
-		t.Errorf("cert count after delete = %d, want 0", len(certs))
+	if len(certs) != 1 || certs[0].Filename != "pve-ssl.pem" {
+		t.Errorf("after delete = %+v, want the cluster CA certificate left alone", certs)
 	}
 }
 
@@ -305,10 +309,25 @@ func TestACMEAccounts(t *testing.T) {
 		t.Fatalf("Wait(register acme): %v", err)
 	}
 
-	if err := svc.UpdateACMEAccount(ctx, "staging", &nodes.ACMEAccountUpdate{
+	// The update runs as a worker: applying it means talking to the CA, and the
+	// 9.2 schema declares a UPID return for this verb.
+	ref, err = svc.UpdateACMEAccount(ctx, "staging", &nodes.ACMEAccountUpdate{
 		Contact: []string{"ops@example.com"},
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("UpdateACMEAccount: %v", err)
+	}
+	if _, err := ts.Wait(ctx, ref); err != nil {
+		t.Fatalf("Wait(update acme): %v", err)
+	}
+	// The contact lives inside the CA's own account object, which the SDK keeps
+	// verbatim rather than modelling — so the round-trip is asserted there.
+	acct, err := svc.GetACMEAccount(ctx, "staging")
+	if err != nil {
+		t.Fatalf("GetACMEAccount: %v", err)
+	}
+	if !strings.Contains(string(acct.Account), "ops@example.com") {
+		t.Errorf("account object = %s, want the updated contact", acct.Account)
 	}
 
 	ref, err = svc.DeactivateACMEAccount(ctx, "staging")
@@ -337,5 +356,48 @@ func TestACMEAccountValidation(t *testing.T) {
 	}
 	if _, err := svc.GetACMEAccount(ctx, ""); err == nil {
 		t.Error("GetACMEAccount(empty) error = nil, want non-nil")
+	}
+	if _, err := svc.UpdateACMEAccount(ctx, "staging", nil); err == nil {
+		t.Error("UpdateACMEAccount(nil) error = nil, want non-nil")
+	}
+	if _, err := svc.UpdateACMEAccount(ctx, "", &nodes.ACMEAccountUpdate{}); err == nil {
+		t.Error("UpdateACMEAccount(no name) error = nil, want non-nil")
+	}
+}
+
+// TestACMEAccountRefresh covers the empty-but-non-nil update: PVE treats an
+// update carrying no new information as "re-read this account from the CA", and
+// that is the only way to ask for it — so it must not be turned away with the
+// nil update.
+func TestACMEAccountRefresh(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc, ts := newServiceAndTasks(t, mock)
+	ctx := context.Background()
+
+	ref, err := svc.RegisterACMEAccount(ctx, &nodes.ACMEAccountSpec{
+		Name: "staging", Contact: []string{"ops@example.com"},
+		Directory: "https://acme-staging.example/directory", TOSURL: "https://acme.example/tos",
+	})
+	if err != nil {
+		t.Fatalf("RegisterACMEAccount: %v", err)
+	}
+	if _, err := ts.Wait(ctx, ref); err != nil {
+		t.Fatalf("Wait(register acme): %v", err)
+	}
+
+	ref, err = svc.UpdateACMEAccount(ctx, "staging", &nodes.ACMEAccountUpdate{})
+	if err != nil {
+		t.Fatalf("UpdateACMEAccount(empty): %v", err)
+	}
+	if _, err := ts.Wait(ctx, ref); err != nil {
+		t.Fatalf("Wait(refresh acme): %v", err)
+	}
+	acct, err := svc.GetACMEAccount(ctx, "staging")
+	if err != nil {
+		t.Fatalf("GetACMEAccount: %v", err)
+	}
+	if !strings.Contains(string(acct.Account), "ops@example.com") {
+		t.Errorf("account object = %s, want the contact left alone", acct.Account)
 	}
 }
