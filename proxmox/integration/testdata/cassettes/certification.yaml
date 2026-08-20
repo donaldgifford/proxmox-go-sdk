@@ -112,3 +112,30 @@
     at 0 interfaces). Harness fix from the leak review: topologyScrub now
     rewrites go-vcr's parsed Request.Form map (the raw body was scrubbed but
     the form kept the live node name).
+- pve_version: 9.2.2
+  recorded: 2026-08-19 # IMPL-0007 Phase-4 ACME DNS-01 run
+  commit: 4d82382 # feat/impl-0007-acme-dns, after the missing-account fix
+  harness: pvelab # freshly rebuilt 3-node nested cluster, ISO-installed
+  cassettes:
+    - TestACMEDNSCloudflare
+  notes: >-
+    First live ACME order: staging account register -> plugin create -> node
+    acmedomain0 -> order -> revoke -> config restore -> plugin delete, 90s
+    end to end (the order itself ~80s). The served certificate covered the
+    requested FQDN, issued by Let's Encrypt staging, which is the phase's
+    success criterion. Two findings reconciled before this entry. PVE reports
+    a MISSING ACME account as 400 "Parameter verification failed" with the
+    detail under the name parameter, not 404 — the harness had tested
+    errors.Is(ErrNotFound) to decide "absent, so register", so the first run
+    against a cluster that had never held the account failed before ordering
+    anything; the check now reads the structured Params["name"], and
+    GetACMEAccount documents the shape rather than the SDK reclassifying 400s
+    from message text. The schema-derived task-vs-sync shapes all held:
+    acmeregister, acmenewcert and acmerevoke are tasks; plugin CRUD and the
+    node config write are synchronous. Replay covers the whole PVE-side
+    sequence; only the TLS probe that dials the node is skipped, since no
+    cassette can stand in for a live socket. Leak review: no PEM or private
+    key in the capture at all (the flow never reads the certificate back
+    through the API), and zero occurrences of the provider token raw or
+    base64, the account id, the root password, the account contact, the real
+    FQDN/zone/registrable domain, any lab address, or the node name.

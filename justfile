@@ -36,8 +36,10 @@ test-replay:
       PVE_TEST_HA_ARM=1 \
       PVE_TEST_FABRIC_NODES=pve,pve2-dogfood,pve3-dogfood \
       PVE_TEST_FABRIC_IFACE=vmbr0 \
+      PVE_TEST_ACME_DOMAIN=pve.acme.example \
+      PVE_TEST_ACME_CF_TOKEN=replay-placeholder \
       go test -tags=integration ./proxmox/integration/ \
-      -run 'TestVersionRoundTrip|TestComputeReads|TestStorageReads|TestClusterAndHAReads|TestNetworkReads|TestAccessReads|TestQEMULifecycle|TestLXCLifecycle|TestISOUpload|TestConsoleMint|TestResourceAffinityPlacement|TestHAStatusReads|TestHAArmDisarmCycle|TestHAResourceMigrate|TestSDNStatusReads|TestSDNFabricLifecycle'
+      -run 'TestVersionRoundTrip|TestComputeReads|TestStorageReads|TestClusterAndHAReads|TestNetworkReads|TestAccessReads|TestQEMULifecycle|TestLXCLifecycle|TestISOUpload|TestConsoleMint|TestResourceAffinityPlacement|TestHAStatusReads|TestHAArmDisarmCycle|TestHAResourceMigrate|TestSDNStatusReads|TestSDNFabricLifecycle|TestACMEDNSCloudflare'
 
 # Run the mockpve test-helper server locally
 run *args:

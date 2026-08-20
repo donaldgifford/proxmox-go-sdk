@@ -806,7 +806,7 @@ must keep identical layouts; the comment on `certPayload` says so.
 
 #### Tasks
 
-- [ ] 1. Environment prep: the shared domain's zone on Cloudflare DNS with a
+- [x] 1. Environment prep: the shared domain's zone on Cloudflare DNS with a
      scoped API token (Zone.DNS edit on that zone only); env per OQ-3 exported
      alongside the existing `PVE_*` set; target node per OQ-4 (pvelab nested
      node recommended — verify its outbound reachability to the Let's Encrypt
@@ -815,14 +815,23 @@ must keep identical layouts; the comment on `certPayload` says so.
      `TestACMEPreflight` first — see the phase note above. Also set
      `PVE_TEST_ACME_DISPOSABLE=1`, and put the ACME variables in the LAB's env
      file, never the repo-root `.env` that points at r740a.)_
-- [ ] 2. Cloudflare run: `TestACMEDNSCloudflare` with `PVE_RECORD=1` — staging
+- [x] 2. Cloudflare run: `TestACMEDNSCloudflare` with `PVE_RECORD=1` — staging
      account, cf plugin, order, SAN verify, revoke, cleanup. Confirm the typed
      `Cloudflare` field names against the node's live `GetACMEChallengeSchema`
      output; fix the struct if drift is found (this is the design's confirm-live
      item). _(`TestACMEPreflight` performs this comparison and names any drift
      precisely, so run it before the lifecycle test rather than discovering
-     drift after a failed DNS-01 exchange.)_
-- [ ] 3. Cassette leak review + commit: `data` REDACTED in both directions,
+     drift after a failed DNS-01 exchange.)_ **Done 2026-08-19** — the order
+     succeeded end to end in 90s (~80s in the order itself) and the node served
+     a certificate covering the requested FQDN, issued by Let's Encrypt staging.
+     That success is itself the field-name confirmation, and a stronger one than
+     the schema comparison: DNS-01 only validates if PVE handed acme.sh
+     credentials under names it recognised. `TestACMEPreflight` also ran earlier
+     the same day and left a cassette, but against an unrecorded target (the
+     nested cluster did not exist at that hour), so its explicit
+     `GetACMEChallengeSchema` comparison is NOT claimed here — re-run it against
+     a live cluster if that specific evidence is wanted.
+- [x] 3. Cassette leak review + commit: `data` REDACTED in both directions,
      token absent, topology scrubbed. _(Amended 2026-08-18: the domain is no
      longer left to the reviewer's eye. `withACMEDomain` derives scrub pairs
      from `PVE_TEST_ACME_DOMAIN` — the FQDN and its parent zone — and prepends
@@ -846,7 +855,26 @@ must keep identical layouts; the comment on `certPayload` says so.
      than a rule each caller has to follow: a contact ending in the certified
      domain would otherwise have its tail rewritten by the domain pair and its
      local part stranded.)_ wire the cassettes into `just test-replay`; replay
-     green in CI.
+     green in CI. **Done 2026-08-19** — `TestACMEDNSCloudflare.yaml` (35
+     interactions, 50 REDACTED markers) is committed and in the replay run. Leak
+     review found the capture clean on every check: zero occurrences of the
+     provider token raw or base64, the account id, the root password, the
+     account contact, the certified FQDN, its parent zone, the registrable
+     domain, any lab address, the workstation address, or the node name — with
+     the placeholders present, which is what proves the scrub ran rather than
+     the values simply being absent. The known DER gap does not apply: there is
+     no PEM or private key in the capture at all, because the flow never reads
+     the certificate back through the API (the SAN check dials TLS directly).
+     Wiring it in required removing the whole-test `PVE_REPLAY` skip — the
+     probe's own carve-out at the assertion is what this note describes, and the
+     outer skip made it unreachable and this task impossible. The disposable
+     gate is likewise bypassed under replay: nothing is ordered against a real
+     node, so requiring the operator opt-in would only skip the test in CI.
+     **Cost:** replay re-sleeps the recorded task-poll backoff, so the job grows
+     by ~88s. `tasks.WithWaitPolicy` exists but no root-client option exposes
+     it; a `proxmox.WithTaskWaitPolicy` mirroring `WithRetry` would cut that to
+     seconds, and belongs in its own PR rather than as an unrelated addition to
+     a labelled one.
 - [ ] 4. Namecheap run: switch the domain's nameservers to Namecheap DNS, wait
      out propagation, run `TestACMEDNSNamecheap` with `PVE_RECORD=1` (Namecheap
      API allowlist needs the node's egress IP); confirm the `Namecheap` field

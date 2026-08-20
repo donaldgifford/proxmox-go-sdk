@@ -92,16 +92,11 @@ func TestACMEDNSNamecheap(t *testing.T) {
 // which is the point of the exercise.
 func runACMEDNSLifecycle(t *testing.T, pluginID string, data nodes.ACMEPluginData) {
 	t.Helper()
-	if os.Getenv(envReplay) == "1" {
-		// A cassette replays the PVE side fine, but the certificate assertion
-		// below dials the node's TLS port, which no cassette can stand in for.
-		t.Skip("ACME lifecycle is live-only: the SAN check dials the node directly")
-	}
 	domain := os.Getenv(envACMEDomain)
 	if domain == "" {
 		t.Skipf("ACME test disabled (set %s to an FQDN in the provider's zone)", envACMEDomain)
 	}
-	if os.Getenv(envACMEDisposable) != "1" {
+	if os.Getenv(envReplay) != "1" && os.Getenv(envACMEDisposable) != "1" {
 		t.Skipf("ordering is gated on %s=1 — an ACME order REPLACES this node's "+
 			"pveproxy certificate with an untrusted staging one, so set it only for a "+
 			"disposable node (pvelab), never r740a", envACMEDisposable)
