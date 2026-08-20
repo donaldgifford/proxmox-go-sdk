@@ -16,7 +16,6 @@ import (
 
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/nodes"
-	"github.com/donaldgifford/proxmox-go-sdk/proxmox/pverr"
 )
 
 // ACME DNS-01 live verification (IMPL-0007 Phase 4). These are the only tests in
@@ -225,7 +224,7 @@ func registerStagingAccount(t *testing.T, c *proxmox.Client, account, directory 
 	if _, err := svc.GetACMEAccount(testCtx(t), account); err == nil {
 		t.Logf("reusing the existing ACME account %q", account)
 		return
-	} else if !errors.Is(err, pverr.ErrNotFound) {
+	} else if !acmeAccountAbsent(err) {
 		t.Fatalf("GetACMEAccount(%s): %v", account, err)
 	}
 

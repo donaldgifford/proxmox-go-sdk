@@ -173,6 +173,23 @@ func (s *Service) ListACMEAccounts(ctx context.Context) ([]string, error) {
 }
 
 // GetACMEAccount returns one registered ACME account by its local handle.
+//
+// An account that does not exist is reported by PVE as HTTP 400 "Parameter
+// verification failed" with the detail under the name parameter — "ACME
+// account config file '<name>' does not exist." — NOT as a 404. So
+// errors.Is(err, pverr.ErrNotFound) does not fire for a missing account, and
+// code that branches on absence should test the parameter detail instead:
+//
+//	var perr *pverr.Error
+//	if errors.As(err, &perr) && perr.Status == http.StatusBadRequest &&
+//		strings.Contains(perr.Params["name"], "does not exist") {
+//		// not registered yet
+//	}
+//
+// Observed live 2026-08-19 against PVE 9.2. The SDK does not reclassify it:
+// deciding from the message text which 400s are really 404s would bake a guess
+// about PVE's prose into the transport, where every op would inherit it.
+// [ListACMEAccounts] is the allocation-free way to test for existence.
 func (s *Service) GetACMEAccount(ctx context.Context, name string) (*ACMEAccount, error) {
 	if name == "" {
 		return nil, fmt.Errorf("nodes.GetACMEAccount: name: %w", svcutil.ErrMissingField)
