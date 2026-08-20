@@ -55,6 +55,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(impl-0007)* Record the colliding-UPID fix
 - *(impl-0007)* Record the r740a destructive-test follow-up
 - *(pvelab)* Document the two-config lab, handoff files and prereqs
+- *(impl-0007)* Record the pvelab rebuild verification
 
 ### Testing
 
