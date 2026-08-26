@@ -981,6 +981,18 @@ must keep identical layouts; the comment on `certPayload` says so.
 
 ## Follow-up: move the destructive integration tests off r740a
 
+**Update 2026-08-26 — the prediction landed, and the short-term policy is
+decided (DESIGN-0007 OQ-6).** r740a is now one node of a 3-node production
+cluster, managed by hoomlab. Until a disposable live target exists again, this
+repo **defers live verification entirely**: features land mock-verified with the
+label "mock-verified, consumer-exercised", and hoomlab — importing changes via a
+local `go.mod replace` — is the live-verification vehicle, since as the consumer
+it can attribute a breakage to the entry it was converging. Nothing in CI needed
+disabling: the only integration run CI performs is cassette replay
+(`just test-replay`, placeholder endpoint); the dogfood recipes and the tagged
+live suite are local-only and remain available. The gate-not-relocation
+deliverable below is unchanged and is what eventually ends the deferral.
+
 **Raised 2026-08-19, not scheduled.** r740a is heading for production as part of
 a real cluster, and the integration suite currently creates and destroys guests
 on it: the QEMU and LXC lifecycles (scratch VMIDs 9101/9102), the ISO upload,

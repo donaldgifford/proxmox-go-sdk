@@ -1,7 +1,7 @@
 ---
 id: DESIGN-0007
 title: "Cluster storage config writes"
-status: Draft
+status: Approved
 author: Donald Gifford
 created: 2026-08-26
 ---
@@ -10,7 +10,9 @@ created: 2026-08-26
 
 # DESIGN-0007: Cluster storage config writes
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-08-26
+**Status:** Approved **Author:** Donald Gifford **Date:** 2026-08-26 (OQs
+decided 2026-08-26: 1–5 and 7 all a; OQ-6 amended — live verification is
+deferred repo-wide, the consumer verifies; see the decision under OQ-6)
 
 <!--toc:start-->
 
@@ -390,29 +392,49 @@ precedent.
   three write paths.
 - **Coverage guard**: the three rows flip only because mock routes serve them; a
   typo'd path is a fabrication failure in CI, not a live 404.
-- **Integration (env-gated, live-only)**: `TestDatastoreLifecycle` behind the
-  existing env plus a new opt-in gate (see OQ-6) — create a scratch zfspool
-  entry over an existing pool with a nodes restriction, read back digest, drift
-  it, converge it, stale-digest negative check, delete, verify gone. Recorded
-  with `PVE_RECORD=1`, leak-reviewed (node names and any server/export values
-  are topology; storage configs can carry `password` for CIFS/PBS — the scratch
-  entry uses none), committed, wired into `just test-replay`.
+- **Integration (env-gated, live-only) — prepared, not run** (OQ-6 decision):
+  `TestDatastoreLifecycle` ships behind the existing env plus a new
+  `PVE_TEST_DATASTORE=1` opt-in gate — create a scratch zfspool entry over an
+  existing pool with a nodes restriction, read back digest, drift it, converge
+  it, stale-digest negative check, delete, verify gone. It is a prepared harness
+  in the `TestACMEDNSNamecheap` mould: labelled as never-run, no cassette,
+  excluded from `just test-replay`, skipping without its gate. Live verification
+  for this repo is deferred (r740a is production now — see OQ-6); until a
+  disposable target exists again, live evidence arrives through the consumer
+  instead (next bullet).
+- **Consumer-driven live verification (hoomlab)**: hoomlab imports the branch
+  via a local `go.mod replace` and runs its `pve storage` converge stage against
+  the cluster it manages. It is the right instrument for this: it knows which
+  entry it expected to create or drift-correct, so a breakage names itself.
+  Findings come back here as issues/fixes before the tag is pinned; the ledger
+  records the surface as **mock-verified, consumer-exercised** — not
+  live-verified by this repo's own suite — per the honesty rule. If the
+  scratch-entry cassette is ever recorded later (a disposable lab path
+  returning), the leak review notes stand: node names and any server/export
+  values are topology; storage configs can carry `password` for CIFS/PBS — the
+  scratch entry uses none.
 
 ## Migration / Rollout Plan
 
 1. One `minor` PR: methods + specs + result + `Datastore.Digest` + mockpve +
-   unit tests + `TestStoragePathsReal` + coverage regen + docs (`storage` doc.go
+   unit tests + `TestStoragePathsReal` + the prepared-but-not-run
+   `TestDatastoreLifecycle` harness + coverage regen + docs (`storage` doc.go
    gains the config-write story; the runnable `Example` grows a create/delete
    leg or a second `Example_datastoreConfig`).
-2. Live verification (Donald-run, pvelab per OQ-6): the integration test above;
-   cassette leak-reviewed, committed, replay wired in. Findings fold back as
-   fixes before the ledger closes.
-3. hoomlab bootstrap bumps the SDK tag and builds the `pve storage` stage
-   against it (out of this repo; issue #28's "Consumer" section).
+2. Consumer-driven verification (OQ-6 decision): hoomlab imports the branch with
+   a local `go.mod replace` and exercises the `pve storage` converge stage
+   against the production cluster it manages. Findings fold back here as
+   issues/fixes; the surface is labelled mock-verified, consumer-exercised.
+3. hoomlab bootstrap bumps to the released tag and drops the replace (out of
+   this repo; issue #28's "Consumer" section).
+4. Deferred until a disposable live target exists again: this repo's own
+   cassette for the lifecycle harness, its `just test-replay` wiring, and the
+   flip from consumer-exercised to live-verified.
 
 ## Open Questions
 
-1. **Write-spec shape** — how do the writes take their parameters?
+1. **Write-spec shape** — how do the writes take their parameters? **Decision
+   (2026-08-26): a.**
    - **a (recommended): separate `DatastoreSpec` (create) and `DatastoreUpdate`
      (update) pointer specs.** The two parameter sets genuinely differ — twelve
      create-fixed params exist only on POST, `delete`/`digest` only on PUT — so
@@ -429,6 +451,7 @@ precedent.
      exactly the silent-no-op class the IMPL-0007 review caught.
 
 2. **Typed-field extent on the specs** — which of the 61 params get fields?
+   **Decision (2026-08-26): a.**
    - **a (recommended): the read type's modelled set plus the zfspool consumer
      case (`Sparse`, `Blocksize`) plus `Digest` on the read type; everything
      else via `Extra`.** Matches the add-on-demand policy the `Datastore` read
@@ -442,7 +465,8 @@ precedent.
      `monhost`, `username`, `snapshot-as-volume-chain`, …). More surface to
      document and keep honest with zero consumers exercising it.
 
-3. **`Content`/`Nodes` representation on the write specs** —
+3. **`Content`/`Nodes` representation on the write specs** — **Decision
+   (2026-08-26): a.**
    - **a (recommended): `[]string`, comma-joined after encode; the read type
      keeps its strings.** Set semantics become structural on the write side (the
      drill's finding), and the join mechanics are the established pattern (ZFS
@@ -454,7 +478,7 @@ precedent.
      read-type change bundled into an otherwise-additive PR, and it would force
      order/normalization decisions onto every existing read consumer.
 
-4. **Create/update return handling** —
+4. **Create/update return handling** — **Decision (2026-08-26): a.**
    - **a (recommended): both return `*DatastoreWriteResult`.** The schema
      declares the same object on both verbs, and the `encryption-key` member is
      one-shot key material — the `UpdateACMEAccount` audit is the precedent for
@@ -467,7 +491,7 @@ precedent.
      but the schema says update returns it too, and asymmetry here is a trap for
      the config-regenerating types.
 
-5. **mockpve list-value normalization** —
+5. **mockpve list-value normalization** — **Decision (2026-08-26): a.**
    - **a (recommended): parse `nodes`/`content` to sets, store and emit
      sorted.** Read-back ≠ submission order (unless coincidentally sorted),
      which is precisely real PVE's behaviour class, and it makes
@@ -477,23 +501,46 @@ precedent.
      assertions, which is exactly the problem: the mock would promise something
      real PVE does not.
 
-6. **Live-verification target and gate** —
-   - **a (recommended): the pvelab nested cluster, zfspool shape.** Create the
-     scratch entry over the nested nodes' existing ZFS pool (`rpool/data`; fall
-     back to a `dir`-type entry if the lab's install turns out not to be
-     ZFS-backed), nodes-restricted — the exact hoomlab shape — behind a new
-     `PVE_TEST_DATASTORE=1` gate, env in the lab's env file. Follows the
-     move-destructive-tests-off-r740a direction (IMPL-0007 follow-up) even
-     though this write is config-only and reversible.
-   - b: r740a. The write is reversible and data-untouching, so the blast radius
-     is small — but it edits the production cluster's storage.cfg, and the
-     follow-up exists because "small" has been wrong before.
-   - c: mock-verified only; let hoomlab's first live converge be the
-     verification. Cheapest, but it outsources the SDK's evidence to a consumer
-     and the repo's honesty rule ("written-but-unverified" labels) exists to
-     avoid exactly that.
+6. **Live-verification target and gate** — **Decision (2026-08-26): amended —
+   none of the drafted options; live verification is deferred repo-wide, and the
+   consumer verifies.** The ground shifted under this question between drafting
+   and review: r740a is no longer a lone host with headroom for lab traffic — it
+   is one node of a **3-node production cluster, managed by hoomlab**. That
+   takes out (b) directly, and it takes out (a) too, because the pvelab nested
+   cluster is provisioned ON r740a: the raw host could still technically carry a
+   local-zfs lab, but changes against that node now risk the cluster around it.
+   So the short-term posture (explicitly accepted as not the long-term answer)
+   is:
+   - **This repo defers live verification and its own cassette capture.**
+     Nothing in CI needed disabling — the only integration run CI performs is
+     `just test-replay`, which replays committed cassettes against a placeholder
+     endpoint; the dogfood recipes and the tagged live suite are local-only and
+     stay available for whoever runs them by hand.
+   - **Features land as normal, mock-verified**, with the honest label:
+     mock-verified, consumer-exercised — never claimed live-verified by this
+     repo's suite.
+   - **hoomlab is the live-verification vehicle, in parallel**: it imports the
+     changes with a local `go.mod replace` and its `pve storage` converge stage
+     exercises them against the production cluster it manages. It is the
+     consumer, so it has the context to know what broke and where when an entry
+     fails to converge — better attribution than a scratch-entry test would
+     give. Findings return here as issues/fixes before the tag is pinned.
+   - The prepared `TestDatastoreLifecycle` harness still ships (gate
+     `PVE_TEST_DATASTORE=1`, `TestACMEDNSNamecheap` precedent: labelled
+     never-run, no cassette), so when a disposable target exists again the run
+     is an env file, not a PR.
 
-7. **Convergence helper in the SDK** —
+   The drafted options, kept for the record:
+   - a: the pvelab nested cluster, zfspool shape over the nested nodes' pool,
+     behind the new gate. (Ruled out short-term: the lab rides the production
+     host.)
+   - b: r740a directly. (Ruled out: production.)
+   - c: mock-verified only, hoomlab's first live converge as the evidence.
+     (Closest to the decision — the amendment adds the explicit deferral policy,
+     the honesty label, and the prepared harness so the evidence gap is stated
+     rather than silent.)
+
+7. **Convergence helper in the SDK** — **Decision (2026-08-26): a.**
    - **a (recommended): none — primitives only.** Create-if-missing /
      update-if-drifted needs a diff policy (which fields count as drift? is an
      `Extra` key authoritative or inherited?) that is consumer business logic;
@@ -521,4 +568,7 @@ precedent.
   evidence for `digest` on datastore reads.
 - hoomlab INV-0001 (hardware drill) — the set-normalization and
   read-shape-vs-write-shape findings behind the mock realism rules.
+- IMPL-0007 "Follow-up: move the destructive integration tests off r740a" — the
+  r740a-is-production trajectory the OQ-6 decision extends into a repo-wide
+  live-verification deferral (updated 2026-08-26 with this decision).
 - `docs/COVERAGE.md` — the three `/storage` gap rows this closes.

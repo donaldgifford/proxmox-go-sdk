@@ -21,6 +21,16 @@ There are two goals here, and you can do them together in one run:
 > so nothing lands in a commit until you review it. Read that section before you
 > record.
 
+**Posture change (2026-08-26, DESIGN-0007 OQ-6): live runs are deferred.** r740a
+is now one node of a 3-node **production** cluster managed by hoomlab, and the
+pvelab nested lab provisions onto that same host — so there is currently no
+disposable target for the mutating tests, and no new cassettes are being
+recorded. New SDK surfaces land mock-verified ("consumer-exercised" once hoomlab
+has run them via a local `go.mod replace`); the env-gated harnesses in this
+guide still ship and still skip cleanly, so ending the deferral is an env file,
+not a code change. CI is unaffected — it only replays the already-committed
+cassettes.
+
 ## Mental model
 
 ```text
