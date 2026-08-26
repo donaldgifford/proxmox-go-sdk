@@ -431,6 +431,14 @@ precedent.
    cassette for the lifecycle harness, its `just test-replay` wiring, and the
    flip from consumer-exercised to live-verified.
 
+_Amended 2026-08-26 by IMPL-0008's OQ decisions: the order of steps 2 and 3
+flips._ The `minor` release is cut **first**, mock-verified and saying so in its
+release notes; hoomlab then verifies against the minted tag (not a branch
+`replace`), and findings arrive as **patch releases**. Delivery is IMPL-0008
+(completes at release); the verification loop and the consumer-exercised label
+flip are **IMPL-0009**, split out so the delivery ledger can complete on what
+this repo ships alone.
+
 ## Open Questions
 
 1. **Write-spec shape** — how do the writes take their parameters? **Decision

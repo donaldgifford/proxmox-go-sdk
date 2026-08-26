@@ -29,6 +29,7 @@ nav:
         - 'IMPL-0006: API coverage tracker delivery': impl/0006-api-coverage-tracker-delivery.md
         - 'IMPL-0007: ACME DNS plugins and node config delivery': impl/0007-acme-dns-plugins-and-node-config-delivery.md
         - 'IMPL-0008: Cluster storage config writes delivery': impl/0008-cluster-storage-config-writes-delivery.md
+        - 'IMPL-0009: Cluster storage config writes consumer verification': impl/0009-cluster-storage-config-writes-consumer-verification.md
     - Investigations:
         - Overview: investigation/README.md
         - 'INV-0001: Nested Proxmox nodes for automated live SDK testing': investigation/0001-nested-proxmox-nodes-for-automated-live-sdk-testing.md

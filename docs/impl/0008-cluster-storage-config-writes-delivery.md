@@ -10,7 +10,9 @@ created: 2026-08-26
 
 # IMPL-0008: Cluster storage config writes delivery
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-08-26
+**Status:** Draft **Author:** Donald Gifford **Date:** 2026-08-26 (OQs decided
+2026-08-26: 1a with the release posture stated, 2a, 3b amended — the
+consumer-verification phase is split out as IMPL-0009)
 
 <!--toc:start-->
 
@@ -26,12 +28,9 @@ created: 2026-08-26
   - [Phase 2: mockpve write support + service methods](#phase-2-mockpve-write-support--service-methods)
     - [Tasks](#tasks-1)
     - [Success Criteria](#success-criteria-1)
-  - [Phase 3: Paths, coverage, prepared harness, docs, PR](#phase-3-paths-coverage-prepared-harness-docs-pr)
+  - [Phase 3: Paths, coverage, prepared harness, docs, PR, closure](#phase-3-paths-coverage-prepared-harness-docs-pr-closure)
     - [Tasks](#tasks-2)
     - [Success Criteria](#success-criteria-2)
-  - [Phase 4: Consumer verification (hoomlab, Donald-run)](#phase-4-consumer-verification-hoomlab-donald-run)
-    - [Tasks](#tasks-3)
-    - [Success Criteria](#success-criteria-3)
 - [File Changes](#file-changes)
 - [Testing Plan](#testing-plan)
 - [Dependencies](#dependencies)
@@ -49,9 +48,13 @@ Deliver the write half of PVE's cluster storage configuration API on
 (`PUT /storage/{storage}`), `DeleteDatastore` (`DELETE /storage/{storage}`) —
 with mockpve serving all three, so `hoomlab`'s `pve storage` converge stage
 (create-if-missing, update-if-drifted) can be built and tested against the SDK.
-Everything ships **mock-verified**; live evidence arrives through hoomlab as the
-consumer (DESIGN-0007 OQ-6), never through this repo's own suite while the
-deferral holds.
+Everything ships **mock-verified**, and — stated up front per OQ-1's decision —
+**the release is cut without live verification**: the `minor` tag is minted on
+merge with mock-verified evidence only, and verification arrives afterwards as a
+**patch release** once hoomlab can import and test/verify. That
+consumer-verification work is deliberately not a phase of this ledger — it is
+**IMPL-0009**, split out (OQ-3's decision) so this ledger can honestly complete
+when everything this repo can build and ship has shipped.
 
 ## Scope
 
@@ -88,9 +91,13 @@ deferral holds.
   `Extra`; added on demand.
 - **mockpve permission enforcement** — filed separately with the drill's parity
   findings (issue #28).
-- **hoomlab's own stage code** — Phase 4 exercises it, but building
-  `bootstrap.hcl` storage blocks, cross-validation, and the converge loop is
-  hoomlab work in hoomlab's repo.
+- **Consumer verification** — moved wholesale to **IMPL-0009** (OQ-3b):
+  hoomlab's import, the converge runs against the production cluster, the
+  findings-to-patch-release loop, and the mock-verified → consumer-exercised
+  label flip all live there.
+- **hoomlab's own stage code** — building `bootstrap.hcl` storage blocks,
+  cross-validation, and the converge loop is hoomlab work in hoomlab's repo
+  (IMPL-0009 tracks only the SDK side of what it finds).
 
 ## Ground facts
 
@@ -238,10 +245,11 @@ neither half is testable alone.
 
 ---
 
-### Phase 3: Paths, coverage, prepared harness, docs, PR
+### Phase 3: Paths, coverage, prepared harness, docs, PR, closure
 
 Hardening and shipping: the guards that keep the paths honest, the harness that
-ends the deferral cheaply later, and the PR.
+ends the deferral cheaply later, the PR, and — per OQ-3b — the ledger's own
+closure: this phase is the last one, and completing it completes IMPL-0008.
 
 #### Tasks
 
@@ -275,9 +283,19 @@ ends the deferral cheaply later, and the PR.
      `Example_datastoreConfig` in `example_test.go` (create zfspool → get →
      update → delete against `mockpve.Serve()`, `// Output:` block —
      documentation and test). `go doc ./...` renders cleanly.
-- [ ] 6. PR: one `minor` PR (exactly one semver label), changelog as the
-     branch's final commit before push. Changelog/PR body carries the two compat
-     notes: `Digest` leaves `Extra`, and `storage.API` grew three methods.
+- [ ] 6. PR + release: one `minor` PR (exactly one semver label), changelog as
+     the branch's final commit before push. The PR body and changelog state the
+     OQ-1 release posture explicitly: **this release ships mock-verified,
+     without live verification; verification follows via hoomlab (IMPL-0009) and
+     any resulting fixes arrive as a patch release.** They also carry the two
+     compat notes: `Digest` leaves `Extra`, and `storage.API` grew three
+     methods.
+- [ ] 7. Ledger closure (after merge + tag): tick this ledger with dated
+     evidence, flip DESIGN-0007 → Implemented, flip IMPL-0008 → Completed with
+     the surface labelled **mock-verified** (the consumer-exercised flip is
+     IMPL-0009's, not this ledger's), and confirm IMPL-0009 is In Progress-able
+     the moment hoomlab starts (closure docs ride a `dont-release` PR or the
+     next release PR).
 
 #### Success Criteria
 
@@ -289,51 +307,10 @@ ends the deferral cheaply later, and the PR.
 - The harness compiles under the integration tag and skips cleanly without its
   gate; it appears in no CI job.
 - `go doc ./...` renders the new surface; the Example runs deterministically.
-
----
-
-### Phase 4: Consumer verification (hoomlab, Donald-run)
-
-The DESIGN-0007 OQ-6 posture executed: hoomlab is the live-verification vehicle,
-in parallel and in its own repo. This phase is Donald-run; SDK-side findings
-fold back as fixes. Until it completes, the write surface is **mock-verified**
-and every doc that mentions it says so.
-
-#### Tasks
-
-- [ ] 1. hoomlab imports the surface (per OQ-1 of this ledger: released tag or
-     `go.mod replace` on main) and builds its `pve storage` stage against it:
-     `bootstrap.hcl` storage blocks → converge loop over
-     `ListDatastores`/`GetDatastore` + the three writes, comparing
-     `Content`/`Nodes` as sets and threading `Datastore.Digest` into
-     `DatastoreUpdate.Digest`.
-- [ ] 2. First converge against the production cluster (hoomlab-run,
-     hoomlab-attributed): create the `fast/vm` + `tank/vm` zfspool entries
-     (node-restricted, sparse) and restrict the stock `local-zfs` entry — the
-     two shapes issue #28 names. hoomlab knows which entry it expected to create
-     or drift-correct, so a breakage names itself.
-- [ ] 3. Findings fold back here as issues → fixes, each pinned by a mock test
-     so mock and PVE cannot silently disagree again. Watch the classes the mock
-     cannot prove: the PUT return shape actually populated, digest semantics on
-     concurrent edits, PVE's real normalization of `nodes`/`content` versus the
-     mock's sorted-set model, and the create-fixed rejection's real
-     status/message.
-- [ ] 4. Ledger closure: record the converge evidence with dates; flip the
-     surface's label from mock-verified to **consumer-exercised** in this ledger
-     and anywhere else that states verification status; per OQ-3, flip IMPL-0008
-     → Completed. The repo-side cassette + replay wiring stays deferred (out of
-     scope) and is NOT resurrected here.
-
-#### Success Criteria
-
-- hoomlab's `pve storage` converge stage runs green against the production
-  cluster: both issue-#28 shapes exist/hold on re-run (idempotent — a second
-  converge is a no-op).
-- Every SDK-vs-PVE discrepancy hoomlab surfaced is fixed on this repo's side
-  with a mock test pinning it — zero known mock-and-SDK-agree-but-PVE- disagrees
-  gaps on the storage write surface.
-- The ledger and docs say **consumer-exercised**, not live-verified — the
-  honesty rule under the deferral.
+- The merge mints the `minor` tag with the mock-verified posture stated in the
+  release notes; IMPL-0008 flips to Completed — everything this repo can build
+  and ship without a live target has shipped, and what remains is tracked with
+  checkboxes in IMPL-0009, not silently here.
 
 ---
 
@@ -352,7 +329,7 @@ and every doc that mentions it says so.
 | `proxmox/integration/datastore_test.go` | Create | Prepared `TestDatastoreLifecycle` (gated, never-run, no cassette) |
 | `TESTING.md`                            | Modify | Harness section + gate row, posture cross-reference               |
 | `docs/COVERAGE.md`                      | Modify | Regenerated: three flips → 261/675                                |
-| `docs/design/0007-…-config-writes.md`   | Modify | Status → Implemented (Phase 3/4 closure)                          |
+| `docs/design/0007-…-config-writes.md`   | Modify | Status → Implemented (Phase 3 task 7)                             |
 
 ## Testing Plan
 
@@ -365,20 +342,25 @@ and every doc that mentions it says so.
   unmodified (Phase 2).
 - `TestStoragePathsReal` pins every literal path in-repo; the coverage
   fabrication guard proves the mock's paths are real PVE paths in CI (Phase 3).
-- Live behaviour is consumer-verified through hoomlab (Phase 4) — no cassette,
-  no replay, per the deferral.
+- Live behaviour is consumer-verified through hoomlab — tracked in
+  **IMPL-0009**, not here; no cassette, no replay, per the deferral.
 
 ## Dependencies
 
 - DESIGN-0007 approved (this branch) — the design this implements.
 - No new Go module dependencies.
-- Phase 4 needs: hoomlab's `pve storage` stage built against this surface
-  (hoomlab repo work), and the production cluster hoomlab already manages.
-  Nothing in Phases 1–3 blocks on it.
+- Nothing here blocks on hoomlab: its stage, the production cluster, and the
+  converge runs are IMPL-0009's dependencies, picked up after this ledger's
+  release ships.
 
 ## Open Questions
 
-1. **Phase-4 import path: when does hoomlab pick the surface up?**
+1. **Phase-4 import path: when does hoomlab pick the surface up?** **Decision
+   (2026-08-26): a — with the posture stated, not implied.** The `minor` release
+   is cut **without live verification** (mock-verified only; the PR body,
+   changelog, and release notes say so), and verification comes afterwards **in
+   the form of a patch release** once hoomlab can import and test/verify.
+   Executed as Phase 3 task 6; the verification loop itself is IMPL-0009.
    - **a (recommended): merge and release first; hoomlab verifies against the
      minted tag (or a `replace` on main).** The repo's working definition of
      done is mock-verified + CI green — features have always merged on that
@@ -398,7 +380,7 @@ and every doc that mentions it says so.
      the change it releases and adds a ceremony merge.
 
 2. **`Extra`-carried secrets (a CIFS/PBS `password` rides `Extra`)** — how much
-   does the SDK do about it?
+   does the SDK do about it? **Decision (2026-08-26): a.**
    - **a (recommended): doc-note only.** The spec doc comments state that
      `Extra` may carry provider secrets and that the consumer owns what it
      prints; the SDK's transport logging (`PVE_DEBUG`) logs method+URL, never
@@ -416,7 +398,15 @@ and every doc that mentions it says so.
      as minimal.
 
 3. **Ledger completion semantics under the deferral** — when does IMPL-0008 flip
-   to Completed?
+   to Completed? **Decision (2026-08-26): b, amended into a split rather than a
+   demotion.** IMPL-0008 completes after Phase 3 — "complete in regards to what
+   we can implement", so a work loop breaks once everything
+   buildable-and-shippable here has shipped — but the former Phase 4 is **not**
+   parked in a follow-up section nobody's checklist forces (option b's stated
+   weakness): it moved wholesale into **IMPL-0009**, its own ledger with its own
+   checkboxes and success criteria, started once hoomlab can begin testing. The
+   consumer-exercised flip therefore still has a checklist that forces it; this
+   ledger's Completed just stops claiming it.
    - **a (recommended): after Phase 4** — hoomlab's converge green and the label
      flipped to consumer-exercised. That keeps this ledger's completion meaning
      what every earlier ledger's meant: the surface was exercised against real
@@ -437,8 +427,10 @@ and every doc that mentions it says so.
   — motivation and consumer.
 - IMPL-0007 — the digest/explicit-delete precedent (ACME plugins), the
   `UpdateACMEAccount` discarded-return lesson, and the "Follow-up: move the
-  destructive integration tests off r740a" section this ledger's Phase 4
-  operates under.
+  destructive integration tests off r740a" section behind the deferral.
+- IMPL-0009 — the consumer-verification ledger split out of this one (OQ-3
+  decision): hoomlab's converge runs, the findings-to-patch-release loop, and
+  the consumer-exercised label flip.
 - hoomlab INV-0001 (hardware drill) — the set-normalization findings behind the
   mock's realism rules.
 - `docs/COVERAGE.md` + `cmd/pve-schemadiff` — the coverage and fabrication
