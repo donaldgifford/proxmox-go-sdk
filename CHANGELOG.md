@@ -10,6 +10,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 - *(design)* DESIGN-0007 — cluster storage config writes ([#28](https://github.com/donaldgifford/proxmox-go-sdk/issues/28))
 - *(design)* DESIGN-0007 OQs decided — all a, OQ-6 amended to defer live runs
+- *(impl)* IMPL-0008 — cluster storage config writes delivery ledger
 
 ## [0.11.0] - 2026-08-20
 
