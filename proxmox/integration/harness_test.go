@@ -127,15 +127,17 @@ const (
 	envScrubExtra  = "PVE_SCRUB_EXTRA"  // CSV of extra live=placeholder scrub pairs for recording (pvelab writes it)
 
 	// Destructive-test gates. Absent -> the corresponding test skips.
-	envTestStorage     = "PVE_TEST_STORAGE"      // target storage for a scratch guest disk / uploads
-	envTestISOStorage  = "PVE_TEST_ISO_STORAGE"  // storage that allows "iso" content for the upload test; falls back to PVE_TEST_STORAGE
-	envTestVMID        = "PVE_TEST_VMID"         // scratch QEMU VMID the suite may create/destroy
-	envTestConsoleVMID = "PVE_TEST_CONSOLE_VMID" // scratch QEMU VMID for the console-mint test (distinct so it can run alongside the lifecycle tests)
-	envTestLXCVMID     = "PVE_TEST_LXC_VMID"     // scratch LXC VMID the suite may create/destroy
-	envTestLXCTemplate = "PVE_TEST_LXC_TEMPLATE" // OS template volid, e.g. local:vztmpl/debian-12-...tar.zst
-	envTestISOPath     = "PVE_TEST_ISO_PATH"     // local path to a (small) ISO to upload (Phase 3)
-	envFabricNodes     = "PVE_TEST_FABRIC_NODES" // CSV of >= 2 node names for TestSDNFabricLifecycle (the pvelab cluster)
-	envFabricIface     = "PVE_TEST_FABRIC_IFACE" // fabric-facing interface name on every fabric node, e.g. ens19
+	envTestStorage       = "PVE_TEST_STORAGE"        // target storage for a scratch guest disk / uploads
+	envTestISOStorage    = "PVE_TEST_ISO_STORAGE"    // storage that allows "iso" content for the upload test; falls back to PVE_TEST_STORAGE
+	envTestVMID          = "PVE_TEST_VMID"           // scratch QEMU VMID the suite may create/destroy
+	envTestConsoleVMID   = "PVE_TEST_CONSOLE_VMID"   // scratch QEMU VMID for the console-mint test (distinct so it can run alongside the lifecycle tests)
+	envTestLXCVMID       = "PVE_TEST_LXC_VMID"       // scratch LXC VMID the suite may create/destroy
+	envTestLXCTemplate   = "PVE_TEST_LXC_TEMPLATE"   // OS template volid, e.g. local:vztmpl/debian-12-...tar.zst
+	envTestISOPath       = "PVE_TEST_ISO_PATH"       // local path to a (small) ISO to upload (Phase 3)
+	envFabricNodes       = "PVE_TEST_FABRIC_NODES"   // CSV of >= 2 node names for TestSDNFabricLifecycle (the pvelab cluster)
+	envFabricIface       = "PVE_TEST_FABRIC_IFACE"   // fabric-facing interface name on every fabric node, e.g. ens19
+	envTestDatastore     = "PVE_TEST_DATASTORE"      // "1" gates TestDatastoreLifecycle (edits the CLUSTER storage config)
+	envTestDatastorePool = "PVE_TEST_DATASTORE_POOL" // optional existing ZFS dataset for a zfspool entry; absent -> dir-type fallback
 	// PVE_TEST_PLACEMENT_VMID_1/2 gate TestResourceAffinityPlacement; they are
 	// read by name there (placementVMID) since each is a one-shot gate.
 	// PVE_TEST_HA_SIDS was retired with TestResourceAffinityRule (design OQ-9:

@@ -328,7 +328,7 @@ closure: this phase is the last one, and completing it completes IMPL-0008.
      Commit the regenerated `docs/COVERAGE.md`. **Done 2026-08-27** — exactly
      `POST /storage`, `PUT /storage/{}`, `DELETE /storage/{}` gap→covered,
      storage family 16→19 of 55, `just coverage-check` clean.
-- [ ] 3. Prepared integration harness (`proxmox/integration/datastore_test.go`,
+- [x] 3. Prepared integration harness (`proxmox/integration/datastore_test.go`,
      `//go:build integration`): `TestDatastoreLifecycle` behind
      `PVE_TEST_DATASTORE=1` + the standard env — create scratch zfspool entry
      over an existing pool (dir-type fallback per DESIGN-0007 OQ-6), nodes
@@ -339,7 +339,12 @@ closure: this phase is the last one, and completing it completes IMPL-0008.
      path via
      `env -u PVE_ENDPOINT go test -tags=integration -run TestDatastoreLifecycle`
      (never run the tagged suite with a live env — it can rewrite committed
-     cassettes).
+     cassettes). **Done 2026-08-27** — gates: skip under `PVE_REPLAY=1` (no
+     cassette by design), skip unless `PVE_TEST_DATASTORE=1`; optional
+     `PVE_TEST_DATASTORE_POOL` picks zfspool-over-existing-dataset vs the dir
+     fallback; the probe REFUSES to adopt a pre-existing `sdk-datastore-test`
+     entry. Both verification commands ran exactly as written (skip fired at the
+     gate, before any client was built — zero requests).
 - [ ] 4. TESTING.md: a short "Storage config writes" subsection — the gate, the
      harness's shape, and a pointer to the posture-change note (this is a
      deferred harness; running it needs a disposable target that does not
