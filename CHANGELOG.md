@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [unreleased]
+
+### Documentation
+
+- *(design)* DESIGN-0007 — cluster storage config writes ([#28](https://github.com/donaldgifford/proxmox-go-sdk/issues/28))
+- *(design)* DESIGN-0007 OQs decided — all a, OQ-6 amended to defer live runs
+- *(impl)* IMPL-0008 — cluster storage config writes delivery ledger
+- *(impl)* IMPL-0008 OQs decided; split consumer verification into IMPL-0009
+
+### Miscellaneous Tasks
+
+- Nudge CI dispatch
+
 ## [0.11.0] - 2026-08-20
 
 ### Features

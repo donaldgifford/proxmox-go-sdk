@@ -40,5 +40,7 @@ docz create impl "Your Implementation Title"
 | IMPL-0005 | HA arm disarm status and migrate delivery                        | In Progress | 2026-07-21 | Donald Gifford | [0005-ha-arm-disarm-status-and-migrate-delivery.md](0005-ha-arm-disarm-status-and-migrate-delivery.md)                                       |
 | IMPL-0006 | API coverage tracker delivery                                    | Completed   | 2026-07-21 | Donald Gifford | [0006-api-coverage-tracker-delivery.md](0006-api-coverage-tracker-delivery.md)                                                               |
 | IMPL-0007 | ACME DNS plugins and node config delivery                        | Completed   | 2026-08-17 | Donald Gifford | [0007-acme-dns-plugins-and-node-config-delivery.md](0007-acme-dns-plugins-and-node-config-delivery.md)                                       |
+| IMPL-0008 | Cluster storage config writes delivery                           | Draft       | 2026-08-26 | Donald Gifford | [0008-cluster-storage-config-writes-delivery.md](0008-cluster-storage-config-writes-delivery.md)                                             |
+| IMPL-0009 | Cluster storage config writes consumer verification              | Draft       | 2026-08-26 | Donald Gifford | [0009-cluster-storage-config-writes-consumer-verification.md](0009-cluster-storage-config-writes-consumer-verification.md)                   |
 
 <!-- END DOCZ AUTO-GENERATED -->
