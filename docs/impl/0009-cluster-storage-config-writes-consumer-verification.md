@@ -105,6 +105,17 @@ The consumer picks the surface up and runs the two shapes issue #28 was filed
 for. This phase lives mostly in hoomlab's repo; the tasks here are the
 SDK-facing checkpoints.
 
+> **Head start (2026-08-27):** this loop began early — hoomlab built its stage
+> against the IMPL-0008 PR branch (go.work) and ran live converges against the
+> production cluster BEFORE the merge, so the first findings landed as PR #30
+> fixes instead of a patch release: the missing-id `GET /storage/{id}` 500 wart
+> (hoomlab INV-0001 deviation 8; existence checks now scan `ListDatastores`) and
+> zfspool `mountpoint` materialization (reads carry server-generated keys;
+> compare fields, not maps). Write paths passed live: create zfspool, partial
+> update with index-read digest, zero-drift re-run. Phase 1 proper picks up from
+> the **v0.12.0** tag import — the tasks below track the released-tag evidence,
+> which the pre-release run does not replace.
+
 #### Tasks
 
 - [ ] 1. hoomlab imports the IMPL-0008 release tag (or, while iterating, a local

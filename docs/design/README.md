@@ -39,6 +39,6 @@ docz create design "Your Design Title"
 | DESIGN-0004 | HA arm and disarm, status reads, and DLB reclassification                        | Implemented | 2026-07-19 | Donald Gifford | [0004-ha-arm-and-disarm-status-reads-and-dlb-reclassification.md](0004-ha-arm-and-disarm-status-reads-and-dlb-reclassification.md)         |
 | DESIGN-0005 | API coverage tracker with CI drift and fabrication guards                        | Implemented | 2026-07-19 | Donald Gifford | [0005-api-coverage-tracker-with-ci-drift-and-fabrication-guards.md](0005-api-coverage-tracker-with-ci-drift-and-fabrication-guards.md)     |
 | DESIGN-0006 | ACME DNS plugins and node ACME config with provider-generic credentials          | Implemented | 2026-08-16 | Donald Gifford | [0006-acme-dns-plugins-and-node-acme-config-with-provider-generic.md](0006-acme-dns-plugins-and-node-acme-config-with-provider-generic.md) |
-| DESIGN-0007 | Cluster storage config writes                                                    | Draft       | 2026-08-26 | Donald Gifford | [0007-cluster-storage-config-writes.md](0007-cluster-storage-config-writes.md)                                                             |
+| DESIGN-0007 | Cluster storage config writes                                                    | Implemented | 2026-08-26 | Donald Gifford | [0007-cluster-storage-config-writes.md](0007-cluster-storage-config-writes.md)                                                             |
 
 <!-- END DOCZ AUTO-GENERATED -->

@@ -1,7 +1,7 @@
 ---
 id: IMPL-0008
 title: "Cluster storage config writes delivery"
-status: Draft
+status: Completed
 author: Donald Gifford
 created: 2026-08-26
 ---
@@ -10,9 +10,10 @@ created: 2026-08-26
 
 # IMPL-0008: Cluster storage config writes delivery
 
-**Status:** Draft **Author:** Donald Gifford **Date:** 2026-08-26 (OQs decided
-2026-08-26: 1a with the release posture stated, 2a, 3b amended — the
-consumer-verification phase is split out as IMPL-0009)
+**Status:** Completed **Author:** Donald Gifford **Date:** 2026-08-26 (OQs
+decided 2026-08-26: 1a with the release posture stated, 2a, 3b amended — the
+consumer-verification phase is split out as IMPL-0009; completed 2026-08-27 with
+v0.12.0, the write surface consumer-exercised pre-release on PR #30)
 
 <!--toc:start-->
 
@@ -363,19 +364,30 @@ closure: this phase is the last one, and completing it completes IMPL-0008.
      read-then-guarded-write idiom inline; the Example's output pins the
      set-normalized read (`images,rootdir`) and the digest-guarded narrow to
      `images`. Both Examples pass; `go doc` renders.
-- [ ] 6. PR + release: one `minor` PR (exactly one semver label), changelog as
+- [x] 6. PR + release: one `minor` PR (exactly one semver label), changelog as
      the branch's final commit before push. The PR body and changelog state the
      OQ-1 release posture explicitly: **this release ships mock-verified,
      without live verification; verification follows via hoomlab (IMPL-0009) and
      any resulting fixes arrive as a patch release.** They also carry the two
      compat notes: `Digest` leaves `Extra`, and `storage.API` grew three
-     methods.
-- [ ] 7. Ledger closure (after merge + tag): tick this ledger with dated
+     methods. **Done 2026-08-27** — PR #30, `minor`, all 13 checks green twice
+     (initial push and after the consumer-findings fixes). Merged 2026-08-27;
+     the release workflow minted **v0.12.0**. The posture line aged well in one
+     respect: hoomlab's verification arrived ON the PR (via go.work) instead of
+     after the tag, so the findings landed as PR fixes rather than the
+     anticipated patch release.
+- [x] 7. Ledger closure (after merge + tag): tick this ledger with dated
      evidence, flip DESIGN-0007 → Implemented, flip IMPL-0008 → Completed with
      the surface labelled **mock-verified** (the consumer-exercised flip is
      IMPL-0009's, not this ledger's), and confirm IMPL-0009 is In Progress-able
      the moment hoomlab starts (closure docs ride a `dont-release` PR or the
-     next release PR).
+     next release PR). **Done 2026-08-27** — this edit. One label upgrade over
+     the task's own wording, per the honesty rule: the write paths are better
+     than mock-verified — **consumer-exercised pre-release** (hoomlab ran
+     create/ update/converge live against the real 3-node cluster from the PR
+     branch; see the consumer-findings block above). What stays IMPL-0009's: the
+     released-tag (v0.12.0) import, any further converge coverage (delete path,
+     additional storage types), and the formal label flip in its own ledger.
 
 **Consumer findings applied pre-release (2026-08-27).** hoomlab built its
 bootstrap `pve storage` stage against this branch (go.work) and ran it against
@@ -403,16 +415,25 @@ findings, both fixed on the PR:
 
 - All CI jobs green on the PR — including `Test Replay (cassettes)` untouched
   (nothing added to replay) and `just coverage-check` (stale report / fabricated
-  route / stale annotation all clean).
+  route / stale annotation all clean). **Met 2026-08-27** (twice: initial push
+  and the findings fixes).
 - `docs/COVERAGE.md` shows 261/675 with the three rows flipped and nothing else
-  changed.
+  changed. **Met 2026-08-27.**
 - The harness compiles under the integration tag and skips cleanly without its
-  gate; it appears in no CI job.
+  gate; it appears in no CI job. **Met 2026-08-27** (skip proven with dead
+  credentials — see the task 4 note).
 - `go doc ./...` renders the new surface; the Example runs deterministically.
+  **Met 2026-08-27.**
 - The merge mints the `minor` tag with the mock-verified posture stated in the
   release notes; IMPL-0008 flips to Completed — everything this repo can build
   and ship without a live target has shipped, and what remains is tracked with
-  checkboxes in IMPL-0009, not silently here.
+  checkboxes in IMPL-0009, not silently here. **Met 2026-08-27** — v0.12.0; and
+  the posture is better than stated: consumer-exercised pre-release.
+
+**Phase 3 complete 2026-08-27. IMPL-0008 is Completed** — all three phases done,
+v0.12.0 released, the write surface consumer-exercised pre-release with both
+live findings fixed before the tag. IMPL-0009 continues from the released-tag
+import.
 
 ---
 

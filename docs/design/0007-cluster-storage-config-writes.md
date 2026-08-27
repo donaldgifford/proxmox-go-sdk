@@ -1,7 +1,7 @@
 ---
 id: DESIGN-0007
 title: "Cluster storage config writes"
-status: Approved
+status: Implemented
 author: Donald Gifford
 created: 2026-08-26
 ---
@@ -10,9 +10,12 @@ created: 2026-08-26
 
 # DESIGN-0007: Cluster storage config writes
 
-**Status:** Approved **Author:** Donald Gifford **Date:** 2026-08-26 (OQs
+**Status:** Implemented **Author:** Donald Gifford **Date:** 2026-08-26 (OQs
 decided 2026-08-26: 1–5 and 7 all a; OQ-6 amended — live verification is
-deferred repo-wide, the consumer verifies; see the decision under OQ-6)
+deferred repo-wide, the consumer verifies; see the decision under OQ-6.
+Implemented by IMPL-0008, released as v0.12.0 on 2026-08-27; the write paths
+were consumer-exercised live pre-release on PR #30, surfacing two parity fixes:
+the missing-id GET 500 wart and zfspool `mountpoint` materialization)
 
 <!--toc:start-->
 
