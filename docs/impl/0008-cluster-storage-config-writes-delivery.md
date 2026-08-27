@@ -227,13 +227,13 @@ neither half is testable alone.
      submitted-but-unmodelled keys (`sparse`, `blocksize`, … — the mock needs
      faithful read-back, not typed fields); `datastoreToPayload` emits them
      (map-shaped JSON, matching real PVE's flat object); `AddStorage` keeps its
-     signature and seeds a digest so existing seeded tests read one.
-     **Done 2026-08-27** — one refinement: the digest lives on `storageState`
+     signature and seeds a digest so existing seeded tests read one. **Done
+     2026-08-27** — one refinement: the digest lives on `storageState`
      (`cfgVersion`/`cfgDigest` + `bumpStorageDigest`), NOT per-record, because
      the live cassette shows the storage.cfg FILE digest — one value shared by
      every entry of a read. `datastoreToPayload(rec, digest)` takes it as an
-     argument. `AddStorage` also normalizes seeded content
-     (`TestGetDatastore`'s expectation updated to the sorted set).
+     argument. `AddStorage` also normalizes seeded content (`TestGetDatastore`'s
+     expectation updated to the sorted set).
 - [x] 2. mockpve handlers: `POST /storage` (missing `storage`/`type` → 400;
      duplicate id → 400 "storage ID '…' already defined"; store the form; answer
      `{storage, type}` — **no fabricated `config`**, the mock supports no
@@ -245,14 +245,14 @@ neither half is testable alone.
      record; null data). Every write **bumps the stored digest**;
      `nodes`/`content` are parsed to sets and emitted **sorted** (OQ-5a), with
      the mock's doc comment stating the rule: list-valued options are sets,
-     compare them as sets.
-     **Done 2026-08-27** — `handleDatastoreCreate`/`Update`/`Delete` +
+     compare them as sets. **Done 2026-08-27** —
+     `handleDatastoreCreate`/`Update`/`Delete` +
      `normalizeSet`/`applyStorageForm`/`clearStorageKey`/`createFixedKeys`,
      routes registered in `registerStorageRoutes`. Form reads use
      `r.PostForm.Get` after `s.parseForm` (gosec G120) and the repeated wire
-     keys are consts (goconst). The stale-digest 400 reuses real PVE's
-     "detected modified configuration" message.
-- [ ] 3. Service methods in `proxmox/storage/datastore.go`:
+     keys are consts (goconst). The stale-digest 400 reuses real PVE's "detected
+     modified configuration" message.
+- [x] 3. Service methods in `proxmox/storage/datastore.go`:
      `CreateDatastore`/`UpdateDatastore` → `*DatastoreWriteResult`,
      `DeleteDatastore` → `error`, per DESIGN-0007's signatures — nil-spec /
      empty-id guards first (`svcutil.ErrNilSpec`/`ErrMissingField`), no version
@@ -260,6 +260,9 @@ neither half is testable alone.
      note (ordinary privilege, tokens work) and delete's config-not-data
      semantics. `storage.API` grows the three methods with a changelog note
      (pre-v1 break for external doubles only).
+     **Done 2026-08-27** — the three methods follow the sdn.CreateZone guard
+     idiom; `storage.API` gained a "Datastore configuration writes
+     (DESIGN-0007)" block. The changelog note is Phase 3 task 6's PR body.
 - [ ] 4. Unit matrix (beside the code, against the mock): create → list/get
      reflects the write including `Extra` keys; duplicate create rejected;
      update applies set-keys, honours `delete`, refuses stale digest AND accepts

@@ -176,6 +176,76 @@ func encodeDatastoreUpdate(update *DatastoreUpdate) (url.Values, error) {
 	return body, nil
 }
 
+// CreateDatastore adds a storage entry to the cluster configuration
+// (POST /storage). The write is synchronous; the result carries the entry's
+// id and type plus any server-generated config — see
+// DatastoreWriteResult.Config for why discarding it can lose key material.
+// Requires Datastore.Allocate on /storage (an ordinary privilege — API
+// tokens work).
+//
+// Creating the entry does not touch the backing storage: a zfspool entry
+// points at an existing dataset, a dir entry at an existing path. PVE
+// activates the storage on each node it applies to and reports the outcome
+// per node via ListNodeStorage.
+func (s *Service) CreateDatastore(ctx context.Context, spec *DatastoreSpec) (*DatastoreWriteResult, error) {
+	if spec == nil {
+		return nil, fmt.Errorf("storage.CreateDatastore: %w", svcutil.ErrNilSpec)
+	}
+	switch {
+	case spec.Storage == "":
+		return nil, fmt.Errorf("storage.CreateDatastore: storage: %w", svcutil.ErrMissingField)
+	case spec.Type == "":
+		return nil, fmt.Errorf("storage.CreateDatastore: type: %w", svcutil.ErrMissingField)
+	}
+	body, err := encodeDatastoreSpec(spec)
+	if err != nil {
+		return nil, fmt.Errorf("storage.CreateDatastore: %w", err)
+	}
+	var res DatastoreWriteResult
+	if err := s.c.DoRequest(ctx, http.MethodPost, datastoresPath(), body, &res); err != nil {
+		return nil, fmt.Errorf("storage.CreateDatastore: %w", err)
+	}
+	return &res, nil
+}
+
+// UpdateDatastore changes a storage entry (PUT /storage/{storage}). Only the
+// fields set on update go on the wire — see DatastoreUpdate for the
+// partial-write and Delete/Digest semantics. The write is synchronous.
+// Requires Datastore.Allocate on /storage.
+func (s *Service) UpdateDatastore(ctx context.Context, storage string, update *DatastoreUpdate) (*DatastoreWriteResult, error) {
+	if storage == "" {
+		return nil, fmt.Errorf("storage.UpdateDatastore: storage: %w", svcutil.ErrMissingField)
+	}
+	if update == nil {
+		return nil, fmt.Errorf("storage.UpdateDatastore: %w", svcutil.ErrNilSpec)
+	}
+	body, err := encodeDatastoreUpdate(update)
+	if err != nil {
+		return nil, fmt.Errorf("storage.UpdateDatastore: %w", err)
+	}
+	var res DatastoreWriteResult
+	if err := s.c.DoRequest(ctx, http.MethodPut, datastorePath(storage), body, &res); err != nil {
+		return nil, fmt.Errorf("storage.UpdateDatastore: %w", err)
+	}
+	return &res, nil
+}
+
+// DeleteDatastore removes a storage entry from the cluster configuration
+// (DELETE /storage/{storage}). It removes CONFIG, not data: the backing
+// dataset, directory, or export and every volume on it survive — the cluster
+// just stops using the entry. The write is synchronous. Requires
+// Datastore.Allocate on /storage; an unknown id resolves to
+// pverr.ErrNotFound.
+func (s *Service) DeleteDatastore(ctx context.Context, storage string) error {
+	if storage == "" {
+		return fmt.Errorf("storage.DeleteDatastore: storage: %w", svcutil.ErrMissingField)
+	}
+	if err := s.c.DoRequest(ctx, http.MethodDelete, datastorePath(storage), nil, nil); err != nil {
+		return fmt.Errorf("storage.DeleteDatastore: %w", err)
+	}
+	return nil
+}
+
 // ListNodeStorage returns the activation and usage status of every storage
 // visible from node (GET /nodes/{node}/storage).
 func (s *Service) ListNodeStorage(ctx context.Context, node string) ([]StorageStatus, error) {
