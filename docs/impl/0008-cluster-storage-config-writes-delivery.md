@@ -194,12 +194,22 @@ form first means Phase 2's handler tests exercise handlers, not encoding bugs.
 
 #### Success Criteria
 
-- `go build ./...`, `just lint`, `just test` (race) green.
+- `go build ./...`, `just lint`, `just test` (race) green. **Met 2026-08-27**
+  (verified after each task).
 - The zfspool wire form is pinned by a table test byte-for-byte, and the
   zero-update-sends-nothing property holds — Phase 2 debugging starts from
-  known-good encoding.
+  known-good encoding. **Met 2026-08-27** — `TestEncodeDatastoreSpec` /
+  `TestEncodeDatastoreUpdate` in `datastore_encode_test.go`.
 - `digest` demonstrably moved: one test proves typed-field presence AND `Extra`
-  absence on the same read.
+  absence on the same read. **Met 2026-08-27** — `TestDatastoreDigestTyped`,
+  which also guards the lossless-read tail (`thinpool` still routes to Extra).
+
+**Phase 1 complete 2026-08-27.** All three tasks done; the new public surface
+(`DatastoreSpec`, `DatastoreUpdate`, `DatastoreWriteResult`, `Datastore.Digest`)
+is doc-commented and renders under `go doc` — the package-level story stays a
+Phase 3 task by design. No go-development review agents exist in this
+environment; the phase's verification is the pinned wire forms + the full suite,
+with a review pass scheduled after Phase 2 (the functional core).
 
 ---
 
