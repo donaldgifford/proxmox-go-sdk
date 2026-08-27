@@ -116,6 +116,46 @@ func TestDatastoreDigestTyped(t *testing.T) {
 	}
 }
 
+// TestDatastoreWriteResultDecode pins the create/update result decode: the
+// config member with a string value, a non-string value kept as its raw token
+// (the additionalProperties tolerance), no config at all, and a null payload —
+// which must decode to the zero result, never an error, so a hypothetical
+// null-answering node cannot turn a write that succeeded into a failure.
+func TestDatastoreWriteResultDecode(t *testing.T) {
+	t.Parallel()
+	var r storage.DatastoreWriteResult
+	blob := `{"storage":"backup","type":"pbs",` +
+		`"config":{"encryption-key":"k3y-material","retry":3}}`
+	if err := json.Unmarshal([]byte(blob), &r); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if r.Storage != "backup" || r.Type != "pbs" {
+		t.Errorf("result = %+v, want storage=backup type=pbs", r)
+	}
+	if got, want := r.Config["encryption-key"], "k3y-material"; got != want {
+		t.Errorf(`Config["encryption-key"] = %q, want %q`, got, want)
+	}
+	if got, want := r.Config["retry"], "3"; got != want {
+		t.Errorf(`Config["retry"] = %q, want raw token %q`, got, want)
+	}
+
+	var plain storage.DatastoreWriteResult
+	if err := json.Unmarshal([]byte(`{"storage":"z","type":"zfspool"}`), &plain); err != nil {
+		t.Fatalf("unmarshal configless: %v", err)
+	}
+	if plain.Config != nil {
+		t.Errorf("Config on a configless result = %v, want nil", plain.Config)
+	}
+
+	var null storage.DatastoreWriteResult
+	if err := json.Unmarshal([]byte(`null`), &null); err != nil {
+		t.Fatalf("unmarshal null: %v", err)
+	}
+	if null.Storage != "" || null.Type != "" || null.Config != nil {
+		t.Errorf("null payload = %+v, want zero result", null)
+	}
+}
+
 func TestGetDatastoreNotFound(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()

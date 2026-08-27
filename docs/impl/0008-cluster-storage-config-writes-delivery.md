@@ -156,7 +156,7 @@ form first means Phase 2's handler tests exercise handlers, not encoding bugs.
      Extra as the lossless-read regression guard, and the digest-less read
      empty. The field comment names DatastoreUpdate.Digest as the destination so
      the idiom is discoverable from the read side.)_
-- [ ] 2. Write types in `proxmox/storage/datastore.go`: `DatastoreSpec`,
+- [x] 2. Write types in `proxmox/storage/datastore.go`: `DatastoreSpec`,
      `DatastoreUpdate`, `DatastoreWriteResult` exactly as DESIGN-0007's "Write
      specs" / "The write result" sections define them (required
      `Storage`+`Type`; `[]string` list fields `json:"-"`; update's pointer
@@ -167,7 +167,14 @@ form first means Phase 2's handler tests exercise handlers, not encoding bugs.
      idiom, the one-shot `encryption-key` warning on `Config`, and the
      `Extra`-sensitivity note per OQ-2 of this ledger (a CIFS/PBS `password`
      rides `Extra`; the SDK never logs bodies, but the consumer owns what it
-     prints).
+     prints). _(Done 2026-08-27: all three types land per the design, plus a
+     custom `DatastoreWriteResult.UnmarshalJSON` — the config member is declared
+     additionalProperties, so a non-string value keeps its raw token instead of
+     failing the write that succeeded, and a null payload decodes to the zero
+     result (the ApplyNetworkConfig posture without a special case).
+     `TestDatastoreWriteResultDecode` pins all four shapes — string config,
+     raw-token config, configless, null — front-loading that row of Phase 2 task
+     4's matrix.)_
 - [ ] 3. Encoding: `svcutil.EncodeWithExtra` + post-encode comma-joins for
      `Content`/`Nodes`/`Delete` (the ZFS-`Devices`/HA-rules/ACME-`Nodes`
      mechanics). Table-driven wire-form tests, no HTTP: the hoomlab zfspool spec
