@@ -354,11 +354,15 @@ closure: this phase is the last one, and completing it completes IMPL-0008.
      (`PVE_ENDPOINT=https://127.0.0.1:1` + dead token pair), never
      `env -u PVE_ENDPOINT` — unsetting the endpoint is what triggers the
      harness's `.env` autoload, and that file points at production.
-- [ ] 5. Docs: `storage/doc.go` gains the config-write story (create/update/
+- [x] 5. Docs: `storage/doc.go` gains the config-write story (create/update/
      delete, digest idiom, delete-is-config-only, the permission note);
      `Example_datastoreConfig` in `example_test.go` (create zfspool → get →
      update → delete against `mockpve.Serve()`, `// Output:` block —
-     documentation and test). `go doc ./...` renders cleanly.
+     documentation and test). `go doc ./...` renders cleanly. **Done
+     2026-08-27** — "Datastore configuration writes" doc.go section with the
+     read-then-guarded-write idiom inline; the Example's output pins the
+     set-normalized read (`images,rootdir`) and the digest-guarded narrow to
+     `images`. Both Examples pass; `go doc` renders.
 - [ ] 6. PR + release: one `minor` PR (exactly one semver label), changelog as
      the branch's final commit before push. The PR body and changelog state the
      OQ-1 release posture explicitly: **this release ships mock-verified,
