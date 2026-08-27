@@ -44,6 +44,12 @@
 // a named action via DatastoreUpdate.Delete, never an empty-string side
 // effect.
 //
+// Probe existence by scanning ListDatastores, not by calling GetDatastore:
+// real PVE answers a missing id with HTTP 500 "storage '<id>' does not
+// exist" (never 404, so never pverr.ErrNotFound), and reads can carry
+// server-generated keys the writer never sent (a zfspool entry gains
+// "mountpoint") — see GetDatastore and Datastore.Extra.
+//
 // See docs/design/0001-proxmox-sdk-package-layout.md,
 // docs/design/0007-cluster-storage-config-writes.md and
 // docs/impl/0001-proxmox-ve-9x-sdk-coverage.md.

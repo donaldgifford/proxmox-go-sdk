@@ -247,7 +247,15 @@ func (s *Server) handleDatastoreGet(w http.ResponseWriter, r *http.Request) {
 	}
 	s.st.mu.Unlock()
 	if rec == nil {
-		s.writeError(w, http.StatusNotFound, msgNoSuchStorage)
+		// Real PVE answers a missing id with HTTP 500 "storage '<id>' does
+		// not exist" — NOT 404 (live-observed by the hoomlab consumer,
+		// 2026-08-27; same wart class as GET /cluster/acme/plugins/{id}).
+		// Mirroring it keeps consumer code that branches on ErrNotFound from
+		// passing here and breaking on first real contact; existence checks
+		// go through ListDatastores. The update/delete handlers keep 404 —
+		// their real missing-id shape is unobserved.
+		s.writeError(w, http.StatusInternalServerError,
+			fmt.Sprintf("storage '%s' does not exist", id))
 		return
 	}
 	s.writeData(w, payload)
@@ -363,6 +371,17 @@ func (s *Server) handleDatastoreCreate(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		applyStorageForm(rec, key, r.PostForm.Get(key))
+	}
+	// Real PVE materializes server-generated properties into the entry:
+	// creating a zfspool storage writes "mountpoint /<pool>" to storage.cfg,
+	// and reads carry it forever after (live-observed by the hoomlab
+	// consumer, 2026-08-27). Mirroring it makes a consumer that full-map
+	// compares read-vs-submitted rotate here, in tests, instead of live.
+	if typ == "zfspool" && rec.Pool != "" && rec.Extra["mountpoint"] == "" {
+		if rec.Extra == nil {
+			rec.Extra = make(map[string]string)
+		}
+		rec.Extra["mountpoint"] = "/" + rec.Pool
 	}
 	if s.st.storage.stores == nil {
 		s.st.storage.stores = make(map[string]*storeRecord)

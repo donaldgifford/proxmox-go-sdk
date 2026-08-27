@@ -377,6 +377,28 @@ closure: this phase is the last one, and completing it completes IMPL-0008.
      the moment hoomlab starts (closure docs ride a `dont-release` PR or the
      next release PR).
 
+**Consumer findings applied pre-release (2026-08-27).** hoomlab built its
+bootstrap `pve storage` stage against this branch (go.work) and ran it against
+the real 3-node cluster before the merge — IMPL-0009's loop started early, on
+the PR instead of a patch release. All write paths passed live (create zfspool,
+partial update with index-read digest, zero-drift converge re-run). Two parity
+findings, both fixed on the PR:
+
+1. **`GET /storage/{id}` missing-id is HTTP 500, not 404** — real PVE answers
+   `storage '<id>' does not exist` (hoomlab's INV-0001 deviation 8; same class
+   as the ACME-plugin GET, deviation 4). mockpve now mirrors the 500 + message
+   shape; `GetDatastore`/`doc.go` document that existence checks must scan
+   `ListDatastores`; the converge test, delete test, and the prepared
+   `TestDatastoreLifecycle` probe (which would have failed live exactly this
+   way) all switched to index-scan probing; the retired-wrong
+   `TestGetDatastoreNotFound` was replaced by `TestGetDatastoreMissing500`.
+   PUT/DELETE missing-id keep the mock's 404 — their real shape is unobserved.
+2. **PVE materializes server-generated properties into the entry** — a zfspool
+   create adds `mountpoint /<pool>` to storage.cfg and every read carries it.
+   mockpve now materializes it (explicit submissions win), and `Datastore.Extra`
+   documents that reads can carry keys the writer never sent: compare the fields
+   a decision needs, never the whole map.
+
 #### Success Criteria
 
 - All CI jobs green on the PR — including `Test Replay (cassettes)` untouched

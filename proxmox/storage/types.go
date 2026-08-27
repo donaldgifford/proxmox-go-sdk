@@ -27,7 +27,12 @@ type Datastore struct {
 	// rather than clobbers a concurrent edit — read, decide, write with the
 	// digest from that read.
 	Digest string `json:"digest,omitempty"`
-	// Extra carries datastore keys the SDK does not model.
+	// Extra carries datastore keys the SDK does not model. Reads can carry
+	// keys the writer never sent: PVE materializes server-generated
+	// properties into the entry (creating a zfspool storage adds
+	// "mountpoint /<pool>"; live-observed 2026-08-27), so compare the fields
+	// a decision needs, never the whole map, or a converge loop rotates
+	// forever on properties it did not write.
 	Extra map[string]string `json:"-"`
 }
 

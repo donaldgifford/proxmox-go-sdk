@@ -431,10 +431,13 @@ rather than deleting anything it did not create.
 go test -tags=integration ./proxmox/integration/... -run TestDatastoreLifecycle -v
 ```
 
-The sequence is hoomlab's converge shape: probe (absent → `ErrNotFound`) →
-create → read back (compare `content`/`nodes` **as sets**, capture the digest) →
-drift-correct with that digest → stale-digest negative check → delete → verify
-gone.
+The sequence is hoomlab's converge shape: probe existence by **scanning
+`ListDatastores`** (the by-id `GetDatastore` is not an existence check — real
+PVE answers a missing id with HTTP 500 `storage '<id>' does not exist`, not 404;
+found live by the hoomlab consumer 2026-08-27) → create → read back (compare
+`content`/`nodes` **as sets**, capture the digest) → drift-correct with that
+digest → stale-digest negative check → delete → verify gone via the same index
+scan.
 
 > **Checking a skip path? Use dead credentials, never an unset endpoint.** The
 > harness autoloads a repo-root `.env` exactly when the credential vars are

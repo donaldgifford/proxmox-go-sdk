@@ -158,15 +158,10 @@ func TestDatastoreWriteResultDecode(t *testing.T) {
 	}
 }
 
-func TestGetDatastoreNotFound(t *testing.T) {
-	t.Parallel()
-	mock := mockpve.New()
-	svc := newService(t, mock)
-
-	if _, err := svc.GetDatastore(context.Background(), "ghost"); !errors.Is(err, pverr.ErrNotFound) {
-		t.Fatalf("GetDatastore(ghost) = %v, want ErrNotFound", err)
-	}
-}
+// TestGetDatastoreNotFound was retired 2026-08-27: it pinned a 404 the real
+// endpoint never sends. The hoomlab consumer observed live that a missing id
+// answers HTTP 500 "storage '<id>' does not exist"; the replacement is
+// TestGetDatastoreMissing500 in datastore_write_test.go.
 
 func TestListNodeStorage(t *testing.T) {
 	t.Parallel()

@@ -72,8 +72,12 @@ func TestCreateDatastoreReflected(t *testing.T) {
 		t.Errorf("content/nodes = %q/%q, want sorted images,rootdir / pve1,pve2",
 			d.Content, d.Nodes)
 	}
+	// mountpoint is server-generated: PVE materializes it into a zfspool
+	// entry on create (the mock mirrors that), so the read carries a key the
+	// writer never sent.
 	for key, want := range map[string]string{
 		"sparse": "1", "blocksize": "16k", "preallocation": "metadata",
+		"mountpoint": "/fast/vm",
 	} {
 		if got := d.Extra[key]; got != want {
 			t.Errorf("Extra[%q] = %q, want %q", key, got, want)
@@ -89,6 +93,53 @@ func TestCreateDatastoreReflected(t *testing.T) {
 	}
 	if len(ds) != 1 || ds[0].Storage != "fast-vm" {
 		t.Errorf("list = %+v, want the one created entry", ds)
+	}
+}
+
+// TestGetDatastoreMissing500 pins the real-PVE wart the hoomlab consumer
+// found live (2026-08-27): GET /storage/{id} for a missing entry is HTTP 500
+// "storage '<id>' does not exist", NOT 404 — so the error must not resolve to
+// ErrNotFound, and existence checks must scan ListDatastores instead.
+func TestGetDatastoreMissing500(t *testing.T) {
+	t.Parallel()
+	svc := newService(t, mockpve.New())
+
+	_, err := svc.GetDatastore(context.Background(), "ghost")
+	if err == nil {
+		t.Fatal("GetDatastore(ghost): want error, got nil")
+	}
+	if errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("GetDatastore(ghost) = %v; real PVE answers 500, this must NOT be ErrNotFound", err)
+	}
+	var pe *pverr.Error
+	if !errors.As(err, &pe) || pe.Status != 500 {
+		t.Fatalf("GetDatastore(ghost) = %v, want *pverr.Error with status 500", err)
+	}
+	if !strings.Contains(pe.Message, "does not exist") {
+		t.Errorf("message = %q, want the does-not-exist wording", pe.Message)
+	}
+}
+
+// TestCreateDatastoreExplicitMountpoint pins that materialization never
+// overrides a submitted value: a zfspool create carrying its own mountpoint
+// reads back exactly that.
+func TestCreateDatastoreExplicitMountpoint(t *testing.T) {
+	t.Parallel()
+	svc := newService(t, mockpve.New())
+	ctx := context.Background()
+
+	if _, err := svc.CreateDatastore(ctx, &storage.DatastoreSpec{
+		Storage: "tank-vm", Type: "zfspool", Pool: "tank/vm",
+		Extra: map[string]string{"mountpoint": "/mnt/custom"},
+	}); err != nil {
+		t.Fatalf("CreateDatastore: %v", err)
+	}
+	d, err := svc.GetDatastore(ctx, "tank-vm")
+	if err != nil {
+		t.Fatalf("GetDatastore: %v", err)
+	}
+	if got := d.Extra["mountpoint"]; got != "/mnt/custom" {
+		t.Errorf("Extra[mountpoint] = %q, want the submitted /mnt/custom", got)
 	}
 }
 
@@ -242,7 +293,9 @@ func TestUpdateDatastoreCreateFixed(t *testing.T) {
 	}
 }
 
-// TestUpdateDatastoreErrors covers the update guards and the unknown-id 404.
+// TestUpdateDatastoreErrors covers the update guards and the unknown-id 404
+// (the mock's shape — the real PUT missing-id status is unobserved; only the
+// GET wart is live-confirmed).
 func TestUpdateDatastoreErrors(t *testing.T) {
 	t.Parallel()
 	svc := newService(t, mockpve.New())
@@ -263,22 +316,22 @@ func TestUpdateDatastoreErrors(t *testing.T) {
 
 // TestDatastoreConvergeShape runs the consumer's converge sequence — the
 // exact loop hoomlab's `pve storage` stage runs per configured entry —
-// against the mock unmodified: probe (miss resolves to ErrNotFound, the
-// create-if-missing branch), create the zfspool entry, read it back
-// comparing list-valued options AS SETS, correct drift via an update guarded
-// by that read's digest, and tear down. Passing here is the
-// seeding-not-stubbing proof: the consumer's logic can run against mockpve
-// before the consumer exists.
+// against the mock unmodified: probe existence by scanning the index (the
+// by-id GET cannot distinguish missing from server error on real PVE — the
+// 500 wart), create the zfspool entry, read it back comparing list-valued
+// options AS SETS, correct drift via an update guarded by that read's
+// digest, and tear down. Passing here is the seeding-not-stubbing proof: the
+// consumer's logic can run against mockpve before the consumer exists.
 func TestDatastoreConvergeShape(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()
 	svc := newService(t, mock)
 	ctx := context.Background()
 
-	// Probe: absent means create, and the branch condition is errors.Is,
-	// never string-matching the message.
-	if _, err := svc.GetDatastore(ctx, "fast-vm"); !errors.Is(err, pverr.ErrNotFound) {
-		t.Fatalf("probe before create = %v, want ErrNotFound", err)
+	// Probe: absent means create. Existence comes from the index scan —
+	// hoomlab's actual approach after finding the by-id 500 wart live.
+	if datastoreInList(t, svc, "fast-vm") {
+		t.Fatal("probe before create: fast-vm already listed")
 	}
 
 	if _, err := svc.CreateDatastore(ctx, &storage.DatastoreSpec{
@@ -320,14 +373,33 @@ func TestDatastoreConvergeShape(t *testing.T) {
 	if err := svc.DeleteDatastore(ctx, "fast-vm"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
-	if _, err := svc.GetDatastore(ctx, "fast-vm"); !errors.Is(err, pverr.ErrNotFound) {
-		t.Fatalf("probe after delete = %v, want ErrNotFound", err)
+	if datastoreInList(t, svc, "fast-vm") {
+		t.Fatal("probe after delete: fast-vm still listed")
 	}
 }
 
-// TestDeleteDatastore pins delete-then-gone: the entry 404s afterwards and
-// the error resolves to pverr.ErrNotFound via errors.Is, as do a repeat
-// delete and the empty-id guard.
+// datastoreInList reports whether id appears in ListDatastores — the
+// existence probe consumers must use, since the by-id GET answers a missing
+// entry with the 500 wart rather than a 404.
+func datastoreInList(t *testing.T, svc *storage.Service, id string) bool {
+	t.Helper()
+	ds, err := svc.ListDatastores(context.Background())
+	if err != nil {
+		t.Fatalf("ListDatastores: %v", err)
+	}
+	for i := range ds {
+		if ds[i].Storage == id {
+			return true
+		}
+	}
+	return false
+}
+
+// TestDeleteDatastore pins delete-then-gone. A by-id get afterwards errors
+// with the real-PVE 500 wart (never ErrNotFound — see
+// TestGetDatastoreMissing500), so gone-ness is confirmed by the index scan;
+// a repeat delete resolves to ErrNotFound (the mock's shape; the real
+// missing-id DELETE shape is unobserved), and the empty-id guard holds.
 func TestDeleteDatastore(t *testing.T) {
 	t.Parallel()
 	mock := mockpve.New()
@@ -338,8 +410,15 @@ func TestDeleteDatastore(t *testing.T) {
 	if err := svc.DeleteDatastore(ctx, "local"); err != nil {
 		t.Fatalf("DeleteDatastore: %v", err)
 	}
-	if _, err := svc.GetDatastore(ctx, "local"); !errors.Is(err, pverr.ErrNotFound) {
-		t.Errorf("get after delete = %v, want ErrNotFound", err)
+	ds, err := svc.ListDatastores(ctx)
+	if err != nil {
+		t.Fatalf("ListDatastores after delete: %v", err)
+	}
+	if len(ds) != 0 {
+		t.Errorf("list after delete = %+v, want empty", ds)
+	}
+	if _, err := svc.GetDatastore(ctx, "local"); err == nil || errors.Is(err, pverr.ErrNotFound) {
+		t.Errorf("get after delete = %v, want the non-ErrNotFound 500 wart", err)
 	}
 	if err := svc.DeleteDatastore(ctx, "local"); !errors.Is(err, pverr.ErrNotFound) {
 		t.Errorf("repeat delete = %v, want ErrNotFound", err)

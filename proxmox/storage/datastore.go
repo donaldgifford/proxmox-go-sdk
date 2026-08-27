@@ -22,6 +22,13 @@ func (s *Service) ListDatastores(ctx context.Context) ([]Datastore, error) {
 }
 
 // GetDatastore returns the configuration of one storage (GET /storage/{storage}).
+//
+// Do not use it as an existence check: real PVE reports a missing id as
+// HTTP 500 "storage '<id>' does not exist" — NOT 404 (live-observed
+// 2026-08-27) — so the error does not resolve to pverr.ErrNotFound and cannot
+// be told apart from a genuine server error. Probe existence by scanning
+// ListDatastores instead; each entry carries every config field including
+// Digest, so the index read costs nothing extra.
 func (s *Service) GetDatastore(ctx context.Context, storage string) (*Datastore, error) {
 	var d Datastore
 	if err := s.c.DoRequest(ctx, http.MethodGet, datastorePath(storage), nil, &d); err != nil {

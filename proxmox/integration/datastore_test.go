@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"context"
 	"errors"
 	"os"
 	"sort"
@@ -47,14 +48,13 @@ func TestDatastoreLifecycle(t *testing.T) {
 	ctx := testCtx(t)
 	node := testNode()
 
-	// Probe: the id must be absent, and absent must resolve to ErrNotFound —
-	// the same branch condition hoomlab's create-if-missing uses.
-	if _, err := svc.GetDatastore(ctx, datastoreTestID); !errors.Is(err, pverr.ErrNotFound) {
-		if err == nil {
-			t.Fatalf("storage entry %q already exists — refusing to adopt it; "+
-				"remove it by hand before rerunning", datastoreTestID)
-		}
-		t.Fatalf("probe GetDatastore(%s): %v (want ErrNotFound)", datastoreTestID, err)
+	// Probe by scanning the index — hoomlab's create-if-missing approach.
+	// The by-id GET is NOT an existence check on real PVE: a missing entry
+	// answers HTTP 500 "storage '<id>' does not exist" (live-observed
+	// 2026-08-27), indistinguishable from a genuine server error.
+	if datastoreListed(ctx, t, svc, datastoreTestID) {
+		t.Fatalf("storage entry %q already exists — refusing to adopt it; "+
+			"remove it by hand before rerunning", datastoreTestID)
 	}
 
 	spec := &storage.DatastoreSpec{
@@ -78,7 +78,11 @@ func TestDatastoreLifecycle(t *testing.T) {
 	t.Cleanup(func() {
 		cctx, cancel := cleanupCtx()
 		defer cancel()
-		if err := svc.DeleteDatastore(cctx, datastoreTestID); err != nil && !errors.Is(err, pverr.ErrNotFound) {
+		err := svc.DeleteDatastore(cctx, datastoreTestID)
+		// Already-gone is fine either way PVE spells it: ErrNotFound, or the
+		// 500-class "does not exist" wart the by-id paths use.
+		if err != nil && !errors.Is(err, pverr.ErrNotFound) &&
+			!strings.Contains(err.Error(), "does not exist") {
 			t.Errorf("cleanup DeleteDatastore(%s): %v", datastoreTestID, err)
 		}
 	})
@@ -127,9 +131,25 @@ func TestDatastoreLifecycle(t *testing.T) {
 	if err := svc.DeleteDatastore(ctx, datastoreTestID); err != nil {
 		t.Fatalf("DeleteDatastore(%s): %v", datastoreTestID, err)
 	}
-	if _, err := svc.GetDatastore(ctx, datastoreTestID); !errors.Is(err, pverr.ErrNotFound) {
-		t.Errorf("GetDatastore after delete = %v, want ErrNotFound", err)
+	if datastoreListed(ctx, t, svc, datastoreTestID) {
+		t.Errorf("entry %q still listed after delete", datastoreTestID)
 	}
+}
+
+// datastoreListed reports whether id appears in ListDatastores — the only
+// reliable existence probe (see the by-id 500 wart above).
+func datastoreListed(ctx context.Context, t *testing.T, svc *storage.Service, id string) bool {
+	t.Helper()
+	ds, err := svc.ListDatastores(ctx)
+	if err != nil {
+		t.Fatalf("ListDatastores: %v", err)
+	}
+	for i := range ds {
+		if ds[i].Storage == id {
+			return true
+		}
+	}
+	return false
 }
 
 // assertCSVSet fails the test unless the comma-joined csv equals want as a set.
