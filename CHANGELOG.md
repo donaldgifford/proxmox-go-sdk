@@ -6,12 +6,32 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [unreleased]
 
+### Features
+
+- *(storage)* Type the datastore config digest on reads
+- *(storage)* Datastore write specs and the typed write result
+- *(storage)* Datastore write encoding with pinned wire forms
+- *(mockpve)* Datastore config writes — state, digest, and the three handlers
+- *(storage)* CreateDatastore, UpdateDatastore, DeleteDatastore
+
 ### Documentation
 
 - *(design)* DESIGN-0007 — cluster storage config writes ([#28](https://github.com/donaldgifford/proxmox-go-sdk/issues/28))
 - *(design)* DESIGN-0007 OQs decided — all a, OQ-6 amended to defer live runs
 - *(impl)* IMPL-0008 — cluster storage config writes delivery ledger
 - *(impl)* IMPL-0008 OQs decided; split consumer verification into IMPL-0009
+- *(impl-0008)* Phase 1 complete — types, digest, encoding all pinned
+- *(impl-0008)* Close Phase 2 — review applied, criteria met
+- *(coverage)* Regen — the three /storage config writes flip to covered
+- *(testing)* Storage config writes section + dead-creds skip-path rule
+- *(storage)* Config-write package story + Example_datastoreConfig
+
+### Testing
+
+- *(storage)* Datastore write unit matrix against mockpve
+- *(storage)* TestDatastoreConvergeShape — the consumer converge proof
+- *(storage)* TestStoragePathsReal pins every storage path literal
+- *(integration)* Prepared TestDatastoreLifecycle harness (never-run)
 
 ### Miscellaneous Tasks
 
