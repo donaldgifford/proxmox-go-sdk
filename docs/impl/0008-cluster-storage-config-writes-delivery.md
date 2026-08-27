@@ -275,12 +275,14 @@ neither half is testable alone.
      covering every row (`wantSet` is the compare-as-sets helper); the
      result-decode row was front-loaded in Phase 1
      (`TestDatastoreWriteResultDecode`). Race suite green.
-- [ ] 5. `TestDatastoreConvergeShape`: hoomlab's exact sequence against the mock
+- [x] 5. `TestDatastoreConvergeShape`: hoomlab's exact sequence against the mock
      — get(miss → `ErrNotFound`) → create zfspool (pool, sparse, content, nodes)
      → get(hit; compare `Content`/`Nodes` **as sets**) → drift-correct via
      update (content restriction) with the read's digest → delete. This is the
      seeding-not-stubbing proof: the consumer's converge logic can run against
-     `mockpve` unmodified.
+     `mockpve` unmodified. **Done 2026-08-27** — in `datastore_write_test.go`;
+     the probe branches on `errors.Is(err, pverr.ErrNotFound)` (never
+     message-matching), the delete is verified by a second probe.
 
 #### Success Criteria
 

@@ -261,6 +261,70 @@ func TestUpdateDatastoreErrors(t *testing.T) {
 	}
 }
 
+// TestDatastoreConvergeShape runs the consumer's converge sequence — the
+// exact loop hoomlab's `pve storage` stage runs per configured entry —
+// against the mock unmodified: probe (miss resolves to ErrNotFound, the
+// create-if-missing branch), create the zfspool entry, read it back
+// comparing list-valued options AS SETS, correct drift via an update guarded
+// by that read's digest, and tear down. Passing here is the
+// seeding-not-stubbing proof: the consumer's logic can run against mockpve
+// before the consumer exists.
+func TestDatastoreConvergeShape(t *testing.T) {
+	t.Parallel()
+	mock := mockpve.New()
+	svc := newService(t, mock)
+	ctx := context.Background()
+
+	// Probe: absent means create, and the branch condition is errors.Is,
+	// never string-matching the message.
+	if _, err := svc.GetDatastore(ctx, "fast-vm"); !errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("probe before create = %v, want ErrNotFound", err)
+	}
+
+	if _, err := svc.CreateDatastore(ctx, &storage.DatastoreSpec{
+		Storage:   "fast-vm",
+		Type:      "zfspool",
+		Pool:      "fast/vm",
+		Sparse:    true,
+		Blocksize: "16k",
+		Content:   []string{"images", "rootdir"},
+		Nodes:     []string{"pve2", "pve1"},
+	}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	got, err := svc.GetDatastore(ctx, "fast-vm")
+	if err != nil {
+		t.Fatalf("read after create: %v", err)
+	}
+	wantSet(t, "content", got.Content, "images", "rootdir")
+	wantSet(t, "nodes", got.Nodes, "pve1", "pve2")
+	if got.Pool != "fast/vm" || got.Extra["sparse"] != "1" {
+		t.Errorf("read = %+v (Extra %v), want pool fast/vm and sparse 1", got, got.Extra)
+	}
+
+	// Drift-correct: narrow the content restriction, guarded by the digest
+	// of the read the decision came from.
+	if _, err := svc.UpdateDatastore(ctx, "fast-vm", &storage.DatastoreUpdate{
+		Content: []string{"images"},
+		Digest:  got.Digest,
+	}); err != nil {
+		t.Fatalf("drift-correct update: %v", err)
+	}
+	corrected, err := svc.GetDatastore(ctx, "fast-vm")
+	if err != nil {
+		t.Fatalf("read after update: %v", err)
+	}
+	wantSet(t, "content", corrected.Content, "images")
+
+	if err := svc.DeleteDatastore(ctx, "fast-vm"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if _, err := svc.GetDatastore(ctx, "fast-vm"); !errors.Is(err, pverr.ErrNotFound) {
+		t.Fatalf("probe after delete = %v, want ErrNotFound", err)
+	}
+}
+
 // TestDeleteDatastore pins delete-then-gone: the entry 404s afterwards and
 // the error resolves to pverr.ErrNotFound via errors.Is, as do a repeat
 // delete and the empty-id guard.
