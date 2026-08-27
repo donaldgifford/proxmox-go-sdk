@@ -407,6 +407,49 @@ If an order fails, `PVE_DEBUG=1` plus the task log on the node
 usual causes are a token missing Zone.DNS edit, a source IP not allowlisted, or
 the nameservers still pointing at the other provider.
 
+### Storage config writes (IMPL-0008)
+
+**Nobody has run this one yet, on purpose.** IMPL-0008 shipped the datastore
+config writes (`CreateDatastore`/`UpdateDatastore`/`DeleteDatastore`)
+**mock-verified** under the repo's live-verification deferral (DESIGN-0007 OQ-6:
+the former test node is one member of a production cluster now, and no
+disposable target currently exists). Verification happens in the consumer —
+hoomlab imports the SDK and its converge runs are the live test (IMPL-0009);
+findings come back as patch releases. `TestDatastoreLifecycle` is therefore a
+**prepared harness**: no cassette, CI does not replay it, and whoever runs it
+first should expect to find something.
+
+It edits the **cluster** storage configuration (config only — deleting an entry
+never touches the backing data — but storage.cfg is cluster-wide state), so
+credentials alone do not fire it: `PVE_TEST_DATASTORE=1` is an explicit opt-in
+gate, and the probe refuses to adopt a pre-existing `sdk-datastore-test` entry
+rather than deleting anything it did not create.
+
+```sh
+# needs: PVE_TEST_DATASTORE=1; optionally PVE_TEST_DATASTORE_POOL=<existing ZFS
+# dataset> for a zfspool entry — absent, a dir entry under /var/lib is used
+go test -tags=integration ./proxmox/integration/... -run TestDatastoreLifecycle -v
+```
+
+The sequence is hoomlab's converge shape: probe (absent → `ErrNotFound`) →
+create → read back (compare `content`/`nodes` **as sets**, capture the digest) →
+drift-correct with that digest → stale-digest negative check → delete → verify
+gone.
+
+> **Checking a skip path? Use dead credentials, never an unset endpoint.** The
+> harness autoloads a repo-root `.env` exactly when the credential vars are
+> absent — so `env -u PVE_ENDPOINT` is what _invites_ the loader to point the
+> run at the real node. Instead satisfy the loader with values that can reach
+> nothing:
+>
+> ```sh
+> PVE_ENDPOINT=https://127.0.0.1:1 PVE_TOKEN_ID='dead@pam!dead' PVE_TOKEN_SECRET=dead \
+>   go test -tags=integration -run TestDatastoreLifecycle ./proxmox/integration/
+> ```
+>
+> The dotenv loader sees a complete credential set and never opens `.env`, and
+> anything that slipped past a gate would dial localhost and fail fast.
+
 ### Everything at once
 
 Once you trust the individual runs:

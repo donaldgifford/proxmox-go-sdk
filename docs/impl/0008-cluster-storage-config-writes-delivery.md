@@ -345,10 +345,15 @@ closure: this phase is the last one, and completing it completes IMPL-0008.
      fallback; the probe REFUSES to adopt a pre-existing `sdk-datastore-test`
      entry. Both verification commands ran exactly as written (skip fired at the
      gate, before any client was built — zero requests).
-- [ ] 4. TESTING.md: a short "Storage config writes" subsection — the gate, the
+- [x] 4. TESTING.md: a short "Storage config writes" subsection — the gate, the
      harness's shape, and a pointer to the posture-change note (this is a
      deferred harness; running it needs a disposable target that does not
-     currently exist).
+     currently exist). **Done 2026-08-27** — "Storage config writes (IMPL-0008)"
+     section in the Namecheap never-run style. Also carries a safety callout
+     Donald requested mid-phase: checking a skip path must use DEAD credentials
+     (`PVE_ENDPOINT=https://127.0.0.1:1` + dead token pair), never
+     `env -u PVE_ENDPOINT` — unsetting the endpoint is what triggers the
+     harness's `.env` autoload, and that file points at production.
 - [ ] 5. Docs: `storage/doc.go` gains the config-write story (create/update/
      delete, digest idiom, delete-is-config-only, the permission note);
      `Example_datastoreConfig` in `example_test.go` (create zfspool → get →
