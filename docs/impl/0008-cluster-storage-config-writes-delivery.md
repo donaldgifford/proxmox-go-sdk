@@ -313,11 +313,15 @@ closure: this phase is the last one, and completing it completes IMPL-0008.
 
 #### Tasks
 
-- [ ] 1. Create `proxmox/storage/paths_test.go` with `TestStoragePathsReal` (the
+- [x] 1. Create `proxmox/storage/paths_test.go` with `TestStoragePathsReal` (the
      `ceph`/`ha`/`nodes`/`sdn` pattern): pin the three write paths and — since
      the file is being created anyway — the existing read/content/ upload/zfs
      paths, including the volid-escaping cases `nodeVolumePath` already
-     documents.
+     documents. **Done 2026-08-27** — writing the pins immediately caught a
+     stale doc comment: `paths.go` claimed `url.PathEscape` renders the volid
+     colon as `%3A`, but it leaves the colon LITERAL (the same finding as the HA
+     `/resources/vm:100` paths; the literal-colon form is what the live ISO
+     upload run drove). Comment corrected, actual wire form pinned.
 - [ ] 2. Coverage: `just coverage` regen — exactly the three `/storage` rows
      flip, 258 → 261 of 675, **zero unmatched routes** (the fabrication guard is
      the proof the mock's new paths are real PVE paths); no annotation edits.
