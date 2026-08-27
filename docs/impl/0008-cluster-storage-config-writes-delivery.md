@@ -322,10 +322,12 @@ closure: this phase is the last one, and completing it completes IMPL-0008.
      colon as `%3A`, but it leaves the colon LITERAL (the same finding as the HA
      `/resources/vm:100` paths; the literal-colon form is what the live ISO
      upload run drove). Comment corrected, actual wire form pinned.
-- [ ] 2. Coverage: `just coverage` regen — exactly the three `/storage` rows
+- [x] 2. Coverage: `just coverage` regen — exactly the three `/storage` rows
      flip, 258 → 261 of 675, **zero unmatched routes** (the fabrication guard is
      the proof the mock's new paths are real PVE paths); no annotation edits.
-     Commit the regenerated `docs/COVERAGE.md`.
+     Commit the regenerated `docs/COVERAGE.md`. **Done 2026-08-27** — exactly
+     `POST /storage`, `PUT /storage/{}`, `DELETE /storage/{}` gap→covered,
+     storage family 16→19 of 55, `just coverage-check` clean.
 - [ ] 3. Prepared integration harness (`proxmox/integration/datastore_test.go`,
      `//go:build integration`): `TestDatastoreLifecycle` behind
      `PVE_TEST_DATASTORE=1` + the standard env — create scratch zfspool entry

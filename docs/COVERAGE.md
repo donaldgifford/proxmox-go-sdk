@@ -2,7 +2,7 @@
 
 # Proxmox VE API coverage
 
-The SDK reaches **258 of 675 endpoints (38.2%)** in the Proxmox VE 9.2 REST API.
+The SDK reaches **261 of 675 endpoints (38.7%)** in the Proxmox VE 9.2 REST API.
 
 The percentage is **not a target**. It is measured against the *entire* REST
 API, including surfaces no SDK consumer has asked for; driving it up for its own
@@ -13,7 +13,7 @@ use the per-service tables to find whether a specific endpoint is reachable.
 |---|---|
 | Measured against | Proxmox VE 9.2 (`apidoc.js from r740a (INV-0004)`, captured 2026-07-19) |
 | Denominator | 675 endpoints in `cmd/pve-schemadiff/testdata/baseline.json` |
-| Numerator | 258 distinct `mockpve` routes (258 matched a real endpoint) |
+| Numerator | 261 distinct `mockpve` routes (261 matched a real endpoint) |
 | Regenerate | `just coverage` |
 
 A **covered** endpoint has a `mockpve` route, which by this repo's discipline of
@@ -38,11 +38,11 @@ nobody has triaged yet.
 | pbs | 6 | 0 | 0 | 5 | 11 | 54.5% |
 | qemu | 42 | 0 | 0 | 62 | 104 | 40.4% |
 | sdn | 34 | 0 | 0 | 56 | 90 | 37.8% |
-| storage | 16 | 0 | 0 | 39 | 55 | 29.1% |
+| storage | 19 | 0 | 0 | 36 | 55 | 34.5% |
 | tasks | 2 | 0 | 0 | 4 | 6 | 33.3% |
 | version | 1 | 0 | 0 | 0 | 1 | 100.0% |
 | unassigned | 0 | 0 | 0 | 67 | 67 | 0.0% |
-| **total** | **258** | **0** | **1** | **416** | **675** | **38.2%** |
+| **total** | **261** | **0** | **1** | **413** | **675** | **38.7%** |
 
 ## Covered outside REST
 
@@ -689,7 +689,7 @@ side channel, so they appear in no table below.
 
 ### storage
 
-16 of 55 covered (29.1%)
+19 of 55 covered (34.5%)
 
 | Method | Path | State | Note |
 |---|---|---|---|
@@ -744,10 +744,10 @@ side channel, so they appear in no table below.
 | GET | `/nodes/{}/storage/{}/status` | covered |  |
 | POST | `/nodes/{}/storage/{}/upload` | covered |  |
 | GET | `/storage` | covered |  |
-| POST | `/storage` | gap |  |
-| DELETE | `/storage/{}` | gap |  |
+| POST | `/storage` | covered |  |
+| DELETE | `/storage/{}` | covered |  |
 | GET | `/storage/{}` | covered |  |
-| PUT | `/storage/{}` | gap |  |
+| PUT | `/storage/{}` | covered |  |
 
 ### tasks
 
