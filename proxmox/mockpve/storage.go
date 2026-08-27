@@ -1,9 +1,12 @@
 package mockpve
 
 import (
+	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
+	"strings"
 )
 
 // maxUploadBytes bounds the in-memory multipart parse for the mock upload
@@ -18,6 +21,18 @@ type storageState struct {
 	stores   map[string]*storeRecord            // storage id -> config.
 	content  map[string]map[string][]*volRecord // node -> storage -> volumes.
 	zfsPools map[string]map[string]*zfsRecord   // node -> pool name -> pool.
+	// cfgVersion/cfgDigest model the storage.cfg FILE digest: one value shared
+	// by every entry of a read (what the live cassette shows), changed by every
+	// write — so read → update(digest) → update(same digest) fails the second
+	// time and the guard is testable without a race.
+	cfgVersion int
+	cfgDigest  string
+}
+
+// bumpStorageDigest advances the config digest. Callers hold state.mu.
+func (st *storageState) bumpStorageDigest() {
+	st.cfgVersion++
+	st.cfgDigest = fmt.Sprintf("%040x", st.cfgVersion)
 }
 
 // zfsRecord is one ZFS pool local to a node.
@@ -30,15 +45,23 @@ type zfsRecord struct {
 }
 
 // storeRecord is one datastore's cluster-scoped configuration plus mock usage.
+// List-valued options (Content, Nodes) are stored NORMALIZED — parsed to a
+// set and re-joined sorted — because that is real PVE's behaviour class:
+// submission order is not preserved on read-back, so list-valued options are
+// sets and consumers must compare them as sets. Extra carries submitted keys
+// the record does not type (sparse, blocksize, …) for faithful read-back.
 type storeRecord struct {
 	Storage string
 	Type    string
 	Content string
 	Path    string
 	Pool    string
+	Nodes   string
 	Shared  bool
+	Disable bool
 	Total   int64
 	Used    int64
+	Extra   map[string]string
 }
 
 // volRecord is one stored object on a node's storage. PVE has no storage-level
@@ -52,14 +75,13 @@ type volRecord struct {
 	VMID    int
 }
 
-// datastorePayload mirrors GET /storage entries.
-type datastorePayload struct {
+// datastoreWritePayload mirrors the object POST /storage and
+// PUT /storage/{storage} return. The mock never emits the optional config
+// member: it supports no auto-generating storage type, and fabricating one
+// would teach consumers to expect it.
+type datastoreWritePayload struct {
 	Storage string `json:"storage"`
 	Type    string `json:"type"`
-	Content string `json:"content,omitempty"`
-	Path    string `json:"path,omitempty"`
-	Pool    string `json:"pool,omitempty"`
-	Shared  int    `json:"shared,omitempty"`
 }
 
 // storageStatusPayload mirrors GET /nodes/{node}/storage entries.
@@ -107,8 +129,10 @@ func (s *Server) AddStorage(id, storageType, content string, total, used int64) 
 		s.st.storage.stores = make(map[string]*storeRecord)
 	}
 	s.st.storage.stores[id] = &storeRecord{
-		Storage: id, Type: storageType, Content: content, Total: total, Used: used,
+		Storage: id, Type: storageType, Content: normalizeSet(content),
+		Total: total, Used: used,
 	}
+	s.st.storage.bumpStorageDigest()
 }
 
 // AddVolume seeds a stored object on node/storage. Call before serving; the
@@ -143,7 +167,10 @@ func (s *Server) AddZFSPool(node, name string, size, free int64) {
 
 func (s *Server) registerStorageRoutes() {
 	s.handle("GET /api2/json/storage", s.handleDatastoreList)
+	s.handle("POST /api2/json/storage", s.handleDatastoreCreate)
 	s.handle("GET /api2/json/storage/{storage}", s.handleDatastoreGet)
+	s.handle("PUT /api2/json/storage/{storage}", s.handleDatastoreUpdate)
+	s.handle("DELETE /api2/json/storage/{storage}", s.handleDatastoreDelete)
 	s.handle("GET /api2/json/nodes/{node}/storage", s.handleNodeStorageList)
 	s.handle("GET /api2/json/nodes/{node}/storage/{storage}/status", s.handleNodeStorageStatus)
 	s.handle("GET /api2/json/nodes/{node}/storage/{storage}/content", s.handleContentList)
@@ -199,9 +226,9 @@ func (s *Server) handleDatastoreList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.st.mu.Lock()
-	out := make([]datastorePayload, 0, len(s.st.storage.stores))
+	out := make([]map[string]any, 0, len(s.st.storage.stores))
 	for _, rec := range s.st.storage.stores {
-		out = append(out, datastoreToPayload(rec))
+		out = append(out, datastoreToPayload(rec, s.st.storage.cfgDigest))
 	}
 	s.st.mu.Unlock()
 	s.writeData(w, out)
@@ -214,16 +241,214 @@ func (s *Server) handleDatastoreGet(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("storage")
 	s.st.mu.Lock()
 	rec := s.st.storage.stores[id]
-	var payload datastorePayload
+	var payload map[string]any
 	if rec != nil {
-		payload = datastoreToPayload(rec)
+		payload = datastoreToPayload(rec, s.st.storage.cfgDigest)
 	}
 	s.st.mu.Unlock()
+	if rec == nil {
+		// Real PVE answers a missing id with HTTP 500 "storage '<id>' does
+		// not exist" — NOT 404 (live-observed by the hoomlab consumer,
+		// 2026-08-27; same wart class as GET /cluster/acme/plugins/{id}).
+		// Mirroring it keeps consumer code that branches on ErrNotFound from
+		// passing here and breaking on first real contact; existence checks
+		// go through ListDatastores. The update/delete handlers keep 404 —
+		// their real missing-id shape is unobserved.
+		s.writeError(w, http.StatusInternalServerError,
+			fmt.Sprintf("storage '%s' does not exist", id))
+		return
+	}
+	s.writeData(w, payload)
+}
+
+// normalizeSet parses a comma-joined list into a set and re-joins it sorted.
+// Real PVE treats list-valued storage options (content, nodes) as sets and
+// does not preserve submission order on read-back; storing sorted makes a
+// consumer that diffs read-vs-submitted strings break in the mock the same
+// way it would live. Compare list-valued options as sets.
+func normalizeSet(csv string) string {
+	if csv == "" {
+		return ""
+	}
+	seen := make(map[string]bool)
+	for _, item := range strings.Split(csv, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			seen[item] = true
+		}
+	}
+	items := make([]string, 0, len(seen))
+	for item := range seen {
+		items = append(items, item)
+	}
+	sort.Strings(items)
+	return strings.Join(items, ",")
+}
+
+// Datastore config form keys consulted in more than one place, pulled out so
+// goconst stays quiet.
+const (
+	storageKeyNodes   = "nodes"
+	storageKeyDisable = "disable"
+	storageKeyDelete  = "delete"
+)
+
+// createFixedKeys are the POST-only /storage parameters: PVE's update schema
+// omits them, so identity and backing location are immutable after create and
+// the update handler refuses them.
+var createFixedKeys = []string{
+	"type", "path", "export", "share", "target", "portal", "vgname",
+	"thinpool", "base", "datastore", "iscsiprovider", "authsupported",
+}
+
+// applyStorageForm routes one submitted config key into the record: typed
+// fields for what handlers consult, Extra for the rest. content/nodes are
+// normalized as sets on the way in.
+func applyStorageForm(rec *storeRecord, key, val string) {
+	switch key {
+	case "content":
+		rec.Content = normalizeSet(val)
+	case storageKeyNodes:
+		rec.Nodes = normalizeSet(val)
+	case "path":
+		rec.Path = val
+	case "pool":
+		rec.Pool = val
+	case "shared":
+		rec.Shared = val == "1"
+	case storageKeyDisable:
+		rec.Disable = val == "1"
+	default:
+		if rec.Extra == nil {
+			rec.Extra = make(map[string]string)
+		}
+		rec.Extra[key] = val
+	}
+}
+
+// clearStorageKey unsets one config key (PVE's delete parameter).
+func clearStorageKey(rec *storeRecord, key string) {
+	switch key {
+	case "content":
+		rec.Content = ""
+	case storageKeyNodes:
+		rec.Nodes = ""
+	case "path":
+		rec.Path = ""
+	case "pool":
+		rec.Pool = ""
+	case "shared":
+		rec.Shared = false
+	case storageKeyDisable:
+		rec.Disable = false
+	default:
+		delete(rec.Extra, key)
+	}
+}
+
+func (s *Server) handleDatastoreCreate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	if !s.parseForm(w, r) {
+		return
+	}
+	id := r.PostForm.Get("storage")
+	typ := r.PostForm.Get("type")
+	if id == "" || typ == "" {
+		s.writeError(w, http.StatusBadRequest, "missing storage or type")
+		return
+	}
+	s.st.mu.Lock()
+	if s.st.storage.stores[id] != nil {
+		s.st.mu.Unlock()
+		s.writeError(w, http.StatusBadRequest,
+			fmt.Sprintf("storage ID '%s' already defined", id))
+		return
+	}
+	rec := &storeRecord{Storage: id, Type: typ}
+	for key := range r.PostForm {
+		if key == "storage" || key == "type" {
+			continue
+		}
+		applyStorageForm(rec, key, r.PostForm.Get(key))
+	}
+	// Real PVE materializes server-generated properties into the entry:
+	// creating a zfspool storage writes "mountpoint /<pool>" to storage.cfg,
+	// and reads carry it forever after (live-observed by the hoomlab
+	// consumer, 2026-08-27). Mirroring it makes a consumer that full-map
+	// compares read-vs-submitted rotate here, in tests, instead of live.
+	if typ == "zfspool" && rec.Pool != "" && rec.Extra["mountpoint"] == "" {
+		if rec.Extra == nil {
+			rec.Extra = make(map[string]string)
+		}
+		rec.Extra["mountpoint"] = "/" + rec.Pool
+	}
+	if s.st.storage.stores == nil {
+		s.st.storage.stores = make(map[string]*storeRecord)
+	}
+	s.st.storage.stores[id] = rec
+	s.st.storage.bumpStorageDigest()
+	s.st.mu.Unlock()
+	s.writeData(w, datastoreWritePayload{Storage: id, Type: typ})
+}
+
+func (s *Server) handleDatastoreUpdate(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	if !s.parseForm(w, r) {
+		return
+	}
+	for _, key := range createFixedKeys {
+		if r.PostForm.Has(key) {
+			s.writeError(w, http.StatusBadRequest,
+				fmt.Sprintf("parameter '%s' is fixed at creation", key))
+			return
+		}
+	}
+	id := r.PathValue("storage")
+	s.st.mu.Lock()
+	defer s.st.mu.Unlock()
+	rec := s.st.storage.stores[id]
 	if rec == nil {
 		s.writeError(w, http.StatusNotFound, msgNoSuchStorage)
 		return
 	}
-	s.writeData(w, payload)
+	if digest := r.PostForm.Get("digest"); digest != "" && digest != s.st.storage.cfgDigest {
+		s.writeError(w, http.StatusBadRequest,
+			"detected modified configuration - file changed by other user? Try again.")
+		return
+	}
+	// delete applies before set-keys, the same contract as guest config.
+	if del := r.PostForm.Get(storageKeyDelete); del != "" {
+		for _, key := range strings.Split(del, ",") {
+			clearStorageKey(rec, strings.TrimSpace(key))
+		}
+	}
+	for key := range r.PostForm {
+		if key == storageKeyDelete || key == "digest" {
+			continue
+		}
+		applyStorageForm(rec, key, r.PostForm.Get(key))
+	}
+	s.st.storage.bumpStorageDigest()
+	s.writeData(w, datastoreWritePayload{Storage: rec.Storage, Type: rec.Type})
+}
+
+func (s *Server) handleDatastoreDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAuth(w, r) {
+		return
+	}
+	id := r.PathValue("storage")
+	s.st.mu.Lock()
+	defer s.st.mu.Unlock()
+	if s.st.storage.stores[id] == nil {
+		s.writeError(w, http.StatusNotFound, msgNoSuchStorage)
+		return
+	}
+	delete(s.st.storage.stores, id)
+	s.st.storage.bumpStorageDigest()
+	s.writeData(w, nil)
 }
 
 func (s *Server) handleNodeStorageList(w http.ResponseWriter, r *http.Request) {
@@ -430,11 +655,36 @@ func (s *Server) handleZFSCreate(w http.ResponseWriter, r *http.Request) {
 	s.writeData(w, s.finishedTask(node, "zfscreate", name))
 }
 
-func datastoreToPayload(rec *storeRecord) datastorePayload {
-	return datastorePayload{
-		Storage: rec.Storage, Type: rec.Type, Content: rec.Content,
-		Path: rec.Path, Pool: rec.Pool, Shared: boolToInt(rec.Shared),
+// datastoreToPayload builds the flat object a datastore config read returns.
+// A map, not a struct: submitted-but-untyped keys (Extra) ride the same flat
+// JSON object on real PVE. digest is the cluster-wide storage.cfg digest.
+func datastoreToPayload(rec *storeRecord, digest string) map[string]any {
+	p := map[string]any{"storage": rec.Storage, "type": rec.Type}
+	if rec.Content != "" {
+		p["content"] = rec.Content
 	}
+	if rec.Path != "" {
+		p["path"] = rec.Path
+	}
+	if rec.Pool != "" {
+		p["pool"] = rec.Pool
+	}
+	if rec.Nodes != "" {
+		p[storageKeyNodes] = rec.Nodes
+	}
+	if rec.Shared {
+		p["shared"] = 1
+	}
+	if rec.Disable {
+		p[storageKeyDisable] = 1
+	}
+	if digest != "" {
+		p["digest"] = digest
+	}
+	for k, v := range rec.Extra {
+		p[k] = v
+	}
+	return p
 }
 
 func storageToStatus(rec *storeRecord) storageStatusPayload {

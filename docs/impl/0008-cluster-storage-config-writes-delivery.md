@@ -144,14 +144,19 @@ form first means Phase 2's handler tests exercise handlers, not encoding bugs.
 
 #### Tasks
 
-- [ ] 1. `Datastore.Digest` in `proxmox/storage/types.go`: add the field
+- [x] 1. `Datastore.Digest` in `proxmox/storage/types.go`: add the field
      (`json:"digest,omitempty"`), add `"digest"` to `datastoreKnownFields`. Unit
      tests: a read carrying `digest` lands it in the typed field and **not** in
      `Extra` (assert both), and a read without one leaves it empty. Doc comment
      teaches the read-then-guarded-write idiom (mirror `ACMEPlugin.Digest`'s
      wording). Note for Phase 3's changelog task: a consumer reading
-     `Extra["digest"]` today loses it to the typed field.
-- [ ] 2. Write types in `proxmox/storage/datastore.go`: `DatastoreSpec`,
+     `Extra["digest"]` today loses it to the typed field. _(Done 2026-08-27:
+     `TestDatastoreDigestTyped` unmarshals the committed cassette's literal
+     shape — digest in the field, absent from Extra, `thinpool` still routed to
+     Extra as the lossless-read regression guard, and the digest-less read
+     empty. The field comment names DatastoreUpdate.Digest as the destination so
+     the idiom is discoverable from the read side.)_
+- [x] 2. Write types in `proxmox/storage/datastore.go`: `DatastoreSpec`,
      `DatastoreUpdate`, `DatastoreWriteResult` exactly as DESIGN-0007's "Write
      specs" / "The write result" sections define them (required
      `Storage`+`Type`; `[]string` list fields `json:"-"`; update's pointer
@@ -162,8 +167,15 @@ form first means Phase 2's handler tests exercise handlers, not encoding bugs.
      idiom, the one-shot `encryption-key` warning on `Config`, and the
      `Extra`-sensitivity note per OQ-2 of this ledger (a CIFS/PBS `password`
      rides `Extra`; the SDK never logs bodies, but the consumer owns what it
-     prints).
-- [ ] 3. Encoding: `svcutil.EncodeWithExtra` + post-encode comma-joins for
+     prints). _(Done 2026-08-27: all three types land per the design, plus a
+     custom `DatastoreWriteResult.UnmarshalJSON` — the config member is declared
+     additionalProperties, so a non-string value keeps its raw token instead of
+     failing the write that succeeded, and a null payload decodes to the zero
+     result (the ApplyNetworkConfig posture without a special case).
+     `TestDatastoreWriteResultDecode` pins all four shapes — string config,
+     raw-token config, configless, null — front-loading that row of Phase 2 task
+     4's matrix.)_
+- [x] 3. Encoding: `svcutil.EncodeWithExtra` + post-encode comma-joins for
      `Content`/`Nodes`/`Delete` (the ZFS-`Devices`/HA-rules/ACME-`Nodes`
      mechanics). Table-driven wire-form tests, no HTTP: the hoomlab zfspool spec
      renders exactly (`storage`, `type`, `pool`, `sparse=1`, `blocksize`,
@@ -171,16 +183,33 @@ form first means Phase 2's handler tests exercise handlers, not encoding bugs.
      empty body; only-set-fields on update (unset pointer booleans absent,
      `false`-and-set present as `0`); `delete`+`digest` render; an `Extra` key
      wins over its typed field (the EncodeWithExtra contract, asserted here so
-     the spec docs stay honest).
+     the spec docs stay honest). _(Done 2026-08-27: unexported
+     `encodeDatastoreSpec`/`encodeDatastoreUpdate` + a shared `joinCSV` in
+     `datastore.go`; Phase 2's methods call these. Wire forms pinned
+     byte-for-byte via `url.Values.Encode` (canonical sorted keys) in the
+     internal `datastore_encode_test.go` — the package's first internal test
+     file, needed because the helpers are unexported: the hoomlab zfspool shape
+     verbatim, false-PVEBool omission on create, Extra-beats-typed,
+     zero-update-empty-body, disable=0-vs-absent tri-state, and delete+digest.)_
 
 #### Success Criteria
 
-- `go build ./...`, `just lint`, `just test` (race) green.
+- `go build ./...`, `just lint`, `just test` (race) green. **Met 2026-08-27**
+  (verified after each task).
 - The zfspool wire form is pinned by a table test byte-for-byte, and the
   zero-update-sends-nothing property holds — Phase 2 debugging starts from
-  known-good encoding.
+  known-good encoding. **Met 2026-08-27** — `TestEncodeDatastoreSpec` /
+  `TestEncodeDatastoreUpdate` in `datastore_encode_test.go`.
 - `digest` demonstrably moved: one test proves typed-field presence AND `Extra`
-  absence on the same read.
+  absence on the same read. **Met 2026-08-27** — `TestDatastoreDigestTyped`,
+  which also guards the lossless-read tail (`thinpool` still routes to Extra).
+
+**Phase 1 complete 2026-08-27.** All three tasks done; the new public surface
+(`DatastoreSpec`, `DatastoreUpdate`, `DatastoreWriteResult`, `Datastore.Digest`)
+is doc-commented and renders under `go doc` — the package-level story stays a
+Phase 3 task by design. No go-development review agents exist in this
+environment; the phase's verification is the pinned wire forms + the full suite,
+with a review pass scheduled after Phase 2 (the functional core).
 
 ---
 
@@ -193,13 +222,19 @@ neither half is testable alone.
 
 #### Tasks
 
-- [ ] 1. mockpve state (`proxmox/mockpve/storage.go`): `storeRecord` grows
+- [x] 1. mockpve state (`proxmox/mockpve/storage.go`): `storeRecord` grows
      `Nodes`, `Disable`, `Digest`, and `Extra map[string]string` for
      submitted-but-unmodelled keys (`sparse`, `blocksize`, … — the mock needs
      faithful read-back, not typed fields); `datastoreToPayload` emits them
      (map-shaped JSON, matching real PVE's flat object); `AddStorage` keeps its
-     signature and seeds a digest so existing seeded tests read one.
-- [ ] 2. mockpve handlers: `POST /storage` (missing `storage`/`type` → 400;
+     signature and seeds a digest so existing seeded tests read one. **Done
+     2026-08-27** — one refinement: the digest lives on `storageState`
+     (`cfgVersion`/`cfgDigest` + `bumpStorageDigest`), NOT per-record, because
+     the live cassette shows the storage.cfg FILE digest — one value shared by
+     every entry of a read. `datastoreToPayload(rec, digest)` takes it as an
+     argument. `AddStorage` also normalizes seeded content (`TestGetDatastore`'s
+     expectation updated to the sorted set).
+- [x] 2. mockpve handlers: `POST /storage` (missing `storage`/`type` → 400;
      duplicate id → 400 "storage ID '…' already defined"; store the form; answer
      `{storage, type}` — **no fabricated `config`**, the mock supports no
      auto-generating type and must not teach consumers to expect one),
@@ -210,16 +245,25 @@ neither half is testable alone.
      record; null data). Every write **bumps the stored digest**;
      `nodes`/`content` are parsed to sets and emitted **sorted** (OQ-5a), with
      the mock's doc comment stating the rule: list-valued options are sets,
-     compare them as sets.
-- [ ] 3. Service methods in `proxmox/storage/datastore.go`:
+     compare them as sets. **Done 2026-08-27** —
+     `handleDatastoreCreate`/`Update`/`Delete` +
+     `normalizeSet`/`applyStorageForm`/`clearStorageKey`/`createFixedKeys`,
+     routes registered in `registerStorageRoutes`. Form reads use
+     `r.PostForm.Get` after `s.parseForm` (gosec G120) and the repeated wire
+     keys are consts (goconst). The stale-digest 400 reuses real PVE's "detected
+     modified configuration" message.
+- [x] 3. Service methods in `proxmox/storage/datastore.go`:
      `CreateDatastore`/`UpdateDatastore` → `*DatastoreWriteResult`,
      `DeleteDatastore` → `error`, per DESIGN-0007's signatures — nil-spec /
      empty-id guards first (`svcutil.ErrNilSpec`/`ErrMissingField`), no version
      gate (9.0 baseline). Doc comments carry the `Datastore.Allocate` permission
      note (ordinary privilege, tokens work) and delete's config-not-data
      semantics. `storage.API` grows the three methods with a changelog note
-     (pre-v1 break for external doubles only).
-- [ ] 4. Unit matrix (beside the code, against the mock): create → list/get
+     (pre-v1 break for external doubles only). **Done 2026-08-27** — the three
+     methods follow the sdn.CreateZone guard idiom; `storage.API` gained a
+     "Datastore configuration writes (DESIGN-0007)" block. The changelog note is
+     Phase 3 task 6's PR body.
+- [x] 4. Unit matrix (beside the code, against the mock): create → list/get
      reflects the write including `Extra` keys; duplicate create rejected;
      update applies set-keys, honours `delete`, refuses stale digest AND accepts
      fresh (both directions); create-fixed key on update rejected; delete →
@@ -227,21 +271,37 @@ neither half is testable alone.
      set-normalization (submit `nodes=b,a` → read `a,b`); `Extra` round-trip for
      an unmodelled key (`preallocation`); result decode with and without
      `config`; digest changes across writes (guard-testable-without-race
-     property).
-- [ ] 5. `TestDatastoreConvergeShape`: hoomlab's exact sequence against the mock
+     property). **Done 2026-08-27** — `datastore_write_test.go`: eight tests
+     covering every row (`wantSet` is the compare-as-sets helper); the
+     result-decode row was front-loaded in Phase 1
+     (`TestDatastoreWriteResultDecode`). Race suite green.
+- [x] 5. `TestDatastoreConvergeShape`: hoomlab's exact sequence against the mock
      — get(miss → `ErrNotFound`) → create zfspool (pool, sparse, content, nodes)
      → get(hit; compare `Content`/`Nodes` **as sets**) → drift-correct via
      update (content restriction) with the read's digest → delete. This is the
      seeding-not-stubbing proof: the consumer's converge logic can run against
-     `mockpve` unmodified.
+     `mockpve` unmodified. **Done 2026-08-27** — in `datastore_write_test.go`;
+     the probe branches on `errors.Is(err, pverr.ErrNotFound)` (never
+     message-matching), the delete is verified by a second probe.
 
 #### Success Criteria
 
-- `go build ./...`, `just lint`, `just test` (race) green.
+- `go build ./...`, `just lint`, `just test` (race) green. **Met 2026-08-27.**
 - The full unit matrix passes; the digest guard is covered in both directions;
-  set-normalization is asserted with an unsorted submission.
+  set-normalization is asserted with an unsorted submission. **Met 2026-08-27**
+  — `TestUpdateDatastoreDigestGuard` (fresh accepted → digest bumped → stale
+  replay 400), `TestCreateDatastoreReflected` (unsorted submission reads back
+  sorted).
 - `TestDatastoreConvergeShape` passes end-to-end — the mock can host the
-  consumer's loop before the consumer exists.
+  consumer's loop before the consumer exists. **Met 2026-08-27.**
+
+**Phase 2 complete 2026-08-27.** All five tasks done. The scheduled post-phase
+review ran (grug-brain reviewer — no go-development agents exist in this
+environment): no complexity findings in production code; its one actionable
+finding (duplicated create/read assertions between `TestConvergeShape` and
+`TestCreateDatastoreReflected`) was applied — the converge test now asserts only
+the set-compare step of its sequence and defers field-level reflection to the
+matrix test.
 
 ---
 
@@ -253,16 +313,22 @@ closure: this phase is the last one, and completing it completes IMPL-0008.
 
 #### Tasks
 
-- [ ] 1. Create `proxmox/storage/paths_test.go` with `TestStoragePathsReal` (the
+- [x] 1. Create `proxmox/storage/paths_test.go` with `TestStoragePathsReal` (the
      `ceph`/`ha`/`nodes`/`sdn` pattern): pin the three write paths and — since
      the file is being created anyway — the existing read/content/ upload/zfs
      paths, including the volid-escaping cases `nodeVolumePath` already
-     documents.
-- [ ] 2. Coverage: `just coverage` regen — exactly the three `/storage` rows
+     documents. **Done 2026-08-27** — writing the pins immediately caught a
+     stale doc comment: `paths.go` claimed `url.PathEscape` renders the volid
+     colon as `%3A`, but it leaves the colon LITERAL (the same finding as the HA
+     `/resources/vm:100` paths; the literal-colon form is what the live ISO
+     upload run drove). Comment corrected, actual wire form pinned.
+- [x] 2. Coverage: `just coverage` regen — exactly the three `/storage` rows
      flip, 258 → 261 of 675, **zero unmatched routes** (the fabrication guard is
      the proof the mock's new paths are real PVE paths); no annotation edits.
-     Commit the regenerated `docs/COVERAGE.md`.
-- [ ] 3. Prepared integration harness (`proxmox/integration/datastore_test.go`,
+     Commit the regenerated `docs/COVERAGE.md`. **Done 2026-08-27** — exactly
+     `POST /storage`, `PUT /storage/{}`, `DELETE /storage/{}` gap→covered,
+     storage family 16→19 of 55, `just coverage-check` clean.
+- [x] 3. Prepared integration harness (`proxmox/integration/datastore_test.go`,
      `//go:build integration`): `TestDatastoreLifecycle` behind
      `PVE_TEST_DATASTORE=1` + the standard env — create scratch zfspool entry
      over an existing pool (dir-type fallback per DESIGN-0007 OQ-6), nodes
@@ -273,16 +339,30 @@ closure: this phase is the last one, and completing it completes IMPL-0008.
      path via
      `env -u PVE_ENDPOINT go test -tags=integration -run TestDatastoreLifecycle`
      (never run the tagged suite with a live env — it can rewrite committed
-     cassettes).
-- [ ] 4. TESTING.md: a short "Storage config writes" subsection — the gate, the
+     cassettes). **Done 2026-08-27** — gates: skip under `PVE_REPLAY=1` (no
+     cassette by design), skip unless `PVE_TEST_DATASTORE=1`; optional
+     `PVE_TEST_DATASTORE_POOL` picks zfspool-over-existing-dataset vs the dir
+     fallback; the probe REFUSES to adopt a pre-existing `sdk-datastore-test`
+     entry. Both verification commands ran exactly as written (skip fired at the
+     gate, before any client was built — zero requests).
+- [x] 4. TESTING.md: a short "Storage config writes" subsection — the gate, the
      harness's shape, and a pointer to the posture-change note (this is a
      deferred harness; running it needs a disposable target that does not
-     currently exist).
-- [ ] 5. Docs: `storage/doc.go` gains the config-write story (create/update/
+     currently exist). **Done 2026-08-27** — "Storage config writes (IMPL-0008)"
+     section in the Namecheap never-run style. Also carries a safety callout
+     Donald requested mid-phase: checking a skip path must use DEAD credentials
+     (`PVE_ENDPOINT=https://127.0.0.1:1` + dead token pair), never
+     `env -u PVE_ENDPOINT` — unsetting the endpoint is what triggers the
+     harness's `.env` autoload, and that file points at production.
+- [x] 5. Docs: `storage/doc.go` gains the config-write story (create/update/
      delete, digest idiom, delete-is-config-only, the permission note);
      `Example_datastoreConfig` in `example_test.go` (create zfspool → get →
      update → delete against `mockpve.Serve()`, `// Output:` block —
-     documentation and test). `go doc ./...` renders cleanly.
+     documentation and test). `go doc ./...` renders cleanly. **Done
+     2026-08-27** — "Datastore configuration writes" doc.go section with the
+     read-then-guarded-write idiom inline; the Example's output pins the
+     set-normalized read (`images,rootdir`) and the digest-guarded narrow to
+     `images`. Both Examples pass; `go doc` renders.
 - [ ] 6. PR + release: one `minor` PR (exactly one semver label), changelog as
      the branch's final commit before push. The PR body and changelog state the
      OQ-1 release posture explicitly: **this release ships mock-verified,
@@ -296,6 +376,28 @@ closure: this phase is the last one, and completing it completes IMPL-0008.
      IMPL-0009's, not this ledger's), and confirm IMPL-0009 is In Progress-able
      the moment hoomlab starts (closure docs ride a `dont-release` PR or the
      next release PR).
+
+**Consumer findings applied pre-release (2026-08-27).** hoomlab built its
+bootstrap `pve storage` stage against this branch (go.work) and ran it against
+the real 3-node cluster before the merge — IMPL-0009's loop started early, on
+the PR instead of a patch release. All write paths passed live (create zfspool,
+partial update with index-read digest, zero-drift converge re-run). Two parity
+findings, both fixed on the PR:
+
+1. **`GET /storage/{id}` missing-id is HTTP 500, not 404** — real PVE answers
+   `storage '<id>' does not exist` (hoomlab's INV-0001 deviation 8; same class
+   as the ACME-plugin GET, deviation 4). mockpve now mirrors the 500 + message
+   shape; `GetDatastore`/`doc.go` document that existence checks must scan
+   `ListDatastores`; the converge test, delete test, and the prepared
+   `TestDatastoreLifecycle` probe (which would have failed live exactly this
+   way) all switched to index-scan probing; the retired-wrong
+   `TestGetDatastoreNotFound` was replaced by `TestGetDatastoreMissing500`.
+   PUT/DELETE missing-id keep the mock's 404 — their real shape is unobserved.
+2. **PVE materializes server-generated properties into the entry** — a zfspool
+   create adds `mountpoint /<pool>` to storage.cfg and every read carries it.
+   mockpve now materializes it (explicit submissions win), and `Datastore.Extra`
+   documents that reads can carry keys the writer never sent: compare the fields
+   a decision needs, never the whole map.
 
 #### Success Criteria
 

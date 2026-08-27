@@ -2,6 +2,7 @@ package storage_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -79,20 +80,88 @@ func TestGetDatastore(t *testing.T) {
 	if d.Storage != "local" || d.Type != "dir" {
 		t.Errorf("datastore = %+v, want storage=local type=dir", d)
 	}
-	if d.Content != "iso,vztmpl,backup" {
-		t.Errorf("content = %q, want iso,vztmpl,backup", d.Content)
+	// The mock normalizes list-valued options to sorted sets (real PVE does
+	// not preserve submission order), so the seeded order reads back sorted.
+	if d.Content != "backup,iso,vztmpl" {
+		t.Errorf("content = %q, want backup,iso,vztmpl", d.Content)
 	}
 }
 
-func TestGetDatastoreNotFound(t *testing.T) {
+// TestDatastoreDigestTyped pins the digest field's routing: a read carrying
+// digest lands it in the typed field, NOT in Extra (a consumer that read
+// Extra["digest"] before v0.12 must move to the field), and a read without one
+// leaves it empty. The wire shape is the committed TestStorageReads cassette's.
+func TestDatastoreDigestTyped(t *testing.T) {
 	t.Parallel()
-	mock := mockpve.New()
-	svc := newService(t, mock)
+	var d storage.Datastore
+	blob := `{"storage":"local-lvm","type":"lvmthin","digest":` +
+		`"921a2c39e40935cc1d681235282a3f4359c66196","thinpool":"data"}`
+	if err := json.Unmarshal([]byte(blob), &d); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if want := "921a2c39e40935cc1d681235282a3f4359c66196"; d.Digest != want {
+		t.Errorf("Digest = %q, want %q", d.Digest, want)
+	}
+	if _, ok := d.Extra["digest"]; ok {
+		t.Error(`Extra still carries "digest"; it must live only in the typed field`)
+	}
+	if got, want := d.Extra["thinpool"], "data"; got != want {
+		t.Errorf(`Extra["thinpool"] = %q, want %q (lossless read regressed)`, got, want)
+	}
 
-	if _, err := svc.GetDatastore(context.Background(), "ghost"); !errors.Is(err, pverr.ErrNotFound) {
-		t.Fatalf("GetDatastore(ghost) = %v, want ErrNotFound", err)
+	var bare storage.Datastore
+	if err := json.Unmarshal([]byte(`{"storage":"local","type":"dir"}`), &bare); err != nil {
+		t.Fatalf("unmarshal bare: %v", err)
+	}
+	if bare.Digest != "" {
+		t.Errorf("Digest on a digest-less read = %q, want empty", bare.Digest)
 	}
 }
+
+// TestDatastoreWriteResultDecode pins the create/update result decode: the
+// config member with a string value, a non-string value kept as its raw token
+// (the additionalProperties tolerance), no config at all, and a null payload —
+// which must decode to the zero result, never an error, so a hypothetical
+// null-answering node cannot turn a write that succeeded into a failure.
+func TestDatastoreWriteResultDecode(t *testing.T) {
+	t.Parallel()
+	var r storage.DatastoreWriteResult
+	blob := `{"storage":"backup","type":"pbs",` +
+		`"config":{"encryption-key":"k3y-material","retry":3}}`
+	if err := json.Unmarshal([]byte(blob), &r); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if r.Storage != "backup" || r.Type != "pbs" {
+		t.Errorf("result = %+v, want storage=backup type=pbs", r)
+	}
+	if got, want := r.Config["encryption-key"], "k3y-material"; got != want {
+		t.Errorf(`Config["encryption-key"] = %q, want %q`, got, want)
+	}
+	if got, want := r.Config["retry"], "3"; got != want {
+		t.Errorf(`Config["retry"] = %q, want raw token %q`, got, want)
+	}
+
+	var plain storage.DatastoreWriteResult
+	if err := json.Unmarshal([]byte(`{"storage":"z","type":"zfspool"}`), &plain); err != nil {
+		t.Fatalf("unmarshal configless: %v", err)
+	}
+	if plain.Config != nil {
+		t.Errorf("Config on a configless result = %v, want nil", plain.Config)
+	}
+
+	var null storage.DatastoreWriteResult
+	if err := json.Unmarshal([]byte(`null`), &null); err != nil {
+		t.Fatalf("unmarshal null: %v", err)
+	}
+	if null.Storage != "" || null.Type != "" || null.Config != nil {
+		t.Errorf("null payload = %+v, want zero result", null)
+	}
+}
+
+// TestGetDatastoreNotFound was retired 2026-08-27: it pinned a 404 the real
+// endpoint never sends. The hoomlab consumer observed live that a missing id
+// answers HTTP 500 "storage '<id>' does not exist"; the replacement is
+// TestGetDatastoreMissing500 in datastore_write_test.go.
 
 func TestListNodeStorage(t *testing.T) {
 	t.Parallel()

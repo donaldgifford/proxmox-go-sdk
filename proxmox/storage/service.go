@@ -38,6 +38,13 @@ type API interface {
 	ListNodeStorage(ctx context.Context, node string) ([]StorageStatus, error)
 	NodeStorageStatus(ctx context.Context, node, storage string) (*StorageStatus, error)
 
+	// Datastore configuration writes (DESIGN-0007). Synchronous — PVE edits
+	// storage.cfg and answers immediately, no task. All three require
+	// Datastore.Allocate on /storage.
+	CreateDatastore(ctx context.Context, spec *DatastoreSpec) (*DatastoreWriteResult, error)
+	UpdateDatastore(ctx context.Context, storage string, update *DatastoreUpdate) (*DatastoreWriteResult, error)
+	DeleteDatastore(ctx context.Context, storage string) error
+
 	// Content listing (task 1).
 	ListContent(ctx context.Context, node, storage string, opts ...ListContentOption) ([]Content, error)
 	GetVolume(ctx context.Context, node, storage, volid string) (*Content, error)

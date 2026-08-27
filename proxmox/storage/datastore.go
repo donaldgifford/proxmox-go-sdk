@@ -2,8 +2,14 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
+
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/internal/svcutil"
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/types"
 )
 
 // ListDatastores returns the cluster's storage configuration (GET /storage).
@@ -16,12 +22,235 @@ func (s *Service) ListDatastores(ctx context.Context) ([]Datastore, error) {
 }
 
 // GetDatastore returns the configuration of one storage (GET /storage/{storage}).
+//
+// Do not use it as an existence check: real PVE reports a missing id as
+// HTTP 500 "storage '<id>' does not exist" — NOT 404 (live-observed
+// 2026-08-27) — so the error does not resolve to pverr.ErrNotFound and cannot
+// be told apart from a genuine server error. Probe existence by scanning
+// ListDatastores instead; each entry carries every config field including
+// Digest, so the index read costs nothing extra.
 func (s *Service) GetDatastore(ctx context.Context, storage string) (*Datastore, error) {
 	var d Datastore
 	if err := s.c.DoRequest(ctx, http.MethodGet, datastorePath(storage), nil, &d); err != nil {
 		return nil, fmt.Errorf("storage.GetDatastore: %w", err)
 	}
 	return &d, nil
+}
+
+// DatastoreSpec creates a storage entry (CreateDatastore). Storage and Type
+// are required; which of the remaining fields apply depends on Type (PVE
+// validates server-side, so an inapplicable field is the server's error to
+// raise, not silently dropped). Unmodelled per-type parameters ride Extra
+// verbatim.
+//
+// Content, Nodes and the mock's read-back treat list-valued options as SETS:
+// PVE does not preserve submission order, so compare them as sets, never as
+// strings.
+type DatastoreSpec struct {
+	Storage string `json:"storage"` // unique storage ID (pve-storage-id).
+	Type    string `json:"type"`    // "dir", "zfspool", "nfs", … — fixed for the entry's lifetime.
+
+	Content []string `json:"-"` // allowed content types ("images", "rootdir", "iso", …); comma-joined.
+	Nodes   []string `json:"-"` // node restriction; comma-joined; empty = all nodes.
+
+	Path   string `json:"path,omitempty"`   // dir/btrfs backing path (create-fixed).
+	Pool   string `json:"pool,omitempty"`   // zfspool dataset / RBD pool.
+	Server string `json:"server,omitempty"` // nfs/cifs server.
+	Export string `json:"export,omitempty"` // NFS export (create-fixed).
+	Share  string `json:"share,omitempty"`  // CIFS share (create-fixed).
+
+	Blocksize string        `json:"blocksize,omitempty"` // zfspool volblocksize, e.g. "16k".
+	Sparse    types.PVEBool `json:"sparse,omitempty"`    // zfspool thin provisioning.
+	Shared    types.PVEBool `json:"shared,omitempty"`
+	Disable   types.PVEBool `json:"disable,omitempty"`
+
+	// Extra carries parameters the SDK does not model ("preallocation",
+	// "krbd", "monhost", "username", …); keys here win over typed fields.
+	// Some storage types put credentials here (a CIFS or PBS "password"):
+	// the SDK never logs request bodies, but whatever the consumer prints
+	// of a spec is the consumer's own responsibility.
+	Extra map[string]string `json:"-"`
+}
+
+// DatastoreUpdate changes an entry (UpdateDatastore). The zero value sends
+// nothing: only set fields go on the wire, so an update cannot accidentally
+// reset a key it did not name. Booleans are pointers because false-and-set
+// and unset must differ on a partial write.
+//
+// Identity and backing location are fixed at creation — PVE's update schema
+// has no type, path, export, share, target, portal, vgname, thinpool, base,
+// datastore, iscsiprovider or authsupported parameters, so changing those
+// means delete and recreate. To CLEAR a key (lift a nodes restriction, drop
+// a content type list), name it in Delete; an empty typed field is "not
+// sent", never "unset".
+type DatastoreUpdate struct {
+	Content []string `json:"-"`
+	Nodes   []string `json:"-"`
+
+	Pool      string         `json:"pool,omitempty"`
+	Blocksize string         `json:"blocksize,omitempty"`
+	Sparse    *types.PVEBool `json:"sparse,omitempty"`
+	Shared    *types.PVEBool `json:"shared,omitempty"`
+	Disable   *types.PVEBool `json:"disable,omitempty"`
+
+	// Delete names settings to unset. It is CSV-joined into PVE's delete
+	// parameter — clearing a key is a named action, never an empty-string
+	// side effect.
+	Delete []string `json:"-"`
+	// Digest is the config digest from the read that informed this update.
+	// When set, PVE refuses the write if the storage config changed since;
+	// pass Datastore.Digest to make read-modify-write safe.
+	Digest string `json:"digest,omitempty"`
+
+	// Extra carries unmodelled parameters; see DatastoreSpec.Extra for the
+	// credentials note.
+	Extra map[string]string `json:"-"`
+}
+
+// DatastoreWriteResult is the response of a datastore create or update: the
+// entry's id and type, plus any configuration PVE generated server-side.
+type DatastoreWriteResult struct {
+	Storage string `json:"storage"`
+	Type    string `json:"type"`
+	// Config carries server-generated properties. The schema names one:
+	// "encryption-key", auto-generated when a PBS datastore is created with
+	// encryption-key=autogen. It is returned HERE and not again — a caller
+	// that discards it has lost the key material.
+	Config map[string]string `json:"config,omitempty"`
+}
+
+// UnmarshalJSON decodes the result, keeping unexpected non-string config
+// values as their raw tokens (the same tolerance as Extra reads) — the
+// config member is declared open-ended (additionalProperties), so a new
+// numeric or boolean property must not fail the write that succeeded.
+func (r *DatastoreWriteResult) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Storage string                     `json:"storage"`
+		Type    string                     `json:"type"`
+		Config  map[string]json.RawMessage `json:"config"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("decode datastore write result: %w", err)
+	}
+	r.Storage, r.Type, r.Config = raw.Storage, raw.Type, nil
+	for key, rawVal := range raw.Config {
+		var s string
+		if err := json.Unmarshal(rawVal, &s); err != nil {
+			s = string(rawVal) // non-string value: keep the raw token.
+		}
+		if r.Config == nil {
+			r.Config = make(map[string]string)
+		}
+		r.Config[key] = s
+	}
+	return nil
+}
+
+// joinCSV sets key to the comma-joined items when the slice is non-empty. A
+// nil or empty slice sets nothing — "not sent" — which is why clearing a key
+// goes through DatastoreUpdate.Delete instead of an empty value.
+func joinCSV(vals url.Values, key string, items []string) {
+	if len(items) > 0 {
+		vals.Set(key, strings.Join(items, ","))
+	}
+}
+
+// encodeDatastoreSpec renders a create spec to PVE's form body: the flat
+// fields via svcutil.EncodeWithExtra (Extra keys win over typed fields),
+// then the list-valued joins — the ZFS-Devices/HA-rules/ACME-nodes
+// mechanics.
+func encodeDatastoreSpec(spec *DatastoreSpec) (url.Values, error) {
+	body, err := svcutil.EncodeWithExtra(spec, spec.Extra)
+	if err != nil {
+		return nil, err
+	}
+	joinCSV(body, "content", spec.Content)
+	joinCSV(body, "nodes", spec.Nodes)
+	return body, nil
+}
+
+// encodeDatastoreUpdate renders an update to PVE's form body. The zero
+// update encodes to an empty body: every field is omitempty, pointer, or a
+// nil slice, so only what the caller set goes on the wire.
+func encodeDatastoreUpdate(update *DatastoreUpdate) (url.Values, error) {
+	body, err := svcutil.EncodeWithExtra(update, update.Extra)
+	if err != nil {
+		return nil, err
+	}
+	joinCSV(body, "content", update.Content)
+	joinCSV(body, "nodes", update.Nodes)
+	joinCSV(body, "delete", update.Delete)
+	return body, nil
+}
+
+// CreateDatastore adds a storage entry to the cluster configuration
+// (POST /storage). The write is synchronous; the result carries the entry's
+// id and type plus any server-generated config — see
+// DatastoreWriteResult.Config for why discarding it can lose key material.
+// Requires Datastore.Allocate on /storage (an ordinary privilege — API
+// tokens work).
+//
+// Creating the entry does not touch the backing storage: a zfspool entry
+// points at an existing dataset, a dir entry at an existing path. PVE
+// activates the storage on each node it applies to and reports the outcome
+// per node via ListNodeStorage.
+func (s *Service) CreateDatastore(ctx context.Context, spec *DatastoreSpec) (*DatastoreWriteResult, error) {
+	if spec == nil {
+		return nil, fmt.Errorf("storage.CreateDatastore: %w", svcutil.ErrNilSpec)
+	}
+	switch {
+	case spec.Storage == "":
+		return nil, fmt.Errorf("storage.CreateDatastore: storage: %w", svcutil.ErrMissingField)
+	case spec.Type == "":
+		return nil, fmt.Errorf("storage.CreateDatastore: type: %w", svcutil.ErrMissingField)
+	}
+	body, err := encodeDatastoreSpec(spec)
+	if err != nil {
+		return nil, fmt.Errorf("storage.CreateDatastore: %w", err)
+	}
+	var res DatastoreWriteResult
+	if err := s.c.DoRequest(ctx, http.MethodPost, datastoresPath(), body, &res); err != nil {
+		return nil, fmt.Errorf("storage.CreateDatastore: %w", err)
+	}
+	return &res, nil
+}
+
+// UpdateDatastore changes a storage entry (PUT /storage/{storage}). Only the
+// fields set on update go on the wire — see DatastoreUpdate for the
+// partial-write and Delete/Digest semantics. The write is synchronous.
+// Requires Datastore.Allocate on /storage.
+func (s *Service) UpdateDatastore(ctx context.Context, storage string, update *DatastoreUpdate) (*DatastoreWriteResult, error) {
+	if storage == "" {
+		return nil, fmt.Errorf("storage.UpdateDatastore: storage: %w", svcutil.ErrMissingField)
+	}
+	if update == nil {
+		return nil, fmt.Errorf("storage.UpdateDatastore: %w", svcutil.ErrNilSpec)
+	}
+	body, err := encodeDatastoreUpdate(update)
+	if err != nil {
+		return nil, fmt.Errorf("storage.UpdateDatastore: %w", err)
+	}
+	var res DatastoreWriteResult
+	if err := s.c.DoRequest(ctx, http.MethodPut, datastorePath(storage), body, &res); err != nil {
+		return nil, fmt.Errorf("storage.UpdateDatastore: %w", err)
+	}
+	return &res, nil
+}
+
+// DeleteDatastore removes a storage entry from the cluster configuration
+// (DELETE /storage/{storage}). It removes CONFIG, not data: the backing
+// dataset, directory, or export and every volume on it survive — the cluster
+// just stops using the entry. The write is synchronous. Requires
+// Datastore.Allocate on /storage; an unknown id resolves to
+// pverr.ErrNotFound.
+func (s *Service) DeleteDatastore(ctx context.Context, storage string) error {
+	if storage == "" {
+		return fmt.Errorf("storage.DeleteDatastore: storage: %w", svcutil.ErrMissingField)
+	}
+	if err := s.c.DoRequest(ctx, http.MethodDelete, datastorePath(storage), nil, nil); err != nil {
+		return fmt.Errorf("storage.DeleteDatastore: %w", err)
+	}
+	return nil
 }
 
 // ListNodeStorage returns the activation and usage status of every storage

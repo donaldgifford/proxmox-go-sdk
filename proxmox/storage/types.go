@@ -22,7 +22,17 @@ type Datastore struct {
 	Nodes   string        `json:"nodes,omitempty"`   // comma-separated node restriction; empty = all.
 	Shared  types.PVEBool `json:"shared,omitempty"`
 	Disable types.PVEBool `json:"disable,omitempty"`
-	// Extra carries datastore keys the SDK does not model.
+	// Digest is the storage.cfg config digest (the same value on every entry
+	// of one read). Pass it to DatastoreUpdate.Digest so an update fails
+	// rather than clobbers a concurrent edit — read, decide, write with the
+	// digest from that read.
+	Digest string `json:"digest,omitempty"`
+	// Extra carries datastore keys the SDK does not model. Reads can carry
+	// keys the writer never sent: PVE materializes server-generated
+	// properties into the entry (creating a zfspool storage adds
+	// "mountpoint /<pool>"; live-observed 2026-08-27), so compare the fields
+	// a decision needs, never the whole map, or a converge loop rotates
+	// forever on properties it did not write.
 	Extra map[string]string `json:"-"`
 }
 
@@ -31,7 +41,7 @@ type Datastore struct {
 var datastoreKnownFields = map[string]bool{
 	"storage": true, "type": true, "content": true, "path": true,
 	"pool": true, "server": true, "export": true, "share": true,
-	"nodes": true, "shared": true, "disable": true,
+	"nodes": true, "shared": true, "disable": true, "digest": true,
 }
 
 // UnmarshalJSON decodes the modelled fields and routes any unknown keys into

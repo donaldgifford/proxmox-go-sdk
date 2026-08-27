@@ -10,8 +10,10 @@ func datastorePath(storage string) string { return "/storage/" + storage }
 
 // Node-scoped status, content, and volumes. A volid such as
 // "local:iso/debian.iso" is a single path segment, so it is percent-escaped
-// (url.PathEscape preserves the colon as %3A and the slash as %2F, which is how
-// PVE expects volids inside a path).
+// with url.PathEscape — which escapes the slash to %2F but leaves the colon
+// literal (a colon is valid in a path segment; the same finding as the HA
+// /resources/vm:100 paths). That literal-colon form is what the live ISO
+// upload run drove end-to-end; TestStoragePathsReal pins it.
 
 func nodeStoragesPath(node string) string { return "/nodes/" + node + "/storage" }
 
