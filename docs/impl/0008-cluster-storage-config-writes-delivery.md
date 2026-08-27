@@ -144,13 +144,18 @@ form first means Phase 2's handler tests exercise handlers, not encoding bugs.
 
 #### Tasks
 
-- [ ] 1. `Datastore.Digest` in `proxmox/storage/types.go`: add the field
+- [x] 1. `Datastore.Digest` in `proxmox/storage/types.go`: add the field
      (`json:"digest,omitempty"`), add `"digest"` to `datastoreKnownFields`. Unit
      tests: a read carrying `digest` lands it in the typed field and **not** in
      `Extra` (assert both), and a read without one leaves it empty. Doc comment
      teaches the read-then-guarded-write idiom (mirror `ACMEPlugin.Digest`'s
      wording). Note for Phase 3's changelog task: a consumer reading
-     `Extra["digest"]` today loses it to the typed field.
+     `Extra["digest"]` today loses it to the typed field. _(Done 2026-08-27:
+     `TestDatastoreDigestTyped` unmarshals the committed cassette's literal
+     shape — digest in the field, absent from Extra, `thinpool` still routed to
+     Extra as the lossless-read regression guard, and the digest-less read
+     empty. The field comment names DatastoreUpdate.Digest as the destination so
+     the idiom is discoverable from the read side.)_
 - [ ] 2. Write types in `proxmox/storage/datastore.go`: `DatastoreSpec`,
      `DatastoreUpdate`, `DatastoreWriteResult` exactly as DESIGN-0007's "Write
      specs" / "The write result" sections define them (required

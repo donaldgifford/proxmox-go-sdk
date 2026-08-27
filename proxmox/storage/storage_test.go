@@ -2,6 +2,7 @@ package storage_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -81,6 +82,37 @@ func TestGetDatastore(t *testing.T) {
 	}
 	if d.Content != "iso,vztmpl,backup" {
 		t.Errorf("content = %q, want iso,vztmpl,backup", d.Content)
+	}
+}
+
+// TestDatastoreDigestTyped pins the digest field's routing: a read carrying
+// digest lands it in the typed field, NOT in Extra (a consumer that read
+// Extra["digest"] before v0.12 must move to the field), and a read without one
+// leaves it empty. The wire shape is the committed TestStorageReads cassette's.
+func TestDatastoreDigestTyped(t *testing.T) {
+	t.Parallel()
+	var d storage.Datastore
+	blob := `{"storage":"local-lvm","type":"lvmthin","digest":` +
+		`"921a2c39e40935cc1d681235282a3f4359c66196","thinpool":"data"}`
+	if err := json.Unmarshal([]byte(blob), &d); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if want := "921a2c39e40935cc1d681235282a3f4359c66196"; d.Digest != want {
+		t.Errorf("Digest = %q, want %q", d.Digest, want)
+	}
+	if _, ok := d.Extra["digest"]; ok {
+		t.Error(`Extra still carries "digest"; it must live only in the typed field`)
+	}
+	if got, want := d.Extra["thinpool"], "data"; got != want {
+		t.Errorf(`Extra["thinpool"] = %q, want %q (lossless read regressed)`, got, want)
+	}
+
+	var bare storage.Datastore
+	if err := json.Unmarshal([]byte(`{"storage":"local","type":"dir"}`), &bare); err != nil {
+		t.Fatalf("unmarshal bare: %v", err)
+	}
+	if bare.Digest != "" {
+		t.Errorf("Digest on a digest-less read = %q, want empty", bare.Digest)
 	}
 }
 
