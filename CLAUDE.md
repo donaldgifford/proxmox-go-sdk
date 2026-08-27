@@ -458,6 +458,28 @@ rather than fabricating a path that would 404. Its signature still returns a
 `tasks.Ref` so a real REST impl can land later non-breaking. mockpve gained
 `AddZFSPool` + the three disk/zfs routes.
 
+**Datastore config writes (DESIGN-0007/IMPL-0008, v0.12.0, 2026-08-27)** landed
+the write half of `/storage`:
+`CreateDatastore`/`UpdateDatastore`/`DeleteDatastore` — all **synchronous**
+(create+update return `*DatastoreWriteResult` `{storage, type, config?}`;
+`config` can carry one-shot server-generated key material), all
+`Datastore.Allocate`. `DatastoreSpec`/`DatastoreUpdate` follow the CSV-join
+pattern for `Content`/`Nodes`/`Delete`; `Datastore.Digest` (typed, moved out of
+Extra) feeds the update's stale-write guard. mockpve serves all three with a
+cluster-wide storage.cfg digest. Two **consumer-found live warts** (hoomlab
+exercised the surface pre-release on the PR, against the real cluster): a
+missing-id `GET /storage/{id}` answers **HTTP 500**
+`storage '<id>' does not exist`, never 404/`ErrNotFound` — existence checks must
+scan `ListDatastores` (mockpve mirrors the 500; PUT/DELETE missing-id shapes are
+unobserved and stay 404 in the mock) — and PVE **materializes server-generated
+properties** (zfspool gains `mountpoint /<pool>`), so compare the fields a
+decision needs, never the full `Extra` map. The prepared
+`TestDatastoreLifecycle` harness (gate `PVE_TEST_DATASTORE=1`) is
+written-but-never-run; checking any tagged skip path uses **dead credentials**
+(`PVE_ENDPOINT=https://127.0.0.1:1` + a dead token pair), never
+`env -u PVE_ENDPOINT` — unsetting creds is what triggers the harness's `.env`
+autoload, and that file points at production.
+
 **Phase 4 (HA/scheduling/replication) is implementation-complete** — all 7 tasks
 checked in IMPL-0001; `ha` is doc-promoted with a runnable resource-affinity
 `Example` (`go doc`-verified). The Success Criterion (define a resource-affinity
