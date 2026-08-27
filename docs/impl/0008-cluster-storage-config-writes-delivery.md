@@ -259,11 +259,11 @@ neither half is testable alone.
      gate (9.0 baseline). Doc comments carry the `Datastore.Allocate` permission
      note (ordinary privilege, tokens work) and delete's config-not-data
      semantics. `storage.API` grows the three methods with a changelog note
-     (pre-v1 break for external doubles only).
-     **Done 2026-08-27** — the three methods follow the sdn.CreateZone guard
-     idiom; `storage.API` gained a "Datastore configuration writes
-     (DESIGN-0007)" block. The changelog note is Phase 3 task 6's PR body.
-- [ ] 4. Unit matrix (beside the code, against the mock): create → list/get
+     (pre-v1 break for external doubles only). **Done 2026-08-27** — the three
+     methods follow the sdn.CreateZone guard idiom; `storage.API` gained a
+     "Datastore configuration writes (DESIGN-0007)" block. The changelog note is
+     Phase 3 task 6's PR body.
+- [x] 4. Unit matrix (beside the code, against the mock): create → list/get
      reflects the write including `Extra` keys; duplicate create rejected;
      update applies set-keys, honours `delete`, refuses stale digest AND accepts
      fresh (both directions); create-fixed key on update rejected; delete →
@@ -271,7 +271,10 @@ neither half is testable alone.
      set-normalization (submit `nodes=b,a` → read `a,b`); `Extra` round-trip for
      an unmodelled key (`preallocation`); result decode with and without
      `config`; digest changes across writes (guard-testable-without-race
-     property).
+     property). **Done 2026-08-27** — `datastore_write_test.go`: eight tests
+     covering every row (`wantSet` is the compare-as-sets helper); the
+     result-decode row was front-loaded in Phase 1
+     (`TestDatastoreWriteResultDecode`). Race suite green.
 - [ ] 5. `TestDatastoreConvergeShape`: hoomlab's exact sequence against the mock
      — get(miss → `ErrNotFound`) → create zfspool (pool, sparse, content, nodes)
      → get(hit; compare `Content`/`Nodes` **as sets**) → drift-correct via
