@@ -14,6 +14,10 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(mockpve)* Datastore config writes — state, digest, and the three handlers
 - *(storage)* CreateDatastore, UpdateDatastore, DeleteDatastore
 
+### Bug Fixes
+
+- *(mockpve,storage)* Apply hoomlab live-lab parity findings
+
 ### Documentation
 
 - *(design)* DESIGN-0007 — cluster storage config writes ([#28](https://github.com/donaldgifford/proxmox-go-sdk/issues/28))
