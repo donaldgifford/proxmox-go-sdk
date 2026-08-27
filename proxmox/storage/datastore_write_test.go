@@ -293,15 +293,15 @@ func TestDatastoreConvergeShape(t *testing.T) {
 		t.Fatalf("create: %v", err)
 	}
 
+	// The read is the converge comparison input; field-level reflection is
+	// TestCreateDatastoreReflected's job — here only the set-compare step of
+	// the sequence is asserted.
 	got, err := svc.GetDatastore(ctx, "fast-vm")
 	if err != nil {
 		t.Fatalf("read after create: %v", err)
 	}
 	wantSet(t, "content", got.Content, "images", "rootdir")
 	wantSet(t, "nodes", got.Nodes, "pve1", "pve2")
-	if got.Pool != "fast/vm" || got.Extra["sparse"] != "1" {
-		t.Errorf("read = %+v (Extra %v), want pool fast/vm and sparse 1", got, got.Extra)
-	}
 
 	// Drift-correct: narrow the content restriction, guarded by the digest
 	// of the read the decision came from.

@@ -286,11 +286,22 @@ neither half is testable alone.
 
 #### Success Criteria
 
-- `go build ./...`, `just lint`, `just test` (race) green.
+- `go build ./...`, `just lint`, `just test` (race) green. **Met 2026-08-27.**
 - The full unit matrix passes; the digest guard is covered in both directions;
-  set-normalization is asserted with an unsorted submission.
+  set-normalization is asserted with an unsorted submission. **Met 2026-08-27**
+  — `TestUpdateDatastoreDigestGuard` (fresh accepted → digest bumped → stale
+  replay 400), `TestCreateDatastoreReflected` (unsorted submission reads back
+  sorted).
 - `TestDatastoreConvergeShape` passes end-to-end — the mock can host the
-  consumer's loop before the consumer exists.
+  consumer's loop before the consumer exists. **Met 2026-08-27.**
+
+**Phase 2 complete 2026-08-27.** All five tasks done. The scheduled post-phase
+review ran (grug-brain reviewer — no go-development agents exist in this
+environment): no complexity findings in production code; its one actionable
+finding (duplicated create/read assertions between `TestConvergeShape` and
+`TestCreateDatastoreReflected`) was applied — the converge test now asserts only
+the set-compare step of its sequence and defers field-level reflection to the
+matrix test.
 
 ---
 
