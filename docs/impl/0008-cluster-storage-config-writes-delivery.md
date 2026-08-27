@@ -222,13 +222,19 @@ neither half is testable alone.
 
 #### Tasks
 
-- [ ] 1. mockpve state (`proxmox/mockpve/storage.go`): `storeRecord` grows
+- [x] 1. mockpve state (`proxmox/mockpve/storage.go`): `storeRecord` grows
      `Nodes`, `Disable`, `Digest`, and `Extra map[string]string` for
      submitted-but-unmodelled keys (`sparse`, `blocksize`, … — the mock needs
      faithful read-back, not typed fields); `datastoreToPayload` emits them
      (map-shaped JSON, matching real PVE's flat object); `AddStorage` keeps its
      signature and seeds a digest so existing seeded tests read one.
-- [ ] 2. mockpve handlers: `POST /storage` (missing `storage`/`type` → 400;
+     **Done 2026-08-27** — one refinement: the digest lives on `storageState`
+     (`cfgVersion`/`cfgDigest` + `bumpStorageDigest`), NOT per-record, because
+     the live cassette shows the storage.cfg FILE digest — one value shared by
+     every entry of a read. `datastoreToPayload(rec, digest)` takes it as an
+     argument. `AddStorage` also normalizes seeded content
+     (`TestGetDatastore`'s expectation updated to the sorted set).
+- [x] 2. mockpve handlers: `POST /storage` (missing `storage`/`type` → 400;
      duplicate id → 400 "storage ID '…' already defined"; store the form; answer
      `{storage, type}` — **no fabricated `config`**, the mock supports no
      auto-generating type and must not teach consumers to expect one),
@@ -240,6 +246,12 @@ neither half is testable alone.
      `nodes`/`content` are parsed to sets and emitted **sorted** (OQ-5a), with
      the mock's doc comment stating the rule: list-valued options are sets,
      compare them as sets.
+     **Done 2026-08-27** — `handleDatastoreCreate`/`Update`/`Delete` +
+     `normalizeSet`/`applyStorageForm`/`clearStorageKey`/`createFixedKeys`,
+     routes registered in `registerStorageRoutes`. Form reads use
+     `r.PostForm.Get` after `s.parseForm` (gosec G120) and the repeated wire
+     keys are consts (goconst). The stale-digest 400 reuses real PVE's
+     "detected modified configuration" message.
 - [ ] 3. Service methods in `proxmox/storage/datastore.go`:
      `CreateDatastore`/`UpdateDatastore` → `*DatastoreWriteResult`,
      `DeleteDatastore` → `error`, per DESIGN-0007's signatures — nil-spec /

@@ -80,8 +80,10 @@ func TestGetDatastore(t *testing.T) {
 	if d.Storage != "local" || d.Type != "dir" {
 		t.Errorf("datastore = %+v, want storage=local type=dir", d)
 	}
-	if d.Content != "iso,vztmpl,backup" {
-		t.Errorf("content = %q, want iso,vztmpl,backup", d.Content)
+	// The mock normalizes list-valued options to sorted sets (real PVE does
+	// not preserve submission order), so the seeded order reads back sorted.
+	if d.Content != "backup,iso,vztmpl" {
+		t.Errorf("content = %q, want backup,iso,vztmpl", d.Content)
 	}
 }
 
