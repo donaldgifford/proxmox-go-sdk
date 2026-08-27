@@ -175,7 +175,7 @@ form first means Phase 2's handler tests exercise handlers, not encoding bugs.
      `TestDatastoreWriteResultDecode` pins all four shapes — string config,
      raw-token config, configless, null — front-loading that row of Phase 2 task
      4's matrix.)_
-- [ ] 3. Encoding: `svcutil.EncodeWithExtra` + post-encode comma-joins for
+- [x] 3. Encoding: `svcutil.EncodeWithExtra` + post-encode comma-joins for
      `Content`/`Nodes`/`Delete` (the ZFS-`Devices`/HA-rules/ACME-`Nodes`
      mechanics). Table-driven wire-form tests, no HTTP: the hoomlab zfspool spec
      renders exactly (`storage`, `type`, `pool`, `sparse=1`, `blocksize`,
@@ -183,7 +183,14 @@ form first means Phase 2's handler tests exercise handlers, not encoding bugs.
      empty body; only-set-fields on update (unset pointer booleans absent,
      `false`-and-set present as `0`); `delete`+`digest` render; an `Extra` key
      wins over its typed field (the EncodeWithExtra contract, asserted here so
-     the spec docs stay honest).
+     the spec docs stay honest). _(Done 2026-08-27: unexported
+     `encodeDatastoreSpec`/`encodeDatastoreUpdate` + a shared `joinCSV` in
+     `datastore.go`; Phase 2's methods call these. Wire forms pinned
+     byte-for-byte via `url.Values.Encode` (canonical sorted keys) in the
+     internal `datastore_encode_test.go` — the package's first internal test
+     file, needed because the helpers are unexported: the hoomlab zfspool shape
+     verbatim, false-PVEBool omission on create, Extra-beats-typed,
+     zero-update-empty-body, disable=0-vs-absent tri-state, and delete+digest.)_
 
 #### Success Criteria
 

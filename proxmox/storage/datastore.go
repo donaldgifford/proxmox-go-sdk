@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
+	"github.com/donaldgifford/proxmox-go-sdk/proxmox/internal/svcutil"
 	"github.com/donaldgifford/proxmox-go-sdk/proxmox/types"
 )
 
@@ -134,6 +137,43 @@ func (r *DatastoreWriteResult) UnmarshalJSON(data []byte) error {
 		r.Config[key] = s
 	}
 	return nil
+}
+
+// joinCSV sets key to the comma-joined items when the slice is non-empty. A
+// nil or empty slice sets nothing — "not sent" — which is why clearing a key
+// goes through DatastoreUpdate.Delete instead of an empty value.
+func joinCSV(vals url.Values, key string, items []string) {
+	if len(items) > 0 {
+		vals.Set(key, strings.Join(items, ","))
+	}
+}
+
+// encodeDatastoreSpec renders a create spec to PVE's form body: the flat
+// fields via svcutil.EncodeWithExtra (Extra keys win over typed fields),
+// then the list-valued joins — the ZFS-Devices/HA-rules/ACME-nodes
+// mechanics.
+func encodeDatastoreSpec(spec *DatastoreSpec) (url.Values, error) {
+	body, err := svcutil.EncodeWithExtra(spec, spec.Extra)
+	if err != nil {
+		return nil, err
+	}
+	joinCSV(body, "content", spec.Content)
+	joinCSV(body, "nodes", spec.Nodes)
+	return body, nil
+}
+
+// encodeDatastoreUpdate renders an update to PVE's form body. The zero
+// update encodes to an empty body: every field is omitempty, pointer, or a
+// nil slice, so only what the caller set goes on the wire.
+func encodeDatastoreUpdate(update *DatastoreUpdate) (url.Values, error) {
+	body, err := svcutil.EncodeWithExtra(update, update.Extra)
+	if err != nil {
+		return nil, err
+	}
+	joinCSV(body, "content", update.Content)
+	joinCSV(body, "nodes", update.Nodes)
+	joinCSV(body, "delete", update.Delete)
+	return body, nil
 }
 
 // ListNodeStorage returns the activation and usage status of every storage
