@@ -64,7 +64,7 @@ jobs:
       # without this import + env, goreleaser fails at the signing step after
       # building everything (every v0.2.0-v0.6.0 release run died here).
       - name: Import GPG signing key
-        uses: crazy-max/ghaction-import-gpg@v6
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
 
