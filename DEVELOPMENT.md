@@ -25,8 +25,8 @@ just             # show the task menu
 ```
 
 `mise install` reads `mise.toml`. The Go version there is kept **in lockstep**
-with the `go` directive in `go.mod` (currently `1.26.4`) — if you bump one, bump
-the other in the same commit.
+with the `go` directive in `go.mod` (currently `1.26.10`) — if you bump one,
+bump the other in the same commit.
 
 ## Common tasks
 
