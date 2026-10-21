@@ -49,7 +49,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Set up mise (for just)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5
         with:
           experimental: true
 
@@ -84,7 +84,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Set up mise (for just)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5
         with:
           experimental: true
 
@@ -142,7 +142,7 @@ jobs:
       # syft is required by the .goreleaser.yml sboms block, which catalogs the
       # mockpve helper archives. mise installs it (per mise.toml) onto PATH.
       - name: Set up mise (for syft)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5
         with:
           experimental: true
 
