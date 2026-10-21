@@ -10,6 +10,10 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 - *(impl-0008)* Close the ledger — v0.12.0 shipped, consumer-exercised
 
+### Miscellaneous Tasks
+
+- Remove .forge-lock.hcl
+
 ## [0.12.0] - 2026-08-27
 
 ### Features
@@ -268,6 +272,89 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 - *(dogfood)* Pin the dogfood recipes to pvelab v0.6.0 (IMPL-0002 Phase 4)
 
+## [0.6.0] - 2026-07-12
+
+### Features
+
+- *(qemu)* ConvertToTemplate with maybe-UPID hedge
+- *(pvelab)* Nested.template config block (VMID sub-range 9210-9219)
+- *(pvelab)* Lab.BuildTemplate/FindTemplate — template build core
+- *(pvelab)* Template build subcommand
+- *(pvelab)* CloneNodeVMs + serialized clone re-identify pass
+- *(pvelab)* Up provisions via linked clones when the template exists
+- *(integration)* Certification.yaml — first mockpve certification entry
+
+### Bug Fixes
+
+- *(pvelab)* Gate each cluster join on runtime quorum, not config presence
+- *(console)* Dial the vncwebsocket path the ticket is bound to
+- *(ha,pverr,integration)* Act on the second live inner-suite run
+
+### Refactor
+
+- *(pvelab)* Apply go-style review findings on the Phase 5 surface
+
+### Documentation
+
+- *(impl)* Check off IMPL-0002 Phase 5 task 1 with dated note
+- *(testing)* Template/linked-clone walkthrough + Phase 5 task 2 ledger note
+- *(testing)* Certification runbook (drift -> dogfood -> refresh -> re-certify)
+- *(inv)* Park INV-0003 — reusable answer-server package idea
+- *(pvelab)* Record the first live formation — P2 live boxes closed
+- *(impl)* Flip the Phase 3 dogfood-run box its pass note already recorded
+- *(impl)* Phase 1 acceptance cycle complete — box + criteria checked
+
+### Testing
+
+- *(integration)* Land the live P4 placement cassette; close P4+P6 in the ledgers
+
+## [0.5.1] - 2026-07-12
+
+### Miscellaneous Tasks
+
+- *(release)* Guard .goreleaser.yml against a pvelab builds entry
+
+## [0.5.0] - 2026-07-12
+
+### Features
+
+- *(integration)* Password-credential support (PVE_USERNAME/PVE_PASSWORD)
+- *(integration)* Multi-pair topology scrub (PVE_SCRUB_EXTRA)
+
+### Documentation
+
+- *(testing)* Dogfood-lab walkthrough + testing-reality refresh
+- *(impl)* Check off IMPL-0002 Phase 3 non-live tasks with dated notes
+
+### Testing
+
+- *(integration)* TestResourceAffinityPlacement (scheduler-observed P4)
+- *(integration)* Retire TestResourceAffinityRule + PVE_TEST_HA_SIDS
+- *(integration)* TestConsoleRFB (live RFB greeting over console.Connect)
+
+### Miscellaneous Tasks
+
+- *(just)* Dogfood-test + composite dogfood recipes
+
+## [0.4.0] - 2026-07-12
+
+### Features
+
+- *(cluster)* Cluster create/join config surface
+- *(mockpve)* Cluster-config emulation (create/join-info/join/nodes)
+- *(pvelab)* Cluster formation wired into up (lab/cluster.go)
+
+### Documentation
+
+- *(cluster)* Promote package overview to cover the config ops
+- *(impl)* Check off IMPL-0002 Phase 2 tasks 1-5 with dated notes
+- *(claude)* Dogfood section covers Phase 2 cluster formation
+- *(impl)* Phase 2 task 8 + success-criteria status notes
+
+### Testing
+
+- *(cluster)* Create/join-info/join/membership unit tests
+
 ## [0.3.0] - 2026-07-12
 
 ### Features
@@ -280,63 +367,21 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - *(pvelab)* Blast-radius-guarded teardown; wire cmdDown
 - *(pvelab)* State file + env handoff; wire up/status/env
 - *(pvelab)* Dogfood just recipes, gitignore entries, example config
-- *(cluster)* Cluster create/join config surface
-- *(mockpve)* Cluster-config emulation (create/join-info/join/nodes)
-- *(pvelab)* Cluster formation wired into up (lab/cluster.go)
-- *(integration)* Password-credential support (PVE_USERNAME/PVE_PASSWORD)
-- *(integration)* Multi-pair topology scrub (PVE_SCRUB_EXTRA)
-- *(qemu)* ConvertToTemplate with maybe-UPID hedge
-- *(pvelab)* Nested.template config block (VMID sub-range 9210-9219)
-- *(pvelab)* Lab.BuildTemplate/FindTemplate — template build core
-- *(pvelab)* Template build subcommand
-- *(pvelab)* CloneNodeVMs + serialized clone re-identify pass
-- *(pvelab)* Up provisions via linked clones when the template exists
-- *(integration)* Certification.yaml — first mockpve certification entry
 
 ### Bug Fixes
 
 - *(mockpve)* Persist create-form keys into guest config
 - *(pvelab)* Quote installer-supplied log values; static env-write error
 - *(pvelab)* Use the modeled newline-strip sanitizer for installer log values
-- *(pvelab)* Gate each cluster join on runtime quorum, not config presence
-- *(console)* Dial the vncwebsocket path the ticket is bound to
-- *(ha,pverr,integration)* Act on the second live inner-suite run
 
 ### Refactor
 
 - *(pvelab)* Address style-review findings
-- *(pvelab)* Apply go-style review findings on the Phase 5 surface
 
 ### Documentation
 
 - Pvelab layout + workflow notes; mockpve is the only SHIPPED binary
 - *(impl)* Check the Phase 1 lint/test/changelog gate
-- *(cluster)* Promote package overview to cover the config ops
-- *(impl)* Check off IMPL-0002 Phase 2 tasks 1-5 with dated notes
-- *(claude)* Dogfood section covers Phase 2 cluster formation
-- *(impl)* Phase 2 task 8 + success-criteria status notes
-- *(testing)* Dogfood-lab walkthrough + testing-reality refresh
-- *(impl)* Check off IMPL-0002 Phase 3 non-live tasks with dated notes
-- *(impl)* Check off IMPL-0002 Phase 5 task 1 with dated note
-- *(testing)* Template/linked-clone walkthrough + Phase 5 task 2 ledger note
-- *(testing)* Certification runbook (drift -> dogfood -> refresh -> re-certify)
-- *(inv)* Park INV-0003 — reusable answer-server package idea
-- *(pvelab)* Record the first live formation — P2 live boxes closed
-- *(impl)* Flip the Phase 3 dogfood-run box its pass note already recorded
-- *(impl)* Phase 1 acceptance cycle complete — box + criteria checked
-
-### Testing
-
-- *(cluster)* Create/join-info/join/membership unit tests
-- *(integration)* TestResourceAffinityPlacement (scheduler-observed P4)
-- *(integration)* Retire TestResourceAffinityRule + PVE_TEST_HA_SIDS
-- *(integration)* TestConsoleRFB (live RFB greeting over console.Connect)
-- *(integration)* Land the live P4 placement cassette; close P4+P6 in the ledgers
-
-### Miscellaneous Tasks
-
-- *(just)* Dogfood-test + composite dogfood recipes
-- *(release)* Guard .goreleaser.yml against a pvelab builds entry
 
 ## [0.2.0] - 2026-07-11
 
