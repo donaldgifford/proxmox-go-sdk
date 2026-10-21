@@ -6,6 +6,12 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [unreleased]
 
+### Bug Fixes
+
+- *(deps)* Bump golang.org/x/crypto to v0.56.0
+
+## [0.12.1] - 2026-10-21
+
 ### Documentation
 
 - *(impl-0008)* Close the ledger — v0.12.0 shipped, consumer-exercised
