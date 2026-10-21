@@ -10,6 +10,10 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 - *(deps)* Bump golang.org/x/crypto to v0.56.0
 
+### Miscellaneous Tasks
+
+- *(security)* Pin govulncheck's Go toolchain to go.mod
+
 ## [0.12.1] - 2026-10-21
 
 ### Documentation
