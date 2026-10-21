@@ -18,6 +18,11 @@ jobs:
     steps:
       - uses: donaldgifford/govulncheck-action@v1
         with:
+          # The action defaults go-version-input to "stable", which setup-go
+          # prefers over go-version-file; blank it so go.mod pins the scan.
+          go-version-input: ""
+          go-version-file: go.mod
+          check-latest: false
           # NOTE that we want to produce the SARIF-formatted report, which can then be consumed by other tools ...
           output-format: sarif
           output-file: govulncheck.sarif
