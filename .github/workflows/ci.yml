@@ -35,7 +35,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.11.4
+          version: v2.15.0
 
   test-go:
     name: Test Go
@@ -151,7 +151,7 @@ jobs:
       # skipped — the signs block needs GPG_FINGERPRINT + a key, which are
       # release-only secrets absent from a PR snapshot.
       - name: Validate goreleaser config (snapshot)
-        uses: goreleaser/goreleaser-action@v7.1.0
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
           version: "~> v2"
           args: release --snapshot --skip=publish,sign --clean
